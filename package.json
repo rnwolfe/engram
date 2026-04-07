@@ -10,5 +10,8 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "verify": "bun run build && bun test && bun run lint"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.10"
   }
 }

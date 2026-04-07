@@ -1,0 +1,235 @@
+/**
+ * DDL SQL constants for the .engram file format (SQLite schema).
+ * Schema version: 0.1.0
+ */
+
+export const CREATE_METADATA = `
+CREATE TABLE metadata (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+`;
+
+export const CREATE_ENTITIES = `
+CREATE TABLE entities (
+  _rowid         INTEGER PRIMARY KEY,
+  id             TEXT NOT NULL UNIQUE,
+  canonical_name TEXT NOT NULL,
+  entity_type    TEXT NOT NULL,
+  summary        TEXT,
+  status         TEXT NOT NULL DEFAULT 'active',
+  created_at     TEXT NOT NULL,
+  updated_at     TEXT NOT NULL,
+  owner_id       TEXT
+);
+`;
+
+export const CREATE_ENTITIES_INDEXES = `
+CREATE INDEX idx_entities_type ON entities(entity_type);
+CREATE INDEX idx_entities_name ON entities(canonical_name);
+`;
+
+export const CREATE_ENTITY_ALIASES = `
+CREATE TABLE entity_aliases (
+  id          TEXT PRIMARY KEY,
+  entity_id   TEXT NOT NULL REFERENCES entities(id),
+  alias       TEXT NOT NULL,
+  valid_from  TEXT,
+  valid_until TEXT,
+  episode_id  TEXT REFERENCES episodes(id),
+  created_at  TEXT NOT NULL
+);
+`;
+
+export const CREATE_ENTITY_ALIASES_INDEXES = `
+CREATE INDEX idx_aliases_entity ON entity_aliases(entity_id);
+CREATE INDEX idx_aliases_name ON entity_aliases(alias);
+`;
+
+export const CREATE_EDGES = `
+CREATE TABLE edges (
+  _rowid         INTEGER PRIMARY KEY,
+  id             TEXT NOT NULL UNIQUE,
+  source_id      TEXT NOT NULL REFERENCES entities(id),
+  target_id      TEXT NOT NULL REFERENCES entities(id),
+  relation_type  TEXT NOT NULL,
+  edge_kind      TEXT NOT NULL,
+  fact           TEXT NOT NULL,
+  weight         REAL DEFAULT 1.0,
+  valid_from     TEXT,
+  valid_until    TEXT,
+  created_at     TEXT NOT NULL,
+  invalidated_at TEXT,
+  superseded_by  TEXT REFERENCES edges(id),
+  confidence     REAL DEFAULT 1.0,
+  owner_id       TEXT
+);
+`;
+
+export const CREATE_EDGES_INDEXES = `
+CREATE INDEX idx_edges_source ON edges(source_id);
+CREATE INDEX idx_edges_target ON edges(target_id);
+CREATE INDEX idx_edges_type ON edges(relation_type);
+CREATE INDEX idx_edges_kind ON edges(edge_kind);
+CREATE INDEX idx_edges_valid ON edges(valid_from, valid_until);
+CREATE INDEX idx_edges_active ON edges(invalidated_at) WHERE invalidated_at IS NULL;
+`;
+
+export const CREATE_EPISODES = `
+CREATE TABLE episodes (
+  _rowid            INTEGER PRIMARY KEY,
+  id                TEXT NOT NULL UNIQUE,
+  source_type       TEXT NOT NULL,
+  source_ref        TEXT,
+  content           TEXT NOT NULL,
+  content_hash      TEXT NOT NULL,
+  actor             TEXT,
+  status            TEXT NOT NULL DEFAULT 'active',
+  timestamp         TEXT NOT NULL,
+  ingested_at       TEXT NOT NULL,
+  owner_id          TEXT,
+  extractor_version TEXT NOT NULL,
+  metadata          TEXT
+);
+`;
+
+export const CREATE_EPISODES_INDEXES = `
+CREATE UNIQUE INDEX idx_episodes_identity ON episodes(source_type, source_ref) WHERE source_ref IS NOT NULL;
+CREATE INDEX idx_episodes_source ON episodes(source_type);
+CREATE INDEX idx_episodes_time ON episodes(timestamp);
+CREATE INDEX idx_episodes_hash ON episodes(content_hash);
+`;
+
+export const CREATE_ENTITY_EVIDENCE = `
+CREATE TABLE entity_evidence (
+  entity_id  TEXT NOT NULL REFERENCES entities(id),
+  episode_id TEXT NOT NULL REFERENCES episodes(id),
+  extractor  TEXT NOT NULL,
+  confidence REAL NOT NULL DEFAULT 1.0,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (entity_id, episode_id, extractor)
+);
+`;
+
+export const CREATE_EDGE_EVIDENCE = `
+CREATE TABLE edge_evidence (
+  edge_id    TEXT NOT NULL REFERENCES edges(id),
+  episode_id TEXT NOT NULL REFERENCES episodes(id),
+  extractor  TEXT NOT NULL,
+  confidence REAL NOT NULL DEFAULT 1.0,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (edge_id, episode_id, extractor)
+);
+`;
+
+export const CREATE_EMBEDDINGS = `
+CREATE TABLE embeddings (
+  id          TEXT PRIMARY KEY,
+  target_type TEXT NOT NULL,
+  target_id   TEXT NOT NULL,
+  model       TEXT NOT NULL,
+  dimensions  INTEGER NOT NULL,
+  vector      BLOB NOT NULL,
+  source_text TEXT NOT NULL,
+  created_at  TEXT NOT NULL,
+  UNIQUE(target_type, target_id, model)
+);
+`;
+
+export const CREATE_EMBEDDINGS_INDEXES = `
+CREATE INDEX idx_embeddings_target ON embeddings(target_type, target_id);
+`;
+
+export const CREATE_INGESTION_RUNS = `
+CREATE TABLE ingestion_runs (
+  id                TEXT PRIMARY KEY,
+  source_type       TEXT NOT NULL,
+  source_scope      TEXT NOT NULL,
+  started_at        TEXT NOT NULL,
+  completed_at      TEXT,
+  cursor            TEXT,
+  extractor_version TEXT NOT NULL,
+  episodes_created  INTEGER DEFAULT 0,
+  entities_created  INTEGER DEFAULT 0,
+  edges_created     INTEGER DEFAULT 0,
+  status            TEXT NOT NULL DEFAULT 'running',
+  error             TEXT
+);
+`;
+
+export const CREATE_INGESTION_RUNS_INDEXES = `
+CREATE INDEX idx_runs_scope ON ingestion_runs(source_type, source_scope);
+`;
+
+export const CREATE_FTS_TABLES = `
+CREATE VIRTUAL TABLE entities_fts USING fts5(
+  canonical_name, summary,
+  content=entities, content_rowid=_rowid
+);
+CREATE VIRTUAL TABLE edges_fts USING fts5(
+  fact,
+  content=edges, content_rowid=_rowid
+);
+CREATE VIRTUAL TABLE episodes_fts USING fts5(
+  content,
+  content=episodes, content_rowid=_rowid
+);
+`;
+
+export const CREATE_FTS_TRIGGERS = `
+CREATE TRIGGER entities_ai AFTER INSERT ON entities BEGIN
+  INSERT INTO entities_fts(rowid, canonical_name, summary) VALUES (new._rowid, new.canonical_name, new.summary);
+END;
+CREATE TRIGGER entities_ad AFTER DELETE ON entities BEGIN
+  INSERT INTO entities_fts(entities_fts, rowid, canonical_name, summary) VALUES ('delete', old._rowid, old.canonical_name, old.summary);
+END;
+CREATE TRIGGER entities_au AFTER UPDATE ON entities BEGIN
+  INSERT INTO entities_fts(entities_fts, rowid, canonical_name, summary) VALUES ('delete', old._rowid, old.canonical_name, old.summary);
+  INSERT INTO entities_fts(rowid, canonical_name, summary) VALUES (new._rowid, new.canonical_name, new.summary);
+END;
+CREATE TRIGGER edges_ai AFTER INSERT ON edges BEGIN
+  INSERT INTO edges_fts(rowid, fact) VALUES (new._rowid, new.fact);
+END;
+CREATE TRIGGER edges_ad AFTER DELETE ON edges BEGIN
+  INSERT INTO edges_fts(edges_fts, rowid, fact) VALUES ('delete', old._rowid, old.fact);
+END;
+CREATE TRIGGER edges_au AFTER UPDATE ON edges BEGIN
+  INSERT INTO edges_fts(edges_fts, rowid, fact) VALUES ('delete', old._rowid, old.fact);
+  INSERT INTO edges_fts(rowid, fact) VALUES (new._rowid, new.fact);
+END;
+CREATE TRIGGER episodes_ai AFTER INSERT ON episodes BEGIN
+  INSERT INTO episodes_fts(rowid, content) VALUES (new._rowid, new.content);
+END;
+CREATE TRIGGER episodes_ad AFTER DELETE ON episodes BEGIN
+  INSERT INTO episodes_fts(episodes_fts, rowid, content) VALUES ('delete', old._rowid, old.content);
+END;
+CREATE TRIGGER episodes_au AFTER UPDATE ON episodes BEGIN
+  INSERT INTO episodes_fts(episodes_fts, rowid, content) VALUES ('delete', old._rowid, old.content);
+  INSERT INTO episodes_fts(rowid, content) VALUES (new._rowid, new.content);
+END;
+`;
+
+/**
+ * All DDL statements in the order they must be applied.
+ * Tables with foreign key dependencies come after their referenced tables.
+ */
+export const SCHEMA_DDL: string[] = [
+  CREATE_METADATA,
+  CREATE_ENTITIES,
+  CREATE_ENTITIES_INDEXES,
+  // episodes must come before entity_aliases (which references episodes)
+  CREATE_EPISODES,
+  CREATE_EPISODES_INDEXES,
+  CREATE_ENTITY_ALIASES,
+  CREATE_ENTITY_ALIASES_INDEXES,
+  CREATE_EDGES,
+  CREATE_EDGES_INDEXES,
+  CREATE_ENTITY_EVIDENCE,
+  CREATE_EDGE_EVIDENCE,
+  CREATE_EMBEDDINGS,
+  CREATE_EMBEDDINGS_INDEXES,
+  CREATE_INGESTION_RUNS,
+  CREATE_INGESTION_RUNS_INDEXES,
+  CREATE_FTS_TABLES,
+  CREATE_FTS_TRIGGERS,
+];

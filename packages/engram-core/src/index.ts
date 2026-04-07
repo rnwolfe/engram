@@ -6,3 +6,12 @@
 
 export const FORMAT_VERSION = "0.1.0";
 export const ENGINE_VERSION = "0.1.0";
+
+export type { CreateOpts, EngramGraph } from "./format/index.js";
+export {
+  closeGraph,
+  createGraph,
+  EngramFormatError,
+  openGraph,
+  SCHEMA_DDL,
+} from "./format/index.js";
