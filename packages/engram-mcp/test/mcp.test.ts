@@ -5,9 +5,9 @@
  * Does not test the full stdio protocol.
  */
 
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { EngramGraph } from "engram-core";
-import { createGraph } from "engram-core";
+import { closeGraph, createGraph } from "engram-core";
 import { readRecentEpisodes, readStats } from "../src/resources.js";
 import { handleGetContext } from "../src/tools/context.js";
 import { handleGetDecay } from "../src/tools/decay.js";
@@ -72,6 +72,10 @@ describe("engram MCP tool handlers", () => {
 
   beforeEach(() => {
     graph = createGraph(":memory:");
+  });
+
+  afterEach(() => {
+    if (graph) closeGraph(graph);
   });
 
   // Write tools

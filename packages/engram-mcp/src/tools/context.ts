@@ -8,6 +8,7 @@ import {
   type Edge,
   type EngramGraph,
   type Entity,
+  EntityNotFoundError,
   type Episode,
   getEdge,
   getEntity,
@@ -115,6 +116,8 @@ export function handleGetContext(
     }
   }
 
+  const MAX_FANOUT = 50;
+
   // Step 3: Fan-out 1-hop traversal from top 3 entity search results
   for (const entityId of top3EntityIds) {
     try {
@@ -123,9 +126,12 @@ export function handleGetContext(
         valid_at: input.valid_at,
       });
 
+      let fanoutCount = 0;
       for (const entity of subgraph.entities) {
+        if (fanoutCount >= MAX_FANOUT) break;
         if (!entityScores.has(entity.id)) {
           entityScores.set(entity.id, 0.3);
+          fanoutCount++;
         }
       }
 
@@ -134,8 +140,12 @@ export function handleGetContext(
           edgeScores.set(edge.id, 0.3);
         }
       }
-    } catch {
-      // Entity may not exist — skip
+    } catch (err) {
+      if (err instanceof EntityNotFoundError) {
+        // Entity may not exist — skip
+        continue;
+      }
+      throw err;
     }
   }
 
