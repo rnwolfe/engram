@@ -2,6 +2,8 @@
  * metrics.ts — Retrieval quality metrics and result types for EngRAMark.
  */
 
+import type { QueryType } from "./datasets/fastify/questions.js";
+
 // ─── Core metric types ────────────────────────────────────────────────────────
 
 export interface RetrievalMetrics {
@@ -16,7 +18,7 @@ export interface RetrievalMetrics {
 export interface BenchmarkResult {
   baseline: string;
   category: string;
-  query_type: string;
+  query_type: QueryType;
   question_id: string;
   question: string;
   retrieved_entities: string[];

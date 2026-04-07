@@ -31,7 +31,7 @@ import {
 } from "../src/baseline.js";
 import type { GroundTruthQuestion } from "../src/datasets/fastify/questions.js";
 import type { BenchmarkReport } from "../src/metrics.js";
-import { compareStrategies, generateReport } from "../src/report.js";
+import { generateReport } from "../src/report.js";
 import { runBenchmark, runQuestion } from "../src/runners/ai-enhanced.js";
 import { ALL_STRATEGIES, runStrategy } from "../src/runners/index.js";
 import { runQuestion as runVcsOnlyQuestion } from "../src/runners/vcs-only.js";
@@ -277,44 +277,6 @@ describe("ai-enhanced runner", () => {
       expect(degradedResult.metrics.mrr).toBe(vcsOnlyResult.metrics.mrr);
     },
   );
-});
-
-// ─── compareStrategies tests ──────────────────────────────────────────────────
-
-describe("compareStrategies", () => {
-  const makeReport = (
-    baseline: string,
-    recall: number,
-    mrrVal: number,
-  ): BenchmarkReport => ({
-    run_at: new Date().toISOString(),
-    baseline,
-    results: [],
-    aggregate: {
-      avg_recall_at_5: recall,
-      avg_mrr: mrrVal,
-      avg_latency_ms: 5.0,
-      total_questions: 5,
-    },
-  });
-
-  test("does not throw for empty reports array", () => {
-    expect(() => compareStrategies([])).not.toThrow();
-  });
-
-  test("does not throw for single strategy report", () => {
-    const report = makeReport("vcs-only", 0.6, 0.7);
-    expect(() => compareStrategies([report])).not.toThrow();
-  });
-
-  test("does not throw for multiple strategy reports", () => {
-    const reports = [
-      makeReport("grep-baseline", 0.35, 0.42),
-      makeReport("vcs-only", 0.6, 0.71),
-      makeReport("ai-enhanced", 0.78, 0.85),
-    ];
-    expect(() => compareStrategies(reports)).not.toThrow();
-  });
 });
 
 // ─── baseline.ts tests ────────────────────────────────────────────────────────

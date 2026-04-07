@@ -171,7 +171,7 @@ export function compareStrategies(reports: BenchmarkReport[]): void {
 
 // ─── Stratified breakdown helpers ─────────────────────────────────────────────
 
-interface TypeMetrics {
+export interface TypeMetrics {
   count: number;
   avg_recall: number;
   avg_mrr: number;
@@ -180,7 +180,7 @@ interface TypeMetrics {
 /**
  * Compute average recall and MRR for a subset of results.
  */
-function aggregateByType(results: BenchmarkResult[]): TypeMetrics {
+export function aggregateByType(results: BenchmarkResult[]): TypeMetrics {
   const n = results.length;
   if (n === 0) return { count: 0, avg_recall: 0, avg_mrr: 0 };
   const recall = results.reduce((s, r) => s + r.metrics.recall_at_k, 0) / n;
