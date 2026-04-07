@@ -5,8 +5,8 @@
  * valid = true means no error-severity violations (warnings are acceptable).
  */
 
-import { FORMAT_VERSION } from "../index.js";
 import type { EngramGraph } from "./graph.js";
+import { FORMAT_VERSION } from "./version.js";
 
 export type ViolationSeverity = "error" | "warning";
 
@@ -33,14 +33,18 @@ const REQUIRED_METADATA_KEYS = [
 function checkMetadata(graph: EngramGraph): Violation[] {
   const violations: Violation[] = [];
 
-  for (const key of REQUIRED_METADATA_KEYS) {
-    const row = graph.db
-      .query<{ value: string }, [string]>(
-        "SELECT value FROM metadata WHERE key = ?",
-      )
-      .get(key);
+  // Batch fetch all required metadata keys in a single query
+  const placeholders = REQUIRED_METADATA_KEYS.map(() => "?").join(", ");
+  const rows = graph.db
+    .query<{ key: string; value: string }, string[]>(
+      `SELECT key, value FROM metadata WHERE key IN (${placeholders})`,
+    )
+    .all(...(REQUIRED_METADATA_KEYS as unknown as string[]));
 
-    if (!row) {
+  const found = new Map(rows.map((r) => [r.key, r.value]));
+
+  for (const key of REQUIRED_METADATA_KEYS) {
+    if (!found.has(key)) {
       violations.push({
         check: "checkMetadata",
         message: `Required metadata key '${key}' is missing`,
@@ -49,16 +53,11 @@ function checkMetadata(graph: EngramGraph): Violation[] {
     }
   }
 
-  const versionRow = graph.db
-    .query<{ value: string }, [string]>(
-      "SELECT value FROM metadata WHERE key = ?",
-    )
-    .get("format_version");
-
-  if (versionRow && versionRow.value !== FORMAT_VERSION) {
+  const formatVersion = found.get("format_version");
+  if (formatVersion && formatVersion !== FORMAT_VERSION) {
     violations.push({
       check: "checkMetadata",
-      message: `Unrecognized format_version '${versionRow.value}' (engine supports '${FORMAT_VERSION}')`,
+      message: `Unrecognized format_version '${formatVersion}' (engine supports '${FORMAT_VERSION}')`,
       severity: "error",
     });
   }
