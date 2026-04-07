@@ -6,3 +6,39 @@
 
 export const FORMAT_VERSION = "0.1.0";
 export const ENGINE_VERSION = "0.1.0";
+
+export type { CreateOpts, EngramGraph } from "./format/index.js";
+export {
+  closeGraph,
+  createGraph,
+  EngramFormatError,
+  openGraph,
+  SCHEMA_DDL,
+} from "./format/index.js";
+export type {
+  Edge,
+  EdgeInput,
+  Entity,
+  EntityInput,
+  Episode,
+  EpisodeInput,
+  EvidenceInput,
+  EvidenceLink,
+  FindEdgesQuery,
+  FindEntitiesQuery,
+} from "./graph/index.js";
+export {
+  addEdge,
+  addEntity,
+  addEpisode,
+  EdgeNotFoundError,
+  EntityNotFoundError,
+  EvidenceRequiredError,
+  findEdges,
+  findEntities,
+  getEdge,
+  getEntity,
+  getEpisode,
+  getEvidenceForEdge,
+  getEvidenceForEntity,
+} from "./graph/index.js";
