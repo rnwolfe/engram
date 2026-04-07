@@ -144,6 +144,7 @@ export function getPath(
   }
 
   const MAX_DEPTH = 10;
+  const maxHops = Math.min(opts.depth ?? MAX_DEPTH, MAX_DEPTH);
 
   // BFS state: track parent entity and edge used to reach each entity
   const visited = new Set<string>([from_id]);
@@ -151,7 +152,7 @@ export function getPath(
 
   let frontier: string[] = [from_id];
 
-  for (let hop = 0; hop < MAX_DEPTH; hop++) {
+  for (let hop = 0; hop < maxHops; hop++) {
     if (frontier.length === 0) break;
 
     const nextFrontier: string[] = [];
@@ -204,7 +205,10 @@ function reconstructPath(
   let current = to_id;
   while (current !== from_id) {
     const p = parent.get(current);
-    if (!p) break;
+    if (!p) {
+      // Incomplete path — return not-found instead of partial result
+      return { found: false, entities: [], edges: [], length: 0 };
+    }
     pathEdges.unshift(p.edge);
     pathEntityIds.unshift(p.entityId);
     current = p.entityId;
