@@ -63,7 +63,7 @@ implementations over that contract.
 
 ## AI-Enhanced Mode
 
-Engram works without any AI configured. With an AI provider, it generates embeddings for entities and episodes during ingest, and blends vector similarity into search scores.
+Engram works without any AI configured. With an AI provider, it generates embeddings for episodes during ingest (entity embeddings deferred to a future release), and blends vector similarity into search scores.
 
 ### Providers
 
@@ -86,7 +86,7 @@ ENGRAM_AI_PROVIDER=ollama engram search "who owns the auth module"
 ENGRAM_AI_PROVIDER=gemini GEMINI_API_KEY=<your-key> engram search "who owns the auth module"
 
 # Ingest with embeddings
-ENGRAM_AI_PROVIDER=ollama engram ingest git --path .
+ENGRAM_AI_PROVIDER=ollama engram ingest git .
 ```
 
 Engram degrades gracefully: if the provider is offline or the key is missing, it logs a warning and falls back to null behavior. Embedding failures never corrupt the graph.

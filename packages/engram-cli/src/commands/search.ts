@@ -8,7 +8,7 @@
 import * as path from "node:path";
 import type { Command } from "commander";
 import type { EngramGraph, SearchResult } from "engram-core";
-import { closeGraph, openGraph, search } from "engram-core";
+import { closeGraph, createProvider, openGraph, search } from "engram-core";
 
 interface SearchOpts {
   limit: string;
@@ -49,11 +49,14 @@ export function registerSearch(program: Command): void {
         process.exit(1);
       }
 
+      const provider = createProvider();
+
       let results: SearchResult[];
       try {
         results = await search(graph, query, {
           limit,
           valid_at: opts.validAt,
+          provider,
         });
         closeGraph(graph);
       } catch (err) {
