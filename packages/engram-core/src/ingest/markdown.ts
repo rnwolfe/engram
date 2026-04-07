@@ -9,8 +9,8 @@ import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { EngramGraph } from "../format/index.js";
+import { ENGINE_VERSION } from "../format/version.js";
 import { addEpisode } from "../graph/episodes.js";
-import { ENGINE_VERSION } from "../index.js";
 import type { IngestResult } from "./git.js";
 
 // ---------------------------------------------------------------------------
@@ -27,7 +27,7 @@ export interface MarkdownIngestOpts {
 // ---------------------------------------------------------------------------
 
 function isGlobPattern(input: string): boolean {
-  return input.includes("*") || input.includes("?") || input.includes("{");
+  return input.includes("*") || input.includes("?");
 }
 
 /**
@@ -40,9 +40,8 @@ async function expandPaths(input: string): Promise<string[]> {
     return [input];
   }
 
-  const lastSlash = input.lastIndexOf("/");
-  const dir = lastSlash >= 0 ? input.slice(0, lastSlash) : ".";
-  const pattern = lastSlash >= 0 ? input.slice(lastSlash + 1) : input;
+  const dir = path.dirname(input);
+  const pattern = path.basename(input);
 
   // Convert glob pattern to regex (supports * and ? only)
   const regexStr = pattern
@@ -98,15 +97,13 @@ export async function ingestMarkdown(
 
     // Validate path exists and is a file
     if (!fs.existsSync(absolutePath)) {
-      console.warn(`ingestMarkdown: file not found, skipping: ${absolutePath}`);
+      // Skip silently — file may have been deleted since glob expansion
       continue;
     }
 
     const stat = fs.statSync(absolutePath);
     if (!stat.isFile()) {
-      console.warn(
-        `ingestMarkdown: path is not a file, skipping: ${absolutePath}`,
-      );
+      // Skip silently — not a regular file
       continue;
     }
 

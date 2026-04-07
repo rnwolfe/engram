@@ -7,8 +7,8 @@
 
 import { createHash } from "node:crypto";
 import type { EngramGraph } from "../format/index.js";
+import { ENGINE_VERSION } from "../format/version.js";
 import { addEpisode } from "../graph/episodes.js";
-import { ENGINE_VERSION } from "../index.js";
 import type { IngestResult } from "./git.js";
 
 // ---------------------------------------------------------------------------
@@ -75,21 +75,9 @@ export async function ingestText(
       counts.episodesSkipped++;
       return counts;
     }
-  } else {
-    // No source_ref — advisory content hash check
-    const existingByHash = graph.db
-      .query<{ id: string }, [string, string]>(
-        "SELECT id FROM episodes WHERE source_type = ? AND content_hash = ?",
-      )
-      .get("manual", contentHash);
-
-    if (existingByHash) {
-      console.warn(
-        `ingestText: content hash ${contentHash.slice(0, 8)} already exists (episode ${existingByHash.id}). ` +
-          "Creating new episode anyway — provide source_ref for strict dedup.",
-      );
-    }
   }
+  // No source_ref — proceed with insert even if content hash matches an existing episode.
+  // Callers who want strict dedup should provide source_ref.
 
   addEpisode(graph, {
     source_type: "manual",
