@@ -40,9 +40,9 @@
     }
   },
   "scripts": {
-    "build": "bun build src/report.ts src/metrics.ts src/baseline.ts src/runners/vcs-only.ts src/runners/grep-baseline.ts src/runners/ai-enhanced.ts src/runners/index.ts src/datasets/fastify/questions.ts --outdir dist --target node",
+    "build": "bun build src/report.ts src/metrics.ts src/baseline.ts src/runners/vcs-only.ts src/runners/grep-baseline.ts src/runners/ai-enhanced.ts src/runners/index.ts src/datasets/fastify/questions.ts src/bench.ts src/fixtures/fastify.ts --outdir dist --target node",
     "test": "bun test",
-    "bench": "bun run src/report.ts"
+    "bench": "bun run src/bench.ts"
   },
   "dependencies": {
     "engram-core": "workspace:*"
