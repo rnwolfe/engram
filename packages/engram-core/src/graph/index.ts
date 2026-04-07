@@ -7,6 +7,13 @@ export { addEntityAlias, resolveEntity } from "./aliases.js";
 export type { Edge, EdgeInput, FindEdgesQuery } from "./edges.js";
 export { addEdge, findEdges, getEdge } from "./edges.js";
 export type {
+  EmbeddingTargetType,
+  FindSimilarOpts,
+  SimilarResult,
+  StoredEmbedding,
+} from "./embeddings.js";
+export { cosineSimilarity, findSimilar, storeEmbedding } from "./embeddings.js";
+export type {
   Entity,
   EntityInput,
   EvidenceInput,
@@ -20,6 +27,5 @@ export {
   EntityNotFoundError,
   EvidenceRequiredError,
 } from "./errors.js";
-
 export type { EvidenceLink } from "./evidence.js";
 export { getEvidenceForEdge, getEvidenceForEntity } from "./evidence.js";

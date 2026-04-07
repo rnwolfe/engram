@@ -2,7 +2,12 @@
  * tools/search.ts — engram_search MCP tool implementation.
  */
 
-import { type EngramGraph, type SearchResult, search } from "engram-core";
+import {
+  createProvider,
+  type EngramGraph,
+  type SearchResult,
+  search,
+} from "engram-core";
 
 export const SEARCH_TOOL = {
   name: "engram_search",
@@ -63,10 +68,11 @@ export interface SearchInput {
   scope?: string;
 }
 
-export function handleSearch(
+export async function handleSearch(
   graph: EngramGraph,
   input: SearchInput,
-): SearchResult[] {
+): Promise<SearchResult[]> {
+  const provider = createProvider();
   return search(graph, input.query, {
     limit: input.limit,
     mode: input.mode,
@@ -74,5 +80,6 @@ export function handleSearch(
     edge_kinds: input.edge_kinds,
     valid_at: input.valid_at,
     min_confidence: input.min_confidence,
+    provider,
   });
 }

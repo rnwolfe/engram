@@ -5,6 +5,7 @@
  */
 
 import {
+  createProvider,
   type Edge,
   type EngramGraph,
   type Entity,
@@ -77,17 +78,19 @@ function estimateTokens(obj: unknown): number {
   return Math.ceil(JSON.stringify(obj).length / 4);
 }
 
-export function handleGetContext(
+export async function handleGetContext(
   graph: EngramGraph,
   input: GetContextInput,
-): ContextResult {
+): Promise<ContextResult> {
   const maxTokens = input.max_tokens ?? 4000;
+  const provider = createProvider();
 
   // Step 1: Hybrid search top 10
-  const searchResults: SearchResult[] = search(graph, input.query, {
+  const searchResults: SearchResult[] = await search(graph, input.query, {
     mode: "hybrid",
     limit: 10,
     valid_at: input.valid_at,
+    provider,
   });
 
   // Step 2: Extract top-3 entity IDs for fan-out traversal

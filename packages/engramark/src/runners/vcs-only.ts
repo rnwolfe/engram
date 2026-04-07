@@ -22,13 +22,13 @@ export const BASELINE_NAME = "vcs-only";
  * @param question - Ground-truth question.
  * @returns BenchmarkResult with metrics and latency.
  */
-export function runQuestion(
+export async function runQuestion(
   graph: EngramGraph,
   question: GroundTruthQuestion,
-): BenchmarkResult {
+): Promise<BenchmarkResult> {
   const start = performance.now();
 
-  const results = search(graph, question.question, {
+  const results = await search(graph, question.question, {
     limit: 10,
     mode: "fulltext",
   });
@@ -67,10 +67,12 @@ export function runQuestion(
  * @param questions - Ground-truth questions to evaluate.
  * @returns BenchmarkReport with per-question results and aggregate metrics.
  */
-export function runBenchmark(
+export async function runBenchmark(
   graph: EngramGraph,
   questions: GroundTruthQuestion[],
-): BenchmarkReport {
-  const results = questions.map((q) => runQuestion(graph, q));
+): Promise<BenchmarkReport> {
+  const results = await Promise.all(
+    questions.map((q) => runQuestion(graph, q)),
+  );
   return generateReport(results, BASELINE_NAME);
 }

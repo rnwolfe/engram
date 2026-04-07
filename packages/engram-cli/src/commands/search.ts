@@ -8,7 +8,7 @@
 import * as path from "node:path";
 import type { Command } from "commander";
 import type { EngramGraph, SearchResult } from "engram-core";
-import { closeGraph, openGraph, search } from "engram-core";
+import { closeGraph, createProvider, openGraph, search } from "engram-core";
 
 interface SearchOpts {
   limit: string;
@@ -25,7 +25,7 @@ export function registerSearch(program: Command): void {
     .option("--valid-at <iso>", "filter edges valid at this ISO8601 timestamp")
     .option("--format <fmt>", "output format: text or json", "text")
     .option("--db <path>", "path to .engram file", ".engram")
-    .action((query: string, opts: SearchOpts) => {
+    .action(async (query: string, opts: SearchOpts) => {
       const dbPath = path.resolve(opts.db);
       const limit = parseInt(opts.limit, 10);
 
@@ -49,11 +49,14 @@ export function registerSearch(program: Command): void {
         process.exit(1);
       }
 
+      const provider = createProvider();
+
       let results: SearchResult[];
       try {
-        results = search(graph, query, {
+        results = await search(graph, query, {
           limit,
           valid_at: opts.validAt,
+          provider,
         });
         closeGraph(graph);
       } catch (err) {

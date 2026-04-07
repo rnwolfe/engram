@@ -7,6 +7,13 @@
 export const FORMAT_VERSION = "0.1.0";
 export const ENGINE_VERSION = "0.1.0";
 
+export type { AIConfig, AIProvider, EntityHint } from "./ai/index.js";
+export {
+  createProvider,
+  GeminiProvider,
+  NullProvider,
+  OllamaProvider,
+} from "./ai/index.js";
 export type {
   CreateOpts,
   EngramGraph,
@@ -27,6 +34,7 @@ export type {
   AliasInput,
   Edge,
   EdgeInput,
+  EmbeddingTargetType,
   Entity,
   EntityInput,
   Episode,
@@ -35,23 +43,29 @@ export type {
   EvidenceLink,
   FindEdgesQuery,
   FindEntitiesQuery,
+  FindSimilarOpts,
+  SimilarResult,
+  StoredEmbedding,
 } from "./graph/index.js";
 export {
   addEdge,
   addEntity,
   addEntityAlias,
   addEpisode,
+  cosineSimilarity,
   EdgeNotFoundError,
   EntityNotFoundError,
   EvidenceRequiredError,
   findEdges,
   findEntities,
+  findSimilar,
   getEdge,
   getEntity,
   getEpisode,
   getEvidenceForEdge,
   getEvidenceForEntity,
   resolveEntity,
+  storeEmbedding,
 } from "./graph/index.js";
 export type { EnrichmentAdapter, EnrichOpts } from "./ingest/adapter.js";
 export { GitHubAdapter } from "./ingest/adapters/github.js";

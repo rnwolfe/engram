@@ -84,7 +84,7 @@ export function createServer(dbPath: string) {
     tools: ALL_TOOLS,
   }));
 
-  server.setRequestHandler(CallToolRequestSchema, (request) => {
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
     const input = (args ?? {}) as Record<string, unknown>;
 
@@ -93,13 +93,13 @@ export function createServer(dbPath: string) {
 
       switch (name) {
         case "engram_search":
-          result = handleSearch(graph, input as SearchInput);
+          result = await handleSearch(graph, input as SearchInput);
           break;
         case "engram_get_entity":
           result = handleGetEntity(graph, input as GetEntityInput);
           break;
         case "engram_get_context":
-          result = handleGetContext(graph, input as GetContextInput);
+          result = await handleGetContext(graph, input as GetContextInput);
           break;
         case "engram_get_decay":
           result = handleGetDecay(graph, input as GetDecayInput);

@@ -16,6 +16,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@google/genai": "^1.48.0",
     "ulid": "^2.3.0"
   }
 }

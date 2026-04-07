@@ -9,6 +9,8 @@ import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { ulid } from "ulid";
+import type { AIProvider } from "../ai/provider.js";
+import { generateEpisodeEmbeddings } from "../ai/utils.js";
 import type { EngramGraph } from "../format/index.js";
 import { ENGINE_VERSION } from "../format/version.js";
 import { resolveEntity } from "../graph/aliases.js";
@@ -31,6 +33,8 @@ export interface GitIngestOpts {
   path_filter?: string[];
   /** Min shared commits for co-change edge (default 3) */
   cochange_threshold?: number;
+  /** AI provider for post-ingest embedding generation (best-effort, never blocks ingest) */
+  provider?: AIProvider;
 }
 
 export interface IngestResult {
@@ -719,6 +723,13 @@ export async function ingestGitRepo(
       entities: counts.entitiesCreated,
       edges: counts.edgesCreated,
     });
+
+    // Post-ingest: generate embeddings for new episodes (best-effort, never blocks)
+    if (opts.provider && counts.episodesCreated > 0) {
+      await generateEpisodeEmbeddings(graph, opts.provider, [
+        ...episodeIds.values(),
+      ]);
+    }
 
     return { ...counts, runId };
   } catch (err: unknown) {

@@ -25,11 +25,11 @@ const WEIGHTS_FULLTEXT = {
 };
 
 const WEIGHTS_HYBRID = {
-  fts: 0.35,
-  evidence: 0.3,
-  temporal: 0.2,
-  graph: 0.15,
-  vector: 0.0,
+  fts: 0.25,
+  evidence: 0.25,
+  temporal: 0.15,
+  graph: 0.1,
+  vector: 0.25,
 };
 
 /**

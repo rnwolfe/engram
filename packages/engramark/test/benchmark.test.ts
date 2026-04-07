@@ -320,7 +320,7 @@ describe("printReport", () => {
 // ─── VCS-only runner integration test ────────────────────────────────────────
 
 describe("vcs-only runner", () => {
-  test("runQuestion returns a valid BenchmarkResult", () => {
+  test("runQuestion returns a valid BenchmarkResult", async () => {
     const question: GroundTruthQuestion = {
       id: "test-own-001",
       category: "ownership",
@@ -328,7 +328,7 @@ describe("vcs-only runner", () => {
       expected_entities: ["Matteo Collina", "fastify/fastify.js"],
     };
 
-    const result = vcsRunQuestion(graph, question);
+    const result = await vcsRunQuestion(graph, question);
 
     expect(result.baseline).toBe("vcs-only");
     expect(result.question_id).toBe("test-own-001");
@@ -342,7 +342,7 @@ describe("vcs-only runner", () => {
     expect(result.metrics.avg_context_size).toBeGreaterThanOrEqual(0);
   });
 
-  test("retrieves Matteo Collina for ownership question", () => {
+  test("retrieves Matteo Collina for ownership question", async () => {
     const question: GroundTruthQuestion = {
       id: "test-own-002",
       category: "ownership",
@@ -351,7 +351,7 @@ describe("vcs-only runner", () => {
       expected_entities: ["Matteo Collina"],
     };
 
-    const result = vcsRunQuestion(graph, question);
+    const result = await vcsRunQuestion(graph, question);
     // recall_at_k should be > 0 since we have Matteo in the graph
     expect(result.metrics.recall_at_k).toBeGreaterThan(0);
   });
@@ -359,7 +359,7 @@ describe("vcs-only runner", () => {
   test("runBenchmark returns full report for subset of questions", async () => {
     const { runBenchmark } = await import("../src/runners/vcs-only.js");
     const subset = FASTIFY_QUESTIONS.slice(0, 3);
-    const report = runBenchmark(graph, subset);
+    const report = await runBenchmark(graph, subset);
 
     expect(report.baseline).toBe("vcs-only");
     expect(report.results).toHaveLength(3);

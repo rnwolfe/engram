@@ -4,9 +4,12 @@
  * Searches across entities, edges, and episodes using FTS5.
  * Scores results using a composite of FTS rank, evidence strength,
  * temporal recency, and graph connectivity.
+ * When provider is set, also performs vector similarity search.
  */
 
+import type { AIProvider } from "../ai/provider.js";
 import type { EngramGraph } from "../format/index.js";
+import { findSimilar } from "../graph/embeddings.js";
 import type { ScoreComponents } from "./scoring.js";
 import {
   computeCompositeScore,
@@ -26,6 +29,7 @@ export interface SearchOpts {
   edge_kinds?: string[]; // 'observed' | 'inferred' | 'asserted' (edges only)
   include_invalidated?: boolean; // default false
   mode?: "fulltext" | "hybrid"; // default 'fulltext'
+  provider?: AIProvider; // when set, enables vector similarity search
 }
 
 export interface SearchResult {
@@ -246,12 +250,13 @@ function getEntityEdgeCount(graph: EngramGraph, entityId: string): number {
 /**
  * Search the graph using full-text search across entities, edges, and episodes.
  * Returns results sorted by composite score descending.
+ * When opts.provider is set, also performs vector similarity search and merges results.
  */
-export function search(
+export async function search(
   graph: EngramGraph,
   query: string,
   opts: SearchOpts = {},
-): SearchResult[] {
+): Promise<SearchResult[]> {
   const limit = opts.limit ?? 20;
   const minConfidence = opts.min_confidence ?? 0.0;
   const mode = opts.mode ?? "fulltext";
@@ -296,6 +301,30 @@ export function search(
     episodeRows.map((r) => r.rank),
   );
 
+  // Build vector similarity map when provider is set and produces a valid embedding
+  const vectorScoreMap = new Map<string, number>();
+  let vectorSimilarResults: Array<{ target_id: string; score: number }> = [];
+  let effectiveMode = mode;
+  if (opts.provider) {
+    try {
+      const queryEmbeddings = await opts.provider.embed([query]);
+      if (queryEmbeddings.length > 0 && queryEmbeddings[0].length > 0) {
+        // Only enable hybrid mode when a real embedding was produced
+        effectiveMode = "hybrid";
+        // v0.1 limitation: brute-force scan is capped at 100 embeddings.
+        // Acceptable for small graphs (<50k embeddings); revisit if performance degrades.
+        const similar = findSimilar(graph, queryEmbeddings[0], { limit: 100 });
+        vectorSimilarResults = similar;
+        for (const result of similar) {
+          vectorScoreMap.set(result.target_id, result.score);
+        }
+      }
+      // If embed() returned [] or [[]] (empty vector), effectiveMode stays as-is (FTS-only)
+    } catch {
+      // Provider failure is non-fatal — fall back to FTS-only
+    }
+  }
+
   const results: SearchResult[] = [];
 
   // Build entity results
@@ -307,16 +336,17 @@ export function search(
     const evidenceScore = normalizeEvidenceCount(provenance.length);
     const edgeCount = getEntityEdgeCount(graph, row.id);
     const graphScore = normalizeGraphScore(edgeCount);
+    const vectorScore = vectorScoreMap.get(row.id) ?? 0.0;
 
     const components: ScoreComponents = {
       fts_score: ftsScore,
       graph_score: graphScore,
       temporal_score: temporalScore,
       evidence_score: evidenceScore,
-      vector_score: 0.0,
+      vector_score: vectorScore,
     };
 
-    const score = computeCompositeScore(components, mode);
+    const score = computeCompositeScore(components, effectiveMode);
 
     results.push({
       type: "entity",
@@ -335,16 +365,17 @@ export function search(
     const temporalScore = computeTemporalScore(row.created_at, now);
     const provenance = getEdgeProvenance(graph, row.id);
     const evidenceScore = normalizeEvidenceCount(provenance.length);
+    const vectorScore = vectorScoreMap.get(row.id) ?? 0.0;
 
     const components: ScoreComponents = {
       fts_score: ftsScore,
       graph_score: 0.0,
       temporal_score: temporalScore,
       evidence_score: evidenceScore,
-      vector_score: 0.0,
+      vector_score: vectorScore,
     };
 
-    const score = computeCompositeScore(components, mode);
+    const score = computeCompositeScore(components, effectiveMode);
 
     results.push({
       type: "edge",
@@ -362,16 +393,17 @@ export function search(
     const row = episodeRows[i];
     const ftsScore = episodeNormalizedRanks[i];
     const temporalScore = computeTemporalScore(row.timestamp, now);
+    const vectorScore = vectorScoreMap.get(row.id) ?? 0.0;
 
     const components: ScoreComponents = {
       fts_score: ftsScore,
       graph_score: 0.0,
       temporal_score: temporalScore,
       evidence_score: 1.0,
-      vector_score: 0.0,
+      vector_score: vectorScore,
     };
 
-    const score = computeCompositeScore(components, mode);
+    const score = computeCompositeScore(components, effectiveMode);
 
     // Truncate content to a reasonable snippet
     const snippet =
@@ -385,6 +417,126 @@ export function search(
       content: snippet,
       provenance: [row.id],
     });
+  }
+
+  // Union in vector-only matches: items found by findSimilar but not in FTS results
+  if (effectiveMode === "hybrid" && vectorSimilarResults.length > 0) {
+    const ftsResultIds = new Set(results.map((r) => r.id));
+
+    for (const simResult of vectorSimilarResults) {
+      if (ftsResultIds.has(simResult.target_id)) continue;
+
+      // Resolve item type and content from graph
+      // Try entity first, then edge, then episode
+      const entity = graph.db
+        .query<
+          {
+            id: string;
+            canonical_name: string;
+            updated_at: string;
+            entity_type: string;
+          },
+          [string]
+        >(
+          "SELECT id, canonical_name, updated_at, entity_type FROM entities WHERE id = ? AND status = 'active'",
+        )
+        .get(simResult.target_id);
+
+      if (entity) {
+        const temporalScore = computeTemporalScore(entity.updated_at, now);
+        const provenance = getEntityProvenance(graph, entity.id);
+        const evidenceScore = normalizeEvidenceCount(provenance.length);
+        const edgeCount = getEntityEdgeCount(graph, entity.id);
+        const graphScore = normalizeGraphScore(edgeCount);
+
+        const components: ScoreComponents = {
+          fts_score: 0.0,
+          graph_score: graphScore,
+          temporal_score: temporalScore,
+          evidence_score: evidenceScore,
+          vector_score: simResult.score,
+        };
+
+        results.push({
+          type: "entity",
+          id: entity.id,
+          score: computeCompositeScore(components, "hybrid"),
+          score_components: components,
+          content: entity.canonical_name,
+          provenance,
+        });
+        continue;
+      }
+
+      const episode = graph.db
+        .query<
+          { id: string; content: string; timestamp: string; status: string },
+          [string]
+        >(
+          "SELECT id, content, timestamp, status FROM episodes WHERE id = ? AND status = 'active'",
+        )
+        .get(simResult.target_id);
+
+      if (episode) {
+        const temporalScore = computeTemporalScore(episode.timestamp, now);
+
+        const components: ScoreComponents = {
+          fts_score: 0.0,
+          graph_score: 0.0,
+          temporal_score: temporalScore,
+          evidence_score: 1.0,
+          vector_score: simResult.score,
+        };
+
+        const snippet =
+          episode.content.length > 200
+            ? `${episode.content.slice(0, 200)}…`
+            : episode.content;
+
+        results.push({
+          type: "episode",
+          id: episode.id,
+          score: computeCompositeScore(components, "hybrid"),
+          score_components: components,
+          content: snippet,
+          provenance: [episode.id],
+        });
+        continue;
+      }
+
+      const edge = graph.db
+        .query<
+          { id: string; fact: string; edge_kind: string; created_at: string },
+          [string]
+        >(
+          "SELECT id, fact, edge_kind, created_at FROM edges WHERE id = ? AND invalidated_at IS NULL",
+        )
+        .get(simResult.target_id);
+
+      if (edge) {
+        const temporalScore = computeTemporalScore(edge.created_at, now);
+        const provenance = getEdgeProvenance(graph, edge.id);
+        const evidenceScore = normalizeEvidenceCount(provenance.length);
+
+        const components: ScoreComponents = {
+          fts_score: 0.0,
+          graph_score: 0.0,
+          temporal_score: temporalScore,
+          evidence_score: evidenceScore,
+          vector_score: simResult.score,
+        };
+
+        results.push({
+          type: "edge",
+          id: edge.id,
+          score: computeCompositeScore(components, "hybrid"),
+          score_components: components,
+          content: edge.fact,
+          provenance,
+          edge_kind: edge.edge_kind,
+        });
+      }
+    }
   }
 
   // Apply min_confidence filter, sort by score desc, limit
