@@ -5,3 +5,9 @@
 export type { ScoreComponents } from "./scoring.js";
 export type { SearchOpts, SearchResult } from "./search.js";
 export { search } from "./search.js";
+export type {
+  PathResult,
+  SubGraph,
+  TraversalOpts,
+} from "./traversal.js";
+export { getNeighbors, getPath } from "./traversal.js";
