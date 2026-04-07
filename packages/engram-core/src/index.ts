@@ -42,3 +42,8 @@ export {
   getEvidenceForEdge,
   getEvidenceForEntity,
 } from "./graph/index.js";
+export {
+  checkActiveEdgeConflict,
+  getFactHistory,
+  supersedeEdge,
+} from "./temporal/index.js";

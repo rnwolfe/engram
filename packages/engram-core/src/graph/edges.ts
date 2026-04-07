@@ -43,6 +43,10 @@ export interface FindEdgesQuery {
   relation_type?: string;
   edge_kind?: string;
   active_only?: boolean;
+  /** ISO8601 UTC timestamp. If provided, only returns edges valid at that point in time. */
+  valid_at?: string;
+  /** If false (default), only active edges (invalidated_at IS NULL) are returned. */
+  include_invalidated?: boolean;
 }
 
 /**
@@ -173,8 +177,19 @@ export function findEdges(
     params.push(query.edge_kind);
   }
 
-  if (query.active_only) {
+  // Exclude invalidated edges unless include_invalidated is explicitly true.
+  // active_only is a legacy alias for the same behaviour.
+  if (query.active_only || !query.include_invalidated) {
     conditions.push("invalidated_at IS NULL");
+  }
+
+  if (query.valid_at !== undefined) {
+    // Half-open interval: valid_from <= valid_at < valid_until
+    // NULL valid_from = -∞ (treat as always started), NULL valid_until = +∞ (treat as still current)
+    conditions.push(
+      "(valid_from IS NULL OR valid_from <= ?) AND (valid_until IS NULL OR valid_until > ?)",
+    );
+    params.push(query.valid_at, query.valid_at);
   }
 
   const where =
