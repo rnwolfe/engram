@@ -46,3 +46,8 @@ export {
   getEvidenceForEntity,
   resolveEntity,
 } from "./graph/index.js";
+export {
+  checkActiveEdgeConflict,
+  getFactHistory,
+  supersedeEdge,
+} from "./temporal/index.js";
