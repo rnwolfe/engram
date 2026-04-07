@@ -24,10 +24,10 @@
  *   ENGRAM_AI_PROVIDER=ollama bun run -F engramark bench
  */
 
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import {
   closeGraph,
@@ -65,10 +65,13 @@ function getFlagValue(flag: string): string | undefined {
 }
 
 const strategyArg = getFlagValue("--strategy");
-const cachedPath = getFlagValue("--cached");
+let cachedPath = getFlagValue("--cached");
 const saveBaselineFlag = getFlag("--save-baseline");
 const ciFlag = getFlag("--ci");
 const baselinePath = ".engramark-baseline.json";
+
+// Resolve --cached path to absolute
+if (cachedPath) cachedPath = resolve(cachedPath);
 
 // Validate --strategy flag
 const VALID_STRATEGIES: StrategyName[] = ALL_STRATEGIES;
@@ -92,14 +95,15 @@ const strategies: StrategyName[] = strategyArg
 // AI provider setup
 // ---------------------------------------------------------------------------
 
-const providerName = process.env.ENGRAM_AI_PROVIDER ?? "null";
-const provider = createProvider();
+const providerLabel = process.env.ENGRAM_AI_PROVIDER ?? null;
+const provider = providerLabel
+  ? createProvider({ provider: providerLabel as "ollama" | "gemini" })
+  : new NullProvider();
 
 // Determine the label for ai-enhanced when no real provider is configured
-const aiEnhancedLabel =
-  providerName === "null" || !providerName
-    ? "ai-enhanced (no provider — FTS only)"
-    : "ai-enhanced";
+const aiEnhancedLabel = providerLabel
+  ? "ai-enhanced"
+  : "ai-enhanced (no provider — FTS only)";
 
 // ---------------------------------------------------------------------------
 // Graph setup: either open cached file or clone + ingest
@@ -107,6 +111,21 @@ const aiEnhancedLabel =
 
 let cloneDir: string | null = null;
 let graphPath: string;
+
+// Signal handlers — clean up temp dir on early exit
+const cleanup = () => {
+  if (cloneDir) {
+    rmSync(cloneDir, { recursive: true, force: true });
+  }
+};
+process.on("SIGINT", () => {
+  cleanup();
+  process.exit(130);
+});
+process.on("SIGTERM", () => {
+  cleanup();
+  process.exit(143);
+});
 
 if (cachedPath) {
   if (!existsSync(cachedPath)) {
@@ -123,8 +142,17 @@ if (cachedPath) {
   console.log(`[bench] Cloning fastify ${FASTIFY_TAG}...`);
   const cloneStart = performance.now();
   try {
-    execSync(
-      `git clone --depth 1 --branch ${FASTIFY_TAG} ${FASTIFY_REPO_URL} ${cloneTarget}`,
+    execFileSync(
+      "git",
+      [
+        "clone",
+        "--depth",
+        "1",
+        "--branch",
+        FASTIFY_TAG,
+        FASTIFY_REPO_URL,
+        cloneTarget,
+      ],
       { stdio: "pipe" },
     );
   } catch (err) {
@@ -144,7 +172,7 @@ if (cachedPath) {
   const ingestStart = performance.now();
   try {
     const ingestResult = await ingestGitRepo(graph, cloneTarget, {
-      provider: providerName !== "null" ? provider : undefined,
+      provider: providerLabel ? provider : undefined,
     });
     const ingestMs = (performance.now() - ingestStart).toFixed(0);
     console.log(
@@ -192,17 +220,10 @@ async function runBenchmarkOnGraph(
     let report: BenchmarkReport;
     if (strategy === "ai-enhanced") {
       // ai-enhanced always runs — with NullProvider if no provider is configured
-      const effectiveProvider =
-        providerName !== "null" ? provider : new NullProvider();
-      report = await runStrategy(
-        strategy,
-        graph,
-        FASTIFY_QUESTIONS,
-        effectiveProvider,
-      );
+      report = await runStrategy(strategy, graph, FASTIFY_QUESTIONS, provider);
 
       // Re-label the baseline field when using NullProvider
-      if (providerName === "null" || !providerName) {
+      if (!providerLabel) {
         report = { ...report, baseline: aiEnhancedLabel };
       }
     } else {
