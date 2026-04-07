@@ -9,11 +9,11 @@
 
 import { ulid } from "ulid";
 import type { EngramGraph } from "../../format/index.js";
+import { ENGINE_VERSION } from "../../format/version.js";
 import { resolveEntity } from "../../graph/aliases.js";
 import { addEdge } from "../../graph/edges.js";
 import { addEntity, type EvidenceInput } from "../../graph/entities.js";
 import { addEpisode } from "../../graph/episodes.js";
-import { ENGINE_VERSION } from "../../index.js";
 import type { EnrichmentAdapter, EnrichOpts } from "../adapter.js";
 import type { IngestResult } from "../git.js";
 
@@ -268,6 +268,18 @@ function ingestPR(
     .join("\n")
     .trim();
 
+  // Pre-check for existing episode (idempotent dedup)
+  const existingEpisode = graph.db
+    .query<{ id: string }, [string, string]>(
+      "SELECT id FROM episodes WHERE source_type = ? AND source_ref = ?",
+    )
+    .get("github_pr", pr.html_url);
+
+  if (existingEpisode) {
+    counts.episodesSkipped++;
+    return;
+  }
+
   const episode = addEpisode(graph, {
     source_type: "github_pr",
     source_ref: pr.html_url,
@@ -283,19 +295,7 @@ function ingestPR(
     },
   });
 
-  // addEpisode returns existing on UNIQUE collision (dedup via source_ref).
-  // Detect whether this episode pre-existed by checking for another row with the same source_ref.
-  const existingBefore = graph.db
-    .query<{ id: string }, [string, string, string]>(
-      "SELECT id FROM episodes WHERE source_type = ? AND source_ref = ? AND id != ?",
-    )
-    .get("github_pr", pr.html_url, episode.id);
-
-  if (existingBefore) {
-    counts.episodesSkipped++;
-  } else {
-    counts.episodesCreated++;
-  }
+  counts.episodesCreated++;
 
   const episodeId = episode.id;
   const evidence: EvidenceInput[] = [
@@ -399,17 +399,22 @@ function ingestIssue(
     { episode_id: episodeId, extractor: EXTRACTOR, confidence: 1.0 },
   ];
 
-  // Create issue entity for references edges
-  const issueEntity = addEntity(
-    graph,
-    {
-      canonical_name: issue.html_url,
-      entity_type: "issue",
-      summary: issue.title,
-    },
-    evidence,
-  );
-  counts.entitiesCreated++;
+  // Resolve or create issue entity for reference edges
+  let issueEntity = resolveEntity(graph, issue.html_url, "issue");
+  if (!issueEntity) {
+    issueEntity = addEntity(
+      graph,
+      {
+        canonical_name: issue.html_url,
+        entity_type: "issue",
+        summary: issue.title,
+      },
+      evidence,
+    );
+    counts.entitiesCreated++;
+  } else {
+    counts.entitiesResolved++;
+  }
 
   const body = issue.body ?? "";
 
@@ -426,6 +431,9 @@ function ingestIssue(
       .get(sha, "commit");
 
     if (!mentioned) continue;
+
+    // Self-reference guard
+    if (mentioned.id === issueEntity.id) continue;
 
     const existing = graph.db
       .query<{ id: string }, [string, string, string, string]>(
@@ -468,6 +476,9 @@ function ingestIssue(
       .get(`%/pull/${refNum}`, `%/issues/${refNum}`);
 
     if (!mentioned) continue;
+
+    // Self-reference guard
+    if (mentioned.id === issueEntity.id) continue;
 
     const existing = graph.db
       .query<{ id: string }, [string, string, string, string]>(
