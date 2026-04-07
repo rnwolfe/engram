@@ -222,7 +222,7 @@ describe("computeCompositeScore", () => {
 
   test("hybrid mode produces different scores than fulltext when vector_score differs", () => {
     // With vector_score > 0, hybrid mode should produce higher scores
-    // because hybrid allocates 0.25 weight to vector vs fulltext's 0.0
+    // because hybrid allocates 0.15 weight to vector vs fulltext's 0.0
     const components = {
       fts_score: 0.5,
       graph_score: 0.5,

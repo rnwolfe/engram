@@ -301,9 +301,13 @@ export async function search(
     episodeRows.map((r) => r.rank),
   );
 
-  // Build vector similarity map when provider is set and produces a valid embedding
-  const vectorScoreMap = new Map<string, number>();
-  let vectorSimilarResults: Array<{ target_id: string; score: number }> = [];
+  // Build vector similarity map when provider is set and produces a valid embedding.
+  // episodeVectorScores maps episode IDs to cosine similarity scores.
+  // findSimilar returns episode IDs (embeddings are generated for episodes, not entities).
+  // Entity vector scores are derived via the evidence chain:
+  //   an entity's vector score = max cosine score of any linked episode in the similarity set.
+  // The same map is used directly for edge and episode lookups (they are also keyed by episode ID).
+  const episodeVectorScores = new Map<string, number>();
   let effectiveMode = mode;
   if (opts.provider) {
     try {
@@ -314,9 +318,8 @@ export async function search(
         // v0.1 limitation: brute-force scan is capped at 100 embeddings.
         // Acceptable for small graphs (<50k embeddings); revisit if performance degrades.
         const similar = findSimilar(graph, queryEmbeddings[0], { limit: 100 });
-        vectorSimilarResults = similar;
         for (const result of similar) {
-          vectorScoreMap.set(result.target_id, result.score);
+          episodeVectorScores.set(result.target_id, result.score);
         }
       }
       // If embed() returned [] or [[]] (empty vector), effectiveMode stays as-is (FTS-only)
@@ -326,15 +329,6 @@ export async function search(
   }
 
   const results: SearchResult[] = [];
-
-  // Build episodeId -> vectorScore map for evidence-chain-based entity boosting.
-  // findSimilar returns episode IDs (embeddings are generated for episodes, not entities).
-  // We translate episode vector scores to entity scores via the evidence chain:
-  // an entity's vector score = max cosine score of any linked episode in the similarity set.
-  const episodeVectorScores = new Map<string, number>();
-  for (const r of vectorSimilarResults) {
-    episodeVectorScores.set(r.target_id, r.score);
-  }
 
   // Build entity results
   for (let i = 0; i < entityRows.length; i++) {
@@ -381,7 +375,7 @@ export async function search(
     const temporalScore = computeTemporalScore(row.created_at, now);
     const provenance = getEdgeProvenance(graph, row.id);
     const evidenceScore = normalizeEvidenceCount(provenance.length);
-    const vectorScore = vectorScoreMap.get(row.id) ?? 0.0;
+    const vectorScore = episodeVectorScores.get(row.id) ?? 0.0;
 
     const components: ScoreComponents = {
       fts_score: ftsScore,
@@ -409,7 +403,7 @@ export async function search(
     const row = episodeRows[i];
     const ftsScore = episodeNormalizedRanks[i];
     const temporalScore = computeTemporalScore(row.timestamp, now);
-    const vectorScore = vectorScoreMap.get(row.id) ?? 0.0;
+    const vectorScore = episodeVectorScores.get(row.id) ?? 0.0;
 
     const components: ScoreComponents = {
       fts_score: ftsScore,
