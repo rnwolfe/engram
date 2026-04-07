@@ -48,16 +48,22 @@ The provider is never required. Engram degrades gracefully at every level:
 | `AIProvider` interface | `embed(texts: string[]): Promise<number[][]>` + `extractEntities(text: string): Promise<EntityHint[]>` |
 | `NullProvider` class | Deterministic no-op. `embed()` returns empty arrays. `extractEntities()` returns []. |
 | `OllamaProvider` class | HTTP client for local Ollama. Configurable model (default: `nomic-embed-text`). |
+| `GeminiProvider` class | Google Gemini via `@google/genai` SDK. Embed model: `text-embedding-004`. |
 | `createProvider(config)` | Factory: reads `ENGRAM_AI_PROVIDER` env + opts, returns the right provider. |
 
 ### Config
 
 ```typescript
 interface AIConfig {
-  provider: "null" | "ollama";     // Required
+  provider: "null" | "ollama" | "gemini";  // Required
   ollama?: {
     baseUrl: string;               // Default: "http://localhost:11434"
     embedModel: string;            // Default: "nomic-embed-text"
+    extractModel?: string;         // Default: none (skip LLM extraction if unset)
+  };
+  gemini?: {
+    apiKey: string;                // Required; also reads GEMINI_API_KEY env var
+    embedModel: string;            // Default: "text-embedding-004"
     extractModel?: string;         // Default: none (skip LLM extraction if unset)
   };
 }
@@ -75,10 +81,11 @@ interface AIConfig {
 
 ## Architecture / Design
 
-- **Module location**: `packages/engram-core/src/ai/` — four files
+- **Module location**: `packages/engram-core/src/ai/` — five files
   - `provider.ts` — `AIProvider` interface + `EntityHint` type
   - `null.ts` — `NullProvider` (always available, deterministic)
   - `ollama.ts` — `OllamaProvider` (HTTP, no native deps)
+  - `gemini.ts` — `GeminiProvider` (via `@google/genai` SDK, embed model: `text-embedding-004`)
   - `index.ts` — `createProvider(config)` factory + re-exports
 
 - **Storage**: The `embeddings` table already exists in schema:
@@ -101,14 +108,14 @@ interface AIConfig {
 
 - **Entity extraction**: `OllamaProvider.extractEntities()` is optional (only when `extractModel` is configured). It takes raw text (commit message, PR body) and returns `EntityHint[]` — suggestions for the caller to resolve and potentially add to the graph. The caller (ingest pipeline) always decides; the LLM never writes to the graph directly.
 
-- **Security**: Never send `.engram` file paths or private keys to the provider. Only send text content (commit messages, PR titles). The provider interface only accepts `string[]` — no filesystem access.
+- **Security**: Never send `.engram` file paths or private keys to the provider. Only send text content (commit messages, PR titles). The provider interface only accepts `string[]` — no filesystem access. Gemini API key is read from `GEMINI_API_KEY` env var; never stored in the `.engram` file.
 
-- **No new npm dependencies** for null or ollama providers. Ollama uses the native `fetch` API (Bun built-in). Only add `@anthropic-ai/sdk` if/when an Anthropic provider is added (separate issue).
+- **Dependencies**: Ollama uses native `fetch` (Bun built-in, no new packages). Gemini requires `@google/genai` (the official Gemini SDK). Only add `@anthropic-ai/sdk` if/when an Anthropic provider is added (separate issue).
 
 ## Dependencies
 
 - **Internal**: All of Phase 1 (graph CRUD, retrieval, ingest) — all shipped ✅
-- **External**: None for null + ollama. Ollama must be installed separately by the user (not a hard dep — graceful fallback).
+- **External**: None for null + ollama. Ollama must be installed separately by the user (not a hard dep — graceful fallback). Gemini requires `@google/genai` npm package and a valid API key via `GEMINI_API_KEY`.
 - **Blocked by**: Nothing. This is unblocked.
 
 ## Acceptance Criteria
@@ -117,18 +124,23 @@ interface AIConfig {
 - [ ] `NullProvider` implements interface: `embed()` returns `[]`, `extractEntities()` returns `[]`
 - [ ] `OllamaProvider` implements interface: calls `POST /api/embed` for embeddings
 - [ ] `OllamaProvider` handles connection refused → logs warning, returns null behavior (does not throw)
+- [ ] `GeminiProvider` implements interface: uses `@google/genai` SDK, embed model `text-embedding-004`
+- [ ] `GeminiProvider` reads `GEMINI_API_KEY` env var; missing key → logs warning, returns null behavior
 - [ ] `createProvider({ provider: "null" })` returns `NullProvider`
 - [ ] `createProvider({ provider: "ollama" })` returns `OllamaProvider` with defaults
+- [ ] `createProvider({ provider: "gemini" })` returns `GeminiProvider` with defaults
 - [ ] `storeEmbedding(graph, targetId, targetType, model, embedding)` writes to `embeddings` table
 - [ ] `findSimilar(graph, queryEmbedding, opts)` returns entities/episodes ranked by cosine similarity
 - [ ] `search(graph, query, { provider })` merges FTS and vector results when provider is set
 - [ ] `search(graph, query)` (no provider) behaves identically to current FTS-only behavior
 - [ ] Ingest: `ingestGitRepo(graph, path, { provider })` generates embeddings for episodes + entities post-ingest
 - [ ] Ingest: embedding generation failure does not fail the ingest (best-effort, logged)
-- [ ] `ENGRAM_AI_PROVIDER=ollama` environment variable configures the provider in CLI context
+- [ ] `ENGRAM_AI_PROVIDER=ollama` env configures Ollama provider in CLI context
+- [ ] `ENGRAM_AI_PROVIDER=gemini` env configures Gemini provider; reads `GEMINI_API_KEY`
 - [ ] `ENGRAM_AI_PROVIDER` unset → null provider (no behavior change from today)
 - [ ] Tests: `NullProvider` unit tests (synchronous, no mocking needed)
 - [ ] Tests: `OllamaProvider` unit tests with mocked fetch
+- [ ] Tests: `GeminiProvider` unit tests with mocked `@google/genai` SDK
 - [ ] Tests: `findSimilar()` returns results sorted by cosine similarity
 - [ ] Tests: hybrid search with null provider produces identical results to current FTS-only search
 - [ ] `bun test` passes, `bun run lint` passes
@@ -144,6 +156,6 @@ interface AIConfig {
 
 ## Documentation Required
 
-- [ ] README: "AI-enhanced mode" section explaining null vs. ollama, how to configure
+- [ ] README: "AI-enhanced mode" section explaining null vs. ollama vs. gemini, how to configure
 - [ ] CLAUDE.md: add `packages/engram-core/src/ai/` to Key Files table
 - [ ] `docs/internal/specs/ai-providers.md` — mark as Implemented after shipping
