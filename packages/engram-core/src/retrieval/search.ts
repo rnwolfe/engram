@@ -10,6 +10,8 @@
 import type { AIProvider } from "../ai/provider.js";
 import type { EngramGraph } from "../format/index.js";
 import { findSimilar } from "../graph/embeddings.js";
+import type { TraversedEntity } from "./graph-search.js";
+import { graphSearch } from "./graph-search.js";
 import type { ScoreComponents } from "./scoring.js";
 import {
   computeCompositeScore,
@@ -30,6 +32,8 @@ export interface SearchOpts {
   include_invalidated?: boolean; // default false
   mode?: "fulltext" | "hybrid"; // default 'fulltext'
   provider?: AIProvider; // when set, enables vector similarity search
+  /** Max graph traversal hops from FTS seed entities. Default 2. 0 disables. */
+  maxHops?: number;
 }
 
 export interface SearchResult {
@@ -328,6 +332,19 @@ export async function search(
     }
   }
 
+  // --- Graph traversal phase ---
+  // Use FTS entity hits as seeds; traverse edges to discover related entities.
+  const maxHops = opts.maxHops ?? 2;
+  const ftsEntityIds = new Set(entityRows.map((r) => r.id));
+  const seeds: Array<[string, number]> = entityRows.map((r, i) => [
+    r.id,
+    entityNormalizedRanks[i],
+  ]);
+  const traversed: TraversedEntity[] = graphSearch(graph, seeds, {
+    maxHops,
+    validAt: opts.valid_at,
+  });
+
   const results: SearchResult[] = [];
 
   // Build entity results
@@ -364,6 +381,55 @@ export async function search(
       score,
       score_components: components,
       content: row.canonical_name,
+      provenance,
+    });
+  }
+
+  // Build graph-traversed entity results (entities found via edge traversal, not FTS)
+  for (const t of traversed) {
+    // Skip entities already in FTS results or filtered by entity_types
+    if (ftsEntityIds.has(t.entityId)) continue;
+    if (
+      opts.entity_types &&
+      opts.entity_types.length > 0 &&
+      !opts.entity_types.includes(t.entityType)
+    )
+      continue;
+
+    const provenance = getEntityProvenance(graph, t.entityId);
+    const evidenceScore = normalizeEvidenceCount(provenance.length);
+    const temporalScore = computeTemporalScore(t.updatedAt, now);
+    const edgeCount = getEntityEdgeCount(graph, t.entityId);
+    const graphScore = normalizeGraphScore(edgeCount);
+
+    // Distance decay: 1-hop entities score higher than 2-hop
+    const distanceDecay = 1.0 / t.hops;
+    // Proxy FTS score: seed's FTS score attenuated by distance and edge confidence
+    const proxyFtsScore = t.seedFtsScore * distanceDecay * t.maxEdgeConfidence;
+
+    // Indirect vector score via evidence chain (same logic as direct FTS entities)
+    let vectorScore = 0.0;
+    for (const epId of provenance) {
+      const s = episodeVectorScores.get(epId) ?? 0;
+      if (s > vectorScore) vectorScore = s;
+    }
+
+    const components: ScoreComponents = {
+      fts_score: proxyFtsScore,
+      graph_score: graphScore,
+      temporal_score: temporalScore,
+      evidence_score: evidenceScore,
+      vector_score: vectorScore,
+    };
+
+    const score = computeCompositeScore(components, effectiveMode);
+
+    results.push({
+      type: "entity",
+      id: t.entityId,
+      score,
+      score_components: components,
+      content: t.canonicalName,
       provenance,
     });
   }
