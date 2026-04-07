@@ -50,6 +50,10 @@ export type { EnrichmentAdapter, EnrichOpts } from "./ingest/adapter.js";
 export { GitHubAdapter } from "./ingest/adapters/github.js";
 export type { GitIngestOpts, IngestResult } from "./ingest/git.js";
 export { ingestGitRepo } from "./ingest/git.js";
+export type { MarkdownIngestOpts } from "./ingest/markdown.js";
+export { ingestMarkdown } from "./ingest/markdown.js";
+export type { TextIngestOpts } from "./ingest/text.js";
+export { ingestText } from "./ingest/text.js";
 export {
   checkActiveEdgeConflict,
   getFactHistory,
