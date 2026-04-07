@@ -48,7 +48,7 @@ The provider is never required. Engram degrades gracefully at every level:
 | `AIProvider` interface | `embed(texts: string[]): Promise<number[][]>` + `extractEntities(text: string): Promise<EntityHint[]>` |
 | `NullProvider` class | Deterministic no-op. `embed()` returns empty arrays. `extractEntities()` returns []. |
 | `OllamaProvider` class | HTTP client for local Ollama. Configurable model (default: `nomic-embed-text`). |
-| `GeminiProvider` class | Google Gemini via `@google/genai` SDK. Embed model: `text-embedding-004`. |
+| `GeminiProvider` class | Google Gemini via `@google/genai` SDK. Embed model: `gemini-embedding-001`. |
 | `createProvider(config)` | Factory: reads `ENGRAM_AI_PROVIDER` env + opts, returns the right provider. |
 
 ### Config
@@ -63,7 +63,7 @@ interface AIConfig {
   };
   gemini?: {
     apiKey: string;                // Required; also reads GEMINI_API_KEY env var
-    embedModel: string;            // Default: "text-embedding-004"
+    embedModel: string;            // Default: "gemini-embedding-001"
     extractModel?: string;         // Default: none (skip LLM extraction if unset)
   };
 }
@@ -85,7 +85,7 @@ interface AIConfig {
   - `provider.ts` — `AIProvider` interface + `EntityHint` type
   - `null.ts` — `NullProvider` (always available, deterministic)
   - `ollama.ts` — `OllamaProvider` (HTTP, no native deps)
-  - `gemini.ts` — `GeminiProvider` (via `@google/genai` SDK, embed model: `text-embedding-004`)
+  - `gemini.ts` — `GeminiProvider` (via `@google/genai` SDK, embed model: `gemini-embedding-001`)
   - `index.ts` — `createProvider(config)` factory + re-exports
 
 - **Storage**: The `embeddings` table already exists in schema:
@@ -124,7 +124,7 @@ interface AIConfig {
 - [ ] `NullProvider` implements interface: `embed()` returns `[]`, `extractEntities()` returns `[]`
 - [ ] `OllamaProvider` implements interface: calls `POST /api/embed` for embeddings
 - [ ] `OllamaProvider` handles connection refused → logs warning, returns null behavior (does not throw)
-- [ ] `GeminiProvider` implements interface: uses `@google/genai` SDK, embed model `text-embedding-004`
+- [ ] `GeminiProvider` implements interface: uses `@google/genai` SDK, embed model `gemini-embedding-001`
 - [ ] `GeminiProvider` reads `GEMINI_API_KEY` env var; missing key → logs warning, returns null behavior
 - [ ] `createProvider({ provider: "null" })` returns `NullProvider`
 - [ ] `createProvider({ provider: "ollama" })` returns `OllamaProvider` with defaults
