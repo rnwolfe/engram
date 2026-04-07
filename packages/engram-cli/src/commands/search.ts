@@ -34,6 +34,11 @@ export function registerSearch(program: Command): void {
         process.exit(1);
       }
 
+      if (opts.format !== "text" && opts.format !== "json") {
+        console.error("Error: --format must be 'text' or 'json'");
+        process.exit(1);
+      }
+
       let graph: EngramGraph | undefined;
       try {
         graph = openGraph(dbPath);

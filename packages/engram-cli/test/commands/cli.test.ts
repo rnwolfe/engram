@@ -261,11 +261,11 @@ describe("engram decay", () => {
 });
 
 describe("engram error handling", () => {
-  it("openGraph throws a descriptive error for a non-engram file", () => {
+  it("openGraph throws a descriptive error for a non-engram file", async () => {
     // CLI commands call openGraph and catch + print the error.
     // Here we verify that openGraph produces a descriptive error, which is
     // what the CLI would log to console.error before exiting.
-    const { openGraph } = require("engram-core");
+    const { openGraph } = await import("engram-core");
     const { tmpDir, dbPath } = tmpDb();
     try {
       fs.writeFileSync(dbPath, "not a valid engram database\n");
@@ -277,6 +277,16 @@ describe("engram error handling", () => {
       }
       // Should throw something (either SQLite error or EngramFormatError)
       expect(caught).not.toBeNull();
+      // Should have a descriptive message mentioning format_version, "not a valid .engram file",
+      // "missing", or a SQLite-level error indicating the file is not a valid database
+      const msg = caught?.message ?? "";
+      const isDescriptive =
+        msg.includes("format_version") ||
+        msg.includes("not a valid .engram file") ||
+        msg.includes("missing") ||
+        msg.includes("not a database") ||
+        msg.includes("database");
+      expect(isDescriptive).toBe(true);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }

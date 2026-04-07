@@ -74,7 +74,6 @@ export function registerExport(program: Command): void {
         } else {
           // Markdown format
           console.log("# Engram Export\n");
-          console.log(`Generated: ${new Date().toISOString()}\n`);
 
           console.log(`## Entities (${entities.length})\n`);
           for (const entity of entities) {

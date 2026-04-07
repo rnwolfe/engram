@@ -68,7 +68,12 @@ export function registerShow(program: Command): void {
         // Edges — target
         const inEdges = findEdges(graph, { target_id: entity.id });
 
-        const allEdges = [...outEdges, ...inEdges];
+        // Dedup edges by ID (outEdges and inEdges may overlap)
+        const edgeMap = new Map<string, (typeof outEdges)[0]>();
+        for (const edge of [...outEdges, ...inEdges]) {
+          if (!edgeMap.has(edge.id)) edgeMap.set(edge.id, edge);
+        }
+        const allEdges = Array.from(edgeMap.values());
 
         if (allEdges.length > 0) {
           // Group by relation_type
