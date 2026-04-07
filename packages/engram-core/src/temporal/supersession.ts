@@ -94,25 +94,31 @@ export function supersedeEdge(
   new_edge: EdgeInput,
   evidence: EvidenceInput[],
 ): { old: Edge; new: Edge } {
-  const oldEdge = graph.db
-    .query<Edge, [string]>("SELECT * FROM edges WHERE id = ?")
-    .get(old_edge_id);
-
-  if (!oldEdge) {
-    throw new EdgeNotFoundError(old_edge_id);
-  }
-
-  if (oldEdge.invalidated_at !== null) {
-    throw new Error(
-      `supersedeEdge: edge ${old_edge_id} is already superseded (invalidated_at = ${oldEdge.invalidated_at})`,
-    );
-  }
-
   const now = new Date().toISOString();
   // Use a container so the transaction closure can assign and we can read it after.
-  const result: { newEdge: Edge | null } = { newEdge: null };
+  const result: { newEdge: Edge | null; oldEdge: Edge | null } = {
+    newEdge: null,
+    oldEdge: null,
+  };
 
   graph.db.transaction(() => {
+    // Fetch old edge inside transaction to prevent TOCTOU race
+    const oldEdge = graph.db
+      .query<Edge, [string]>("SELECT * FROM edges WHERE id = ?")
+      .get(old_edge_id);
+
+    if (!oldEdge) {
+      throw new EdgeNotFoundError(old_edge_id);
+    }
+
+    if (oldEdge.invalidated_at !== null) {
+      throw new Error(
+        `supersedeEdge: edge ${old_edge_id} is already superseded (invalidated_at = ${oldEdge.invalidated_at})`,
+      );
+    }
+
+    result.oldEdge = oldEdge;
+
     // Insert the new edge within the transaction
     result.newEdge = addEdge(graph, new_edge, evidence);
 
@@ -125,9 +131,22 @@ export function supersedeEdge(
          SET invalidated_at = ?,
              superseded_by  = ?,
              valid_until    = ?
-         WHERE id = ?`,
+         WHERE id = ? AND invalidated_at IS NULL`,
       )
       .run(now, result.newEdge.id, closingValidUntil, old_edge_id);
+
+    // Verify the update actually succeeded by checking the row
+    const verifyRow = graph.db
+      .query<{ invalidated_at: string | null }, [string]>(
+        "SELECT invalidated_at FROM edges WHERE id = ?",
+      )
+      .get(old_edge_id);
+
+    if (!verifyRow || verifyRow.invalidated_at === null) {
+      throw new Error(
+        `supersedeEdge: failed to invalidate edge ${old_edge_id} — it may have been concurrently superseded`,
+      );
+    }
   })();
 
   if (!result.newEdge) {

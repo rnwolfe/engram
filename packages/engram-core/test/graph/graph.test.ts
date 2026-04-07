@@ -584,7 +584,7 @@ describe("getEvidenceForEntity / getEvidenceForEdge", () => {
     expect(link.episode.content).toBe("commit message");
   });
 
-  test("getEvidenceForEntity returns empty array for entity with no evidence (after direct DB insert)", () => {
+  test("getEvidenceForEntity returns empty array for a nonexistent entity_id", () => {
     // Evidence chain returns empty for non-existent entity_id
     const chain = getEvidenceForEntity(graph, "nonexistent-entity");
     expect(chain).toEqual([]);

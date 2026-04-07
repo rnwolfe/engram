@@ -74,7 +74,6 @@ export function addEdge(
       string,
       string,
       string,
-      string,
       number,
       string | null,
       string | null,

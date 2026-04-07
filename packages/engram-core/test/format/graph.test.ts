@@ -16,7 +16,7 @@ import {
 import { ENGINE_VERSION, FORMAT_VERSION } from "../../src/index.js";
 
 function tmpPath(name: string): string {
-  return join(tmpdir(), `engram-test-${name}-${Date.now()}.engram`);
+  return join(tmpdir(), `engram-test-${name}-${crypto.randomUUID()}.engram`);
 }
 
 function cleanupFiles(paths: string[]): void {
@@ -141,12 +141,18 @@ describe("schema: all required tables exist", () => {
 
   const REQUIRED_FTS_TABLES = ["entities_fts", "edges_fts", "episodes_fts"];
 
-  let path: string;
-  let graph: ReturnType<typeof createGraph>;
+  let path: string | undefined;
+  let graph: ReturnType<typeof createGraph> | undefined;
 
   afterEach(() => {
-    if (graph) closeGraph(graph);
-    cleanupFiles([path]);
+    if (graph) {
+      closeGraph(graph);
+      graph = undefined;
+    }
+    if (path) {
+      cleanupFiles([path]);
+      path = undefined;
+    }
   });
 
   it("has all required base tables", () => {
