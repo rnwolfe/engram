@@ -5,7 +5,7 @@
 import { createHash } from "node:crypto";
 import { ulid } from "ulid";
 import type { EngramGraph } from "../format/index.js";
-import { ENGINE_VERSION } from "../index.js";
+import { ENGINE_VERSION } from "../format/version.js";
 
 export interface EpisodeInput {
   source_type: string;
@@ -40,6 +40,16 @@ export interface Episode {
  * returns the existing episode instead of throwing.
  */
 export function addEpisode(graph: EngramGraph, input: EpisodeInput): Episode {
+  // If source_ref provided, check for existing episode first (idempotent dedup)
+  if (input.source_ref != null) {
+    const existing = graph.db
+      .query<Episode, [string, string]>(
+        "SELECT * FROM episodes WHERE source_type = ? AND source_ref = ?",
+      )
+      .get(input.source_type, input.source_ref);
+    if (existing) return existing;
+  }
+
   const id = ulid();
   const now = new Date().toISOString();
   const content_hash = createHash("sha256").update(input.content).digest("hex");
@@ -50,18 +60,17 @@ export function addEpisode(graph: EngramGraph, input: EpisodeInput): Episode {
   const insert = graph.db.prepare<
     void,
     [
-      string,
-      string,
-      string | null,
-      string,
-      string,
-      string | null,
-      string,
-      string,
-      string | null,
-      string,
-      string,
-      string | null,
+      string, // id
+      string, // source_type
+      string | null, // source_ref
+      string, // content
+      string, // content_hash
+      string | null, // actor
+      string, // timestamp
+      string, // ingested_at
+      string | null, // owner_id
+      string, // extractor_version
+      string | null, // metadata
     ]
   >(
     `INSERT INTO episodes
@@ -69,38 +78,21 @@ export function addEpisode(graph: EngramGraph, input: EpisodeInput): Episode {
      VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)`,
   );
 
-  try {
-    graph.db.transaction(() => {
-      insert.run(
-        id,
-        input.source_type,
-        input.source_ref ?? null,
-        input.content,
-        content_hash,
-        input.actor ?? null,
-        input.timestamp,
-        now,
-        input.owner_id ?? null,
-        extractor_version,
-        metadata,
-      );
-    })();
-  } catch (err: unknown) {
-    // Handle duplicate (source_type, source_ref) constraint violation
-    if (
-      input.source_ref != null &&
-      err instanceof Error &&
-      err.message.includes("UNIQUE constraint failed")
-    ) {
-      const existing = graph.db
-        .query<Episode, [string, string]>(
-          "SELECT * FROM episodes WHERE source_type = ? AND source_ref = ?",
-        )
-        .get(input.source_type, input.source_ref);
-      if (existing) return existing;
-    }
-    throw err;
-  }
+  graph.db.transaction(() => {
+    insert.run(
+      id,
+      input.source_type,
+      input.source_ref ?? null,
+      input.content,
+      content_hash,
+      input.actor ?? null,
+      input.timestamp,
+      now,
+      input.owner_id ?? null,
+      extractor_version,
+      metadata,
+    );
+  })();
 
   const row = graph.db
     .query<Episode, [string]>("SELECT * FROM episodes WHERE id = ?")

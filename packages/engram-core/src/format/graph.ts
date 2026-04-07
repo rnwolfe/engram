@@ -8,8 +8,8 @@
 
 import { Database } from "bun:sqlite";
 import { ulid } from "ulid";
-import { ENGINE_VERSION, FORMAT_VERSION } from "../index.js";
 import { SCHEMA_DDL } from "./schema.js";
+import { ENGINE_VERSION, FORMAT_VERSION } from "./version.js";
 
 export interface EngramGraph {
   db: Database;
@@ -51,33 +51,38 @@ function applySchema(db: Database): void {
 export function createGraph(path: string, opts: CreateOpts = {}): EngramGraph {
   const db = new Database(path, { create: true });
 
-  applyPragmas(db);
-  applySchema(db);
+  try {
+    applyPragmas(db);
+    applySchema(db);
 
-  const createdAt = new Date().toISOString();
-  const ownerId = opts.ownerId ?? ulid();
-  const defaultTimezone = opts.defaultTimezone ?? "UTC";
+    const createdAt = new Date().toISOString();
+    const ownerId = opts.ownerId ?? ulid();
+    const defaultTimezone = opts.defaultTimezone ?? "UTC";
 
-  const insertMeta = db.prepare(
-    "INSERT INTO metadata (key, value) VALUES (?, ?)",
-  );
+    const insertMeta = db.prepare(
+      "INSERT INTO metadata (key, value) VALUES (?, ?)",
+    );
 
-  db.transaction(() => {
-    insertMeta.run("format_version", FORMAT_VERSION);
-    insertMeta.run("engine_version", ENGINE_VERSION);
-    insertMeta.run("created_at", createdAt);
-    insertMeta.run("owner_id", ownerId);
-    insertMeta.run("default_timezone", defaultTimezone);
-  })();
+    db.transaction(() => {
+      insertMeta.run("format_version", FORMAT_VERSION);
+      insertMeta.run("engine_version", ENGINE_VERSION);
+      insertMeta.run("created_at", createdAt);
+      insertMeta.run("owner_id", ownerId);
+      insertMeta.run("default_timezone", defaultTimezone);
+    })();
 
-  return {
-    db,
-    path,
-    formatVersion: FORMAT_VERSION,
-    engineVersion: ENGINE_VERSION,
-    createdAt,
-    ownerId,
-  };
+    return {
+      db,
+      path,
+      formatVersion: FORMAT_VERSION,
+      engineVersion: ENGINE_VERSION,
+      createdAt,
+      ownerId,
+    };
+  } catch (err) {
+    db.close();
+    throw err;
+  }
 }
 
 /**
@@ -118,8 +123,22 @@ export function openGraph(path: string): EngramGraph {
   }
 
   const engineVersion = getMeta("engine_version") ?? ENGINE_VERSION;
-  const createdAt = getMeta("created_at") ?? "";
-  const ownerId = getMeta("owner_id") ?? "";
+
+  const createdAt = getMeta("created_at");
+  if (!createdAt) {
+    db.close();
+    throw new EngramFormatError(
+      `openGraph: missing 'created_at' in metadata — not a valid .engram file: ${path}`,
+    );
+  }
+
+  const ownerId = getMeta("owner_id");
+  if (!ownerId) {
+    db.close();
+    throw new EngramFormatError(
+      `openGraph: missing 'owner_id' in metadata — not a valid .engram file: ${path}`,
+    );
+  }
 
   return {
     db,
