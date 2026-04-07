@@ -343,7 +343,9 @@ describe("search", () => {
   test("respects min_confidence filter", async () => {
     seedGraph(graph);
     const allResults = await search(graph, "database");
-    const filteredResults = await search(graph, "database", { min_confidence: 0.99 });
+    const filteredResults = await search(graph, "database", {
+      min_confidence: 0.99,
+    });
     expect(filteredResults.length).toBeLessThanOrEqual(allResults.length);
     for (const r of filteredResults) {
       expect(r.score).toBeGreaterThanOrEqual(0.99);
@@ -352,9 +354,13 @@ describe("search", () => {
 
   test("respects entity_types filter", async () => {
     seedGraph(graph);
-    const results = await search(graph, "service module database authentication", {
-      entity_types: ["service"],
-    });
+    const results = await search(
+      graph,
+      "service module database authentication",
+      {
+        entity_types: ["service"],
+      },
+    );
     const entityResults = results.filter((r) => r.type === "entity");
     // All entity results should be of type 'service'
     for (const r of entityResults) {

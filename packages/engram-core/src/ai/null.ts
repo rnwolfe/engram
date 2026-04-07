@@ -8,8 +8,12 @@
 import type { AIProvider, EntityHint } from "./provider.js";
 
 export class NullProvider implements AIProvider {
-  async embed(_texts: string[]): Promise<number[][]> {
-    return [];
+  modelName(): string {
+    return "null";
+  }
+
+  async embed(texts: string[]): Promise<number[][]> {
+    return texts.map(() => []);
   }
 
   async extractEntities(_text: string): Promise<EntityHint[]> {

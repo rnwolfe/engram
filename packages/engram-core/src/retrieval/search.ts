@@ -307,6 +307,8 @@ export async function search(
     try {
       const queryEmbeddings = await opts.provider.embed([query]);
       if (queryEmbeddings.length > 0 && queryEmbeddings[0].length > 0) {
+        // v0.1 limitation: brute-force scan is capped at 100 embeddings.
+        // Acceptable for small graphs (<50k embeddings); revisit if performance degrades.
         const similar = findSimilar(graph, queryEmbeddings[0], { limit: 100 });
         for (const result of similar) {
           vectorScoreMap.set(result.target_id, result.score);

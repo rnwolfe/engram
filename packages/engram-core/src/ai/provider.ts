@@ -26,6 +26,12 @@ export interface EntityHint {
  */
 export interface AIProvider {
   /**
+   * Return the model identifier used for embeddings.
+   * Used to record the model name in the embedding storage.
+   */
+  modelName(): string;
+
+  /**
    * Generate embeddings for a batch of texts.
    * Returns an array of embedding vectors (one per input text).
    * Returns empty arrays on failure — never throws.

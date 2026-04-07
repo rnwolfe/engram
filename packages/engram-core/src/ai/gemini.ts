@@ -47,6 +47,10 @@ export class GeminiProvider implements AIProvider {
     }
   }
 
+  modelName(): string {
+    return this.embedModel;
+  }
+
   async embed(texts: string[]): Promise<number[][]> {
     if (texts.length === 0) return [];
     if (!this.apiKey) return [];

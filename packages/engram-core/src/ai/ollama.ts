@@ -36,6 +36,10 @@ export class OllamaProvider implements AIProvider {
     this.extractModel = opts?.extractModel;
   }
 
+  modelName(): string {
+    return this.embedModel;
+  }
+
   async embed(texts: string[]): Promise<number[][]> {
     if (texts.length === 0) return [];
 
