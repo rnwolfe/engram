@@ -5,16 +5,16 @@
  * Requires no external API tokens — git commands only.
  */
 
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { ulid } from "ulid";
 import type { EngramGraph } from "../format/index.js";
+import { ENGINE_VERSION } from "../format/version.js";
 import { resolveEntity } from "../graph/aliases.js";
 import { addEdge } from "../graph/edges.js";
 import { addEntity, type EvidenceInput } from "../graph/entities.js";
 import { addEpisode } from "../graph/episodes.js";
-import { ENGINE_VERSION } from "../index.js";
 import { supersedeEdge } from "../temporal/supersession.js";
 import { parseGitLog, recencyWeight } from "./git-parse.js";
 
@@ -172,6 +172,33 @@ function getLastCursor(graph: EngramGraph, sourceScope: string): string | null {
 // Git log execution
 // ---------------------------------------------------------------------------
 
+function validatePathFilter(pathFilter: string[]): string[] {
+  const validated: string[] = [];
+  for (const p of pathFilter) {
+    // Reject absolute paths
+    if (path.isAbsolute(p)) {
+      throw new Error(
+        `ingestGitRepo: path_filter entry must be a relative path, got: ${p}`,
+      );
+    }
+    // Reject path traversal
+    const normalized = path.normalize(p);
+    if (normalized.startsWith("..")) {
+      throw new Error(
+        `ingestGitRepo: path_filter entry must not traverse parent directories, got: ${p}`,
+      );
+    }
+    // Reject pathspec magic (starts with ':')
+    if (p.startsWith(":")) {
+      throw new Error(
+        `ingestGitRepo: path_filter entry must not use pathspec magic, got: ${p}`,
+      );
+    }
+    validated.push(normalized);
+  }
+  return validated;
+}
+
 function runGitLog(
   repoPath: string,
   opts: GitIngestOpts,
@@ -200,26 +227,22 @@ function runGitLog(
   }
 
   if (opts.path_filter && opts.path_filter.length > 0) {
+    const validated = validatePathFilter(opts.path_filter);
     args.push("--");
-    for (const p of opts.path_filter) {
-      // Prevent directory traversal / shell injection
-      const sanitized = path.normalize(p).replace(/^(\.\.[/\\])+/, "");
-      args.push(sanitized);
+    for (const p of validated) {
+      args.push(p);
     }
   }
 
   try {
-    const result = execSync(
-      `git ${args.map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(" ")}`,
-      {
-        maxBuffer: 100 * 1024 * 1024, // 100 MB
-        encoding: "utf8",
-      },
-    );
+    const result = execFileSync("git", args, {
+      maxBuffer: 100 * 1024 * 1024, // 100 MB
+      encoding: "utf8",
+    });
     return result;
   } catch (err: unknown) {
     if (err instanceof Error && "stdout" in err) {
-      // execSync throws on non-zero exit but may still have output
+      // execFileSync throws on non-zero exit but may still have output
       return (err as { stdout: string }).stdout ?? "";
     }
     throw err;
@@ -314,8 +337,17 @@ export async function ingestGitRepo(
   const validatedPath = validateRepoPath(repoPath);
   const threshold = opts.cochange_threshold ?? 3;
 
+  if (threshold < 1) {
+    throw new Error(
+      `ingestGitRepo: cochange_threshold must be >= 1, got: ${threshold}`,
+    );
+  }
+
+  // Build source_scope that includes significant opts for cursor scoping
+  const sourceScope = `${validatedPath}::branch=${opts.branch ?? "HEAD"}`;
+
   // Create ingestion run record
-  const run = createIngestionRun(graph, validatedPath);
+  const run = createIngestionRun(graph, sourceScope);
   const runId = run.id;
 
   const counts = {
@@ -329,14 +361,14 @@ export async function ingestGitRepo(
 
   try {
     // Get last cursor for idempotency
-    const lastCursor = getLastCursor(graph, validatedPath);
+    const lastCursor = getLastCursor(graph, sourceScope);
 
     // Run git log
     const rawLog = runGitLog(validatedPath, opts, lastCursor);
     const commits = parseGitLog(rawLog);
 
     if (commits.length === 0) {
-      completeIngestionRun(graph, runId, lastCursor, {
+      completeIngestionRun(graph, runId, lastCursor ?? null, {
         episodes: 0,
         entities: 0,
         edges: 0,
