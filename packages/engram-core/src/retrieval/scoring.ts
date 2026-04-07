@@ -9,7 +9,7 @@ export interface ScoreComponents {
   graph_score: number; // 1-hop neighbor count, normalized
   temporal_score: number; // recency decay (0-1)
   evidence_score: number; // evidence strength (0-1)
-  vector_score: number; // always 0.0 (deferred)
+  vector_score: number; // cosine similarity via episode evidence chain (hybrid mode only)
 }
 
 /**
@@ -25,11 +25,11 @@ const WEIGHTS_FULLTEXT = {
 };
 
 const WEIGHTS_HYBRID = {
-  fts: 0.25,
+  fts: 0.35,
   evidence: 0.25,
   temporal: 0.15,
   graph: 0.1,
-  vector: 0.25,
+  vector: 0.15,
 };
 
 /**
