@@ -29,7 +29,7 @@ export async function runQuestion(
   const start = performance.now();
 
   const results = await search(graph, question.question, {
-    limit: 10,
+    limit: 20,
     mode: "fulltext",
   });
 

@@ -56,12 +56,11 @@ export async function runQuestion(
   // vectors" which would be a meaningless intermediate state.
   const useHybrid = providerAvailable ?? (await isProviderAvailable(provider));
 
-  // NOTE: limit: 10 fetches mixed result types (entities + episodes). Only
-  // entity-typed results count toward recall. In practice this yields at least
-  // 5 entity results for typical graphs, but on sparse graphs the effective
-  // recall pool may be smaller than the k=5 cutoff used in computeMetrics.
+  // limit: 20 ensures enough entity results survive after filtering out
+  // episode/edge results. Graph traversal adds entity candidates that need
+  // room to surface alongside FTS-direct hits.
   const results = await search(graph, question.question, {
-    limit: 10,
+    limit: 20,
     ...(useHybrid
       ? { mode: "hybrid" as const, provider }
       : { mode: "fulltext" as const }),

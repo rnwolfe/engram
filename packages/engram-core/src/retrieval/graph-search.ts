@@ -11,12 +11,13 @@ import type { Edge } from "../graph/edges.js";
 import { findEdges } from "../graph/edges.js";
 import { getEntity } from "../graph/entities.js";
 
-/** Default relation types followed during graph traversal. */
-const DEFAULT_RELATION_TYPES = [
-  "authored_by",
-  "likely_owner_of",
-  "co_changes_with",
-];
+/**
+ * Default relation types followed during graph traversal.
+ * authored_by is excluded: it connects persons to every committed file,
+ * producing too many low-signal results. likely_owner_of is the refined
+ * ownership signal; co_changes_with captures structural coupling.
+ */
+const DEFAULT_RELATION_TYPES = ["likely_owner_of", "co_changes_with"];
 
 export interface TraversedEntity {
   entityId: string;

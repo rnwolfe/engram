@@ -402,10 +402,13 @@ export async function search(
     const edgeCount = getEntityEdgeCount(graph, t.entityId);
     const graphScore = normalizeGraphScore(edgeCount);
 
-    // Distance decay: 1-hop entities score higher than 2-hop
-    const distanceDecay = 1.0 / t.hops;
-    // Proxy FTS score: seed's FTS score attenuated by distance and path confidence
-    const proxyFtsScore = t.seedFtsScore * distanceDecay * t.minPathConfidence;
+    // Proxy FTS score: seed's FTS score with a fixed traversal discount.
+    // The discount ensures graph-traversed entities rank below direct FTS
+    // hits but above noise. Edge confidence from the ingester (often 0.001-0.01)
+    // is too low to use as a multiplier — intrinsic entity properties
+    // (evidence, temporal, connectivity) differentiate within traversal results.
+    const traversalDiscount = t.hops === 1 ? 0.85 : 0.55;
+    const proxyFtsScore = t.seedFtsScore * traversalDiscount;
 
     // Indirect vector score via evidence chain (same logic as direct FTS entities)
     let vectorScore = 0.0;
