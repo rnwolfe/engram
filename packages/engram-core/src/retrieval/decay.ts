@@ -168,18 +168,22 @@ function detectContradicted(
   nowMs: number,
 ): DecayItem[] {
   const recentWindowMs = staleDays * 2 * 24 * 60 * 60 * 1000;
+  const recentCutoff = new Date(nowMs - recentWindowMs).toISOString();
 
+  // Only report recently superseded edges (within recentWindowMs)
   const rows = graph.db
-    .query<ContradictedRow, []>(`
+    .query<ContradictedRow, [string]>(`
       SELECT id, fact, invalidated_at
       FROM edges
       WHERE invalidated_at IS NOT NULL AND superseded_by IS NOT NULL
+        AND invalidated_at >= ?
     `)
-    .all();
+    .all(recentCutoff);
 
   return rows.map((row) => {
     const ageMs = nowMs - new Date(row.invalidated_at).getTime();
-    const severity: DecaySeverity = ageMs <= recentWindowMs ? "medium" : "low";
+    const severity: DecaySeverity =
+      ageMs <= recentWindowMs / 2 ? "medium" : "low";
     return {
       type: "edge" as const,
       id: row.id,
@@ -213,18 +217,18 @@ function detectConcentratedRisk(
         en.id,
         en.canonical_name,
         COUNT(DISTINCT ed.id) AS edge_count,
-        COUNT(DISTINCT ep.owner_id) AS owner_count
+        COUNT(DISTINCT COALESCE(NULLIF(ep.owner_id, ''), NULLIF(ep.actor, ''))) AS owner_count
       FROM entities en
       JOIN edges ed ON (ed.source_id = en.id OR ed.target_id = en.id)
         AND ed.invalidated_at IS NULL
       JOIN entity_evidence ee ON ee.entity_id = en.id
       JOIN episodes ep ON ep.id = ee.episode_id
         AND ep.status != 'redacted'
-        AND ep.owner_id IS NOT NULL
+        AND COALESCE(NULLIF(ep.owner_id, ''), NULLIF(ep.actor, '')) IS NOT NULL
       WHERE en.status = 'active'
       GROUP BY en.id
       HAVING COUNT(DISTINCT ed.id) >= ?
-        AND COUNT(DISTINCT ep.owner_id) <= 2
+        AND COUNT(DISTINCT COALESCE(NULLIF(ep.owner_id, ''), NULLIF(ep.actor, ''))) <= 2
     `)
     .all(minEdges);
 
@@ -284,7 +288,7 @@ function detectDormantOwner(
   for (const row of rawRows) {
     const key = `${row.entity_id}::${row.actor}`;
     const tsMs = new Date(row.ts).getTime();
-    const ageMs = nowMs - tsMs;
+    const ageMs = Math.max(0, nowMs - tsMs); // clamp to prevent negative age from future timestamps
     const weight = Math.exp((-ageMs * Math.LN2) / HALF_LIFE_MS);
 
     const existing = actorMap.get(key);
