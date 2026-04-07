@@ -54,6 +54,18 @@ When `ENGRAM_AI_PROVIDER` is unset, the `ai-enhanced` strategy runs with NullPro
 | `vcs-only` | Graph-structured FTS with scoring. Default strategy. |
 | `ai-enhanced` | Hybrid FTS+vector search. Always included; uses NullProvider (FTS only) when `ENGRAM_AI_PROVIDER` is unset. |
 
+## Question types
+
+Each ground-truth question has a `query_type` that indicates what retrieval capability it tests:
+
+| Type | Count | Description |
+|------|-------|-------------|
+| `keyword` | 20 | Answer is text-scannable in raw git log (FTS baseline excels) |
+| `relational` | 12 | Answer requires following 1-2 graph edges (authored_by, likely_owner_of, co_changes_with) |
+| `graph_traversal` | 8 | Answer requires multi-hop reasoning or aggregation over graph topology |
+
+When running multiple strategies, the output includes a per-query-type breakdown table showing where each strategy excels or falls short.
+
 ## Metrics
 
 | Metric | Description |
@@ -121,4 +133,4 @@ closeGraph(graph);
 - `src/report.ts` — Report generation, `printReport()`, `compareStrategies()`
 - `src/baseline.ts` — `saveBaseline()`, `loadBaseline()`, `compareToBaseline()`
 - `src/metrics.ts` — `recallAtK()`, `mrr()`, `computeMetrics()`
-- `src/datasets/fastify/` — Ground-truth Q&A dataset (20 questions)
+- `src/datasets/fastify/` — Ground-truth Q&A dataset (40 questions: 20 keyword, 12 relational, 8 graph_traversal)

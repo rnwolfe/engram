@@ -93,6 +93,26 @@ const strategies: StrategyName[] = strategyArg
   : ALL_STRATEGIES;
 
 // ---------------------------------------------------------------------------
+// Question balance check
+// ---------------------------------------------------------------------------
+
+const keywordCount = FASTIFY_QUESTIONS.filter(
+  (q) => q.query_type === "keyword",
+).length;
+const nonKeywordCount = FASTIFY_QUESTIONS.filter(
+  (q) => q.query_type !== "keyword",
+).length;
+
+if (keywordCount > nonKeywordCount) {
+  console.warn(
+    `[bench] WARNING: keyword questions (${keywordCount}) outnumber ` +
+      `relational+graph questions (${nonKeywordCount}). ` +
+      "Consider adding more relational/graph_traversal questions " +
+      "for a balanced benchmark.",
+  );
+}
+
+// ---------------------------------------------------------------------------
 // AI provider setup
 // ---------------------------------------------------------------------------
 

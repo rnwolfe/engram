@@ -164,4 +164,134 @@ export function compareStrategies(reports: BenchmarkReport[]): void {
 
   console.log("─".repeat(72));
   console.log("");
+
+  // ─── Stratified breakdown by query_type ─────────────────────────────────
+  printStratifiedBreakdown(reports);
+}
+
+// ─── Stratified breakdown helpers ─────────────────────────────────────────────
+
+export interface TypeMetrics {
+  count: number;
+  avg_recall: number;
+  avg_mrr: number;
+}
+
+/**
+ * Compute average recall and MRR for a subset of results.
+ */
+export function aggregateByType(results: BenchmarkResult[]): TypeMetrics {
+  const n = results.length;
+  if (n === 0) return { count: 0, avg_recall: 0, avg_mrr: 0 };
+  const recall = results.reduce((s, r) => s + r.metrics.recall_at_k, 0) / n;
+  const mrrVal = results.reduce((s, r) => s + r.metrics.mrr, 0) / n;
+  return { count: n, avg_recall: recall, avg_mrr: mrrVal };
+}
+
+/**
+ * Prints a per-query_type breakdown table after the overall comparison.
+ */
+function printStratifiedBreakdown(reports: BenchmarkReport[]): void {
+  // Discover all query_types present across all reports
+  const queryTypes = new Set<string>();
+  for (const report of reports) {
+    for (const r of report.results) {
+      queryTypes.add(r.query_type);
+    }
+  }
+
+  const sortedTypes = [...queryTypes].sort((a, b) => {
+    const order: Record<string, number> = {
+      keyword: 0,
+      relational: 1,
+      graph_traversal: 2,
+    };
+    return (order[a] ?? 99) - (order[b] ?? 99);
+  });
+
+  if (sortedTypes.length <= 1) return; // No breakdown needed for single type
+
+  // Compute per-type metrics for each strategy
+  const typeMetricsByStrategy = new Map<string, Map<string, TypeMetrics>>();
+  for (const report of reports) {
+    const byType = new Map<string, TypeMetrics>();
+    for (const qt of sortedTypes) {
+      const subset = report.results.filter((r) => r.query_type === qt);
+      byType.set(qt, aggregateByType(subset));
+    }
+    typeMetricsByStrategy.set(report.baseline, byType);
+  }
+
+  // Build column headers with counts
+  const typeLabels = sortedTypes.map((qt) => {
+    // Use count from first report (all reports have same questions)
+    const firstReport = reports[0];
+    const count = firstReport.results.filter((r) => r.query_type === qt).length;
+    const label = qt === "graph_traversal" ? "graph" : qt;
+    return { qt, label: `${label} (${count})` };
+  });
+
+  // Calculate column widths
+  const strategyColWidth = 22;
+  const typeColWidth = 19;
+  const totalWidth = strategyColWidth + typeColWidth * typeLabels.length;
+
+  console.log("EngRAMark — By Query Type");
+  console.log("─".repeat(totalWidth));
+
+  // Type header row
+  let typeHeader = padRight("", strategyColWidth);
+  for (const tl of typeLabels) {
+    typeHeader += padRight(tl.label, typeColWidth);
+  }
+  console.log(typeHeader);
+
+  // Sub-header row (R@5 / MRR under each type)
+  let subHeader = padRight("Strategy", strategyColWidth);
+  for (const _tl of typeLabels) {
+    subHeader += padRight("R@5    MRR", typeColWidth);
+  }
+  console.log(subHeader);
+
+  console.log("─".repeat(totalWidth));
+
+  // Data rows
+  for (const report of reports) {
+    const byType = typeMetricsByStrategy.get(report.baseline);
+    if (!byType) continue;
+
+    let row = padRight(report.baseline, strategyColWidth);
+    for (const tl of typeLabels) {
+      const m = byType.get(tl.qt);
+      if (m && m.count > 0) {
+        row += padRight(
+          `${m.avg_recall.toFixed(2)}   ${m.avg_mrr.toFixed(2)}`,
+          typeColWidth,
+        );
+      } else {
+        row += padRight("—", typeColWidth);
+      }
+    }
+    console.log(row);
+  }
+
+  console.log("─".repeat(totalWidth));
+
+  // Legend
+  const legend = sortedTypes
+    .map((qt) => {
+      switch (qt) {
+        case "keyword":
+          return "keyword = text-scannable";
+        case "relational":
+          return "relational = graph edges required";
+        case "graph_traversal":
+          return "graph = multi-hop traversal";
+        default:
+          return qt;
+      }
+    })
+    .join("  |  ");
+  console.log(legend);
+  console.log("");
 }
