@@ -1,7 +1,7 @@
 # EngRAMark — AI Provider Benchmarking Extension — Spec
 
 **Phase**: 1 (completion)
-**Status**: Draft
+**Status**: Implemented
 **Proposed**: 2026-04-07
 **Vision fit**: Turns EngRAMark from a snapshot into a living quality gate — provider-comparative benchmarking directly validates "queryable with AI" against ground truth, rather than trusting it by assumption.
 

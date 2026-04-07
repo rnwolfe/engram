@@ -6,6 +6,13 @@
  */
 
 export type {
+  BaselineEntry,
+  BaselineFile,
+  CompareBaselineResult,
+  RegressionResult,
+} from "./baseline.js";
+export { compareToBaseline, loadBaseline, saveBaseline } from "./baseline.js";
+export type {
   BenchmarkReport,
   BenchmarkResult,
   RetrievalMetrics,
@@ -101,4 +108,60 @@ export function printReport(report: BenchmarkReport): void {
 
 function padRight(s: string, width: number): string {
   return s.length >= width ? `${s.slice(0, width - 1)} ` : s.padEnd(width);
+}
+
+/**
+ * Renders a side-by-side comparison table for multiple strategy results.
+ * Includes delta columns relative to the vcs-only baseline.
+ *
+ * @param reports - Array of BenchmarkReports to compare (one per strategy).
+ */
+export function compareStrategies(reports: BenchmarkReport[]): void {
+  if (reports.length === 0) {
+    console.log("\nNo strategies to compare.");
+    return;
+  }
+
+  const vcsReport = reports.find((r) => r.baseline === "vcs-only");
+
+  console.log("\nEngRAMark — Strategy Comparison");
+  console.log("─".repeat(72));
+  console.log(
+    padRight("Strategy", 22) +
+      padRight("Recall@5", 12) +
+      padRight("MRR", 10) +
+      padRight("Avg Latency(ms)", 18) +
+      "vs vcs-only",
+  );
+  console.log("─".repeat(72));
+
+  for (const report of reports) {
+    const { aggregate, baseline } = report;
+    const recallStr = aggregate.avg_recall_at_5.toFixed(2);
+    const mrrStr = aggregate.avg_mrr.toFixed(2);
+    const latencyStr = aggregate.avg_latency_ms.toFixed(1);
+
+    let deltaStr = "—";
+    if (vcsReport && baseline !== "vcs-only") {
+      const recallDelta =
+        aggregate.avg_recall_at_5 - vcsReport.aggregate.avg_recall_at_5;
+      const mrrDelta = aggregate.avg_mrr - vcsReport.aggregate.avg_mrr;
+      const recallSign = recallDelta >= 0 ? "+" : "";
+      const mrrSign = mrrDelta >= 0 ? "+" : "";
+      deltaStr = `${recallSign}${(recallDelta * 100).toFixed(1)}pp Recall, ${mrrSign}${(mrrDelta * 100).toFixed(1)}pp MRR`;
+    } else if (baseline === "vcs-only") {
+      deltaStr = "(baseline)";
+    }
+
+    console.log(
+      padRight(baseline, 22) +
+        padRight(recallStr, 12) +
+        padRight(mrrStr, 10) +
+        padRight(latencyStr, 18) +
+        deltaStr,
+    );
+  }
+
+  console.log("─".repeat(72));
+  console.log("");
 }
