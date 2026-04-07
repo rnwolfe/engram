@@ -2,6 +2,8 @@
  * graph/index.ts — re-exports for the graph CRUD module.
  */
 
+export type { Alias, AliasInput } from "./aliases.js";
+export { addEntityAlias, resolveEntity } from "./aliases.js";
 export type { Edge, EdgeInput, FindEdgesQuery } from "./edges.js";
 export { addEdge, findEdges, getEdge } from "./edges.js";
 export type {

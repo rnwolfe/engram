@@ -16,6 +16,8 @@ export {
   SCHEMA_DDL,
 } from "./format/index.js";
 export type {
+  Alias,
+  AliasInput,
   Edge,
   EdgeInput,
   Entity,
@@ -30,6 +32,7 @@ export type {
 export {
   addEdge,
   addEntity,
+  addEntityAlias,
   addEpisode,
   EdgeNotFoundError,
   EntityNotFoundError,
@@ -41,6 +44,7 @@ export {
   getEpisode,
   getEvidenceForEdge,
   getEvidenceForEntity,
+  resolveEntity,
 } from "./graph/index.js";
 export {
   checkActiveEdgeConflict,
