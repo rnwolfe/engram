@@ -356,8 +356,8 @@ describe("vcs-only runner", () => {
     expect(result.metrics.recall_at_k).toBeGreaterThan(0);
   });
 
-  test("runBenchmark returns full report for subset of questions", () => {
-    const { runBenchmark } = require("../src/runners/vcs-only.js");
+  test("runBenchmark returns full report for subset of questions", async () => {
+    const { runBenchmark } = await import("../src/runners/vcs-only.js");
     const subset = FASTIFY_QUESTIONS.slice(0, 3);
     const report = runBenchmark(graph, subset);
 
@@ -407,8 +407,8 @@ describe("grep-baseline runner", () => {
     expect(result.metrics.recall_at_k).toBeGreaterThan(0);
   });
 
-  test("runBenchmark returns full report", () => {
-    const { runBenchmark } = require("../src/runners/grep-baseline.js");
+  test("runBenchmark returns full report", async () => {
+    const { runBenchmark } = await import("../src/runners/grep-baseline.js");
     const subset = FASTIFY_QUESTIONS.slice(0, 3);
     const report = runBenchmark(graph, subset);
 

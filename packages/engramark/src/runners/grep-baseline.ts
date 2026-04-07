@@ -76,13 +76,20 @@ export function runQuestion(
   );
 
   // For the grep baseline we have no entity names, only raw text.
-  // Check if expected entity names appear anywhere in the retrieved text.
+  // Build retrievedEntities in ranked order: scan contents top-to-bottom
+  // and record the first expected entity found in each content snippet.
   const retrievedEntities: string[] = [];
-  for (const expected of question.expected_entities) {
-    const found = contents.some((c) =>
-      c.toLowerCase().includes(expected.toLowerCase()),
-    );
-    if (found) retrievedEntities.push(expected);
+  const addedEntities = new Set<string>();
+  for (const content of contents) {
+    for (const expected of question.expected_entities) {
+      if (
+        !addedEntities.has(expected) &&
+        content.toLowerCase().includes(expected.toLowerCase())
+      ) {
+        retrievedEntities.push(expected);
+        addedEntities.add(expected);
+      }
+    }
   }
 
   const metrics = computeMetrics(
