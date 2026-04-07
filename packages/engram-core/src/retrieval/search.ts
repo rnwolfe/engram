@@ -114,7 +114,7 @@ function searchEntities(
       entities.entity_type,
       entities.updated_at,
       entities.status,
-      entities_fts.rank
+      bm25(entities_fts) AS rank
     FROM entities_fts
     JOIN entities ON entities._rowid = entities_fts.rowid
     WHERE entities_fts MATCH ?
@@ -168,7 +168,7 @@ function searchEdges(
       edges.valid_until,
       edges.invalidated_at,
       edges.created_at,
-      edges_fts.rank
+      bm25(edges_fts) AS rank
     FROM edges_fts
     JOIN edges ON edges._rowid = edges_fts.rowid
     WHERE edges_fts MATCH ?
@@ -193,7 +193,7 @@ function searchEpisodes(
       episodes.content,
       episodes.timestamp,
       episodes.status,
-      episodes_fts.rank
+      bm25(episodes_fts) AS rank
     FROM episodes_fts
     JOIN episodes ON episodes._rowid = episodes_fts.rowid
     WHERE episodes_fts MATCH ?
