@@ -40,14 +40,14 @@ export function resolveEntity(
   if (type !== undefined) {
     const row = graph.db
       .query<Entity, [string, string]>(
-        "SELECT * FROM entities WHERE canonical_name = ? AND entity_type = ? LIMIT 1",
+        "SELECT * FROM entities WHERE canonical_name = ? AND entity_type = ? ORDER BY created_at ASC LIMIT 1",
       )
       .get(name, type);
     if (row) return row;
   } else {
     const row = graph.db
       .query<Entity, [string]>(
-        "SELECT * FROM entities WHERE canonical_name = ? LIMIT 1",
+        "SELECT * FROM entities WHERE canonical_name = ? ORDER BY created_at ASC LIMIT 1",
       )
       .get(name);
     if (row) return row;
@@ -58,26 +58,30 @@ export function resolveEntity(
 
   if (type !== undefined) {
     const row = graph.db
+      .query<Entity, [string, string, string, string]>(
+        `SELECT e.* FROM entities e
+         JOIN entity_aliases a ON a.entity_id = e.id
+         WHERE a.alias = ?
+           AND (a.valid_from IS NULL OR a.valid_from <= ?)
+           AND (a.valid_until IS NULL OR a.valid_until > ?)
+           AND e.entity_type = ?
+         ORDER BY a.created_at DESC, e.created_at ASC
+         LIMIT 1`,
+      )
+      .get(name, now, now, type);
+    return row ?? null;
+  } else {
+    const row = graph.db
       .query<Entity, [string, string, string]>(
         `SELECT e.* FROM entities e
          JOIN entity_aliases a ON a.entity_id = e.id
          WHERE a.alias = ?
+           AND (a.valid_from IS NULL OR a.valid_from <= ?)
            AND (a.valid_until IS NULL OR a.valid_until > ?)
-           AND e.entity_type = ?
+         ORDER BY a.created_at DESC, e.created_at ASC
          LIMIT 1`,
       )
-      .get(name, now, type);
-    return row ?? null;
-  } else {
-    const row = graph.db
-      .query<Entity, [string, string]>(
-        `SELECT e.* FROM entities e
-         JOIN entity_aliases a ON a.entity_id = e.id
-         WHERE a.alias = ?
-           AND (a.valid_until IS NULL OR a.valid_until > ?)
-         LIMIT 1`,
-      )
-      .get(name, now);
+      .get(name, now, now);
     return row ?? null;
   }
 }
@@ -101,23 +105,26 @@ export function addEntityAlias(graph: EngramGraph, input: AliasInput): Alias {
   const id = ulid();
   const now = new Date().toISOString();
 
-  graph.db
-    .prepare<
-      void,
-      [
-        string,
-        string,
-        string,
-        string | null,
-        string | null,
-        string | null,
-        string,
-      ]
-    >(
-      `INSERT INTO entity_aliases (id, entity_id, alias, valid_from, valid_until, episode_id, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
+  const insertStmt = graph.db.prepare<
+    void,
+    [
+      string,
+      string,
+      string,
+      string | null,
+      string | null,
+      string | null,
+      string,
+    ]
+  >(
+    `INSERT INTO entity_aliases (id, entity_id, alias, valid_from, valid_until, episode_id, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  );
+
+  let row: Alias | null = null;
+
+  graph.db.transaction(() => {
+    insertStmt.run(
       id,
       input.entity_id,
       input.alias,
@@ -127,9 +134,11 @@ export function addEntityAlias(graph: EngramGraph, input: AliasInput): Alias {
       now,
     );
 
-  const row = graph.db
-    .query<Alias, [string]>("SELECT * FROM entity_aliases WHERE id = ?")
-    .get(id);
+    row =
+      graph.db
+        .query<Alias, [string]>("SELECT * FROM entity_aliases WHERE id = ?")
+        .get(id) ?? null;
+  })();
 
   if (!row) {
     throw new Error(`addEntityAlias: failed to retrieve inserted alias ${id}`);
