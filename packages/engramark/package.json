@@ -1,0 +1,15 @@
+{
+  "name": "engramark",
+  "version": "0.1.0",
+  "description": "Benchmark suite for engram knowledge retrieval",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "bun build src/report.ts --outdir dist --target node",
+    "test": "bun test",
+    "bench": "bun run src/report.ts"
+  },
+  "dependencies": {
+    "engram-core": "workspace:*"
+  }
+}
