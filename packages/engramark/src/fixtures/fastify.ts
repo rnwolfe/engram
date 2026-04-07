@@ -18,6 +18,7 @@ export const FASTIFY_REPO_URL = "https://github.com/fastify/fastify";
  * Pinned release tag for the benchmark fixture.
  *
  * Pinned to a specific tag to ensure reproducible benchmark results.
- * Shallow-clone with `--depth 1 --branch <tag>` takes ~2–5s.
+ * Shallow-clone with `--depth 500 --branch <tag>` provides ~500 commits of
+ * history for meaningful bus-factor, co-change, and ownership analysis.
  */
 export const FASTIFY_TAG = "v4.28.1";

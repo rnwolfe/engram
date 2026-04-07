@@ -416,6 +416,45 @@ describe("grep-baseline runner", () => {
     expect(report.results).toHaveLength(3);
     expect(report.aggregate.total_questions).toBe(3);
   });
+
+  test("entity matching uses full content, not truncated at 200 chars", () => {
+    // Regression test: entity name appears after the 200-char mark in episode content.
+    // This verifies the fix that uses row.content (full) for matching, not the
+    // truncated snippets used only for context-size estimation.
+    const padding = "x".repeat(210);
+    const entityName = "lib/deep-module.js";
+
+    const localGraph = createGraph(":memory:");
+    const ep = addEpisode(localGraph, {
+      source_type: "git_commit",
+      source_ref: "trunc-regression-001",
+      content: `${padding} ${entityName}`,
+      actor: "Test Author",
+      timestamp: "2024-01-01T00:00:00.000Z",
+    });
+    addEntity(
+      localGraph,
+      {
+        canonical_name: entityName,
+        entity_type: "file",
+        summary: "A deeply buried module",
+      },
+      [{ episode_id: ep.id, extractor: "test", confidence: 1.0 }],
+    );
+
+    const question: GroundTruthQuestion = {
+      id: "test-trunc-regression",
+      category: "ownership",
+      question: entityName,
+      expected_entities: [entityName],
+    };
+
+    const result = grepRunQuestion(localGraph, question);
+    expect(result.retrieved_entities).toContain(entityName);
+    expect(result.metrics.recall_at_k).toBe(1.0);
+
+    closeGraph(localGraph);
+  });
 });
 
 // ─── Dataset sanity check ─────────────────────────────────────────────────────

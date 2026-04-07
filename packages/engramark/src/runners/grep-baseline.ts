@@ -70,27 +70,27 @@ export function runQuestion(
 
   const latency_ms = performance.now() - start;
 
-  // Extract content snippets as "retrieved entities" for comparison
-  const contents = rows.map((r) =>
-    r.content.length > 200 ? `${r.content.slice(0, 200)}…` : r.content,
-  );
-
-  // For the grep baseline we have no entity names, only raw text.
-  // Build retrievedEntities in ranked order: scan contents top-to-bottom
-  // and record the first expected entity found in each content snippet.
+  // For entity matching: scan the full episode content (not truncated).
+  // Build retrievedEntities in ranked order: scan content top-to-bottom
+  // and record the first expected entity found in each episode.
   const retrievedEntities: string[] = [];
   const addedEntities = new Set<string>();
-  for (const content of contents) {
+  for (const row of rows) {
     for (const expected of question.expected_entities) {
       if (
         !addedEntities.has(expected) &&
-        content.toLowerCase().includes(expected.toLowerCase())
+        row.content.toLowerCase().includes(expected.toLowerCase())
       ) {
         retrievedEntities.push(expected);
         addedEntities.add(expected);
       }
     }
   }
+
+  // Extract truncated content snippets for display / context-size metrics.
+  const contents = rows.map((r) =>
+    r.content.length > 200 ? `${r.content.slice(0, 200)}…` : r.content,
+  );
 
   const metrics = computeMetrics(
     question.expected_entities,
