@@ -73,7 +73,7 @@ export const FASTIFY_QUESTIONS: GroundTruthQuestion[] = [
     id: "fastify-own-003",
     category: "ownership",
     question: "contentTypeParser",
-    expected_entities: ["lib/contentTypeParser.js"],
+    expected_entities: ["lib/contentTypeParser.js", "kaka@kakawebsitedemo.com"],
     expected_relation: "authored_by",
     notes:
       "KaKa (kaka@kakawebsitedemo.com) has the most commits to lib/contentTypeParser.js " +
@@ -189,7 +189,7 @@ export const FASTIFY_QUESTIONS: GroundTruthQuestion[] = [
     id: "fastify-coc-001",
     category: "co_change",
     question: "fastify.js",
-    expected_entities: ["fastify.js"],
+    expected_entities: ["fastify.js", "package.json"],
     expected_relation: "co_changes_with",
     notes:
       "fastify.js and package.json have the highest co_changes_with weight (1.0) in this window. " +
