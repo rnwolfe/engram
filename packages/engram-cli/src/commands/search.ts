@@ -25,7 +25,7 @@ export function registerSearch(program: Command): void {
     .option("--valid-at <iso>", "filter edges valid at this ISO8601 timestamp")
     .option("--format <fmt>", "output format: text or json", "text")
     .option("--db <path>", "path to .engram file", ".engram")
-    .action((query: string, opts: SearchOpts) => {
+    .action(async (query: string, opts: SearchOpts) => {
       const dbPath = path.resolve(opts.db);
       const limit = parseInt(opts.limit, 10);
 
@@ -51,7 +51,7 @@ export function registerSearch(program: Command): void {
 
       let results: SearchResult[];
       try {
-        results = search(graph, query, {
+        results = await search(graph, query, {
           limit,
           valid_at: opts.validAt,
         });

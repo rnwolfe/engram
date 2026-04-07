@@ -250,5 +250,6 @@ When creating a PR that implements a GitHub issue:
 | `packages/engram-core/src/format/` | `.engram` file schema and migrations |
 | `packages/engram-core/src/graph/` | Entity, edge, alias, evidence CRUD |
 | `packages/engram-core/src/temporal/` | Temporal logic (validity, supersession, snapshots) |
+| `packages/engram-core/src/ai/` | AI provider layer (NullProvider, OllamaProvider, GeminiProvider) |
 | `packages/engram-core/src/ingest/git.ts` | Git VCS ingestion (the "money command" engine) |
 | `packages/engram-core/src/ingest/adapter.ts` | EnrichmentAdapter interface |

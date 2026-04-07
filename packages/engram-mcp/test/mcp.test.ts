@@ -170,10 +170,10 @@ describe("engram MCP tool handlers", () => {
   });
 
   describe("handleSearch", () => {
-    test("returns results for matching query", () => {
+    test("returns results for matching query", async () => {
       seedGraph(graph);
 
-      const results = handleSearch(graph, { query: "Alice" });
+      const results = await handleSearch(graph, { query: "Alice" });
       expect(results.length).toBeGreaterThan(0);
       // Results may be entity, edge, or episode — just check score
       expect(results[0].score).toBeGreaterThan(0);
@@ -182,24 +182,24 @@ describe("engram MCP tool handlers", () => {
       expect(entityResults.length).toBeGreaterThan(0);
     });
 
-    test("returns empty array for no matches", () => {
+    test("returns empty array for no matches", async () => {
       seedGraph(graph);
-      const results = handleSearch(graph, { query: "zzznomatch999" });
+      const results = await handleSearch(graph, { query: "zzznomatch999" });
       expect(results).toEqual([]);
     });
 
-    test("respects limit", () => {
+    test("respects limit", async () => {
       seedGraph(graph);
-      const results = handleSearch(graph, { query: "Alice", limit: 1 });
+      const results = await handleSearch(graph, { query: "Alice", limit: 1 });
       expect(results.length).toBeLessThanOrEqual(1);
     });
   });
 
   describe("handleGetContext", () => {
-    test("returns context with entities and edges", () => {
+    test("returns context with entities and edges", async () => {
       seedGraph(graph);
 
-      const result = handleGetContext(graph, { query: "Alice auth" });
+      const result = await handleGetContext(graph, { query: "Alice auth" });
 
       expect(result).toHaveProperty("entities");
       expect(result).toHaveProperty("edges");
@@ -210,11 +210,11 @@ describe("engram MCP tool handlers", () => {
       expect(result.context_tokens).toBeGreaterThanOrEqual(0);
     });
 
-    test("respects max_tokens budget", () => {
+    test("respects max_tokens budget", async () => {
       seedGraph(graph);
 
       // Very small budget — should truncate
-      const result = handleGetContext(graph, {
+      const result = await handleGetContext(graph, {
         query: "Alice",
         max_tokens: 10,
       });
@@ -223,8 +223,8 @@ describe("engram MCP tool handlers", () => {
       expect(result.truncated).toBe(true);
     });
 
-    test("returns empty context for no-match query", () => {
-      const result = handleGetContext(graph, { query: "zzznomatch999" });
+    test("returns empty context for no-match query", async () => {
+      const result = await handleGetContext(graph, { query: "zzznomatch999" });
 
       expect(result.entities).toEqual([]);
       expect(result.edges).toEqual([]);

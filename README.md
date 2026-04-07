@@ -61,6 +61,54 @@ implementations over that contract.
 7. **Format over features** — the `.engram` format is the contract
 8. **Personal today, tribal tomorrow** — provenance from day one, merge later
 
+## AI-Enhanced Mode
+
+Engram works without any AI configured. With an AI provider, it generates embeddings for entities and episodes during ingest, and blends vector similarity into search scores.
+
+### Providers
+
+| Provider | Configuration | Notes |
+|----------|---------------|-------|
+| `null` | (default) | No embeddings. FTS-only search. Always available. |
+| `ollama` | `ENGRAM_AI_PROVIDER=ollama` | Local Ollama. Default model: `nomic-embed-text`. |
+| `gemini` | `ENGRAM_AI_PROVIDER=gemini` + `GEMINI_API_KEY=<key>` | Google Gemini. Default model: `gemini-embedding-001`. |
+
+### Usage
+
+```bash
+# No AI — FTS-only (default behavior, unchanged)
+engram search "who owns the auth module"
+
+# With Ollama running locally
+ENGRAM_AI_PROVIDER=ollama engram search "who owns the auth module"
+
+# With Gemini
+ENGRAM_AI_PROVIDER=gemini GEMINI_API_KEY=<your-key> engram search "who owns the auth module"
+
+# Ingest with embeddings
+ENGRAM_AI_PROVIDER=ollama engram ingest git --path .
+```
+
+Engram degrades gracefully: if the provider is offline or the key is missing, it logs a warning and falls back to null behavior. Embedding failures never corrupt the graph.
+
+### Programmatic API
+
+```typescript
+import { createProvider, storeEmbedding, findSimilar, search } from "engram-core";
+
+// Create a provider (reads ENGRAM_AI_PROVIDER env by default)
+const provider = createProvider({ provider: "ollama" });
+
+// Hybrid search (FTS + vector)
+const results = await search(graph, "auth module ownership", { provider });
+
+// Store embeddings manually
+storeEmbedding(graph, entityId, "entity", "nomic-embed-text", embeddingVector, sourceText);
+
+// Find similar items by vector
+const similar = findSimilar(graph, queryEmbedding, { limit: 10, target_type: "entity" });
+```
+
 ## Status
 
 **v0.1 — in development.** Format is experimental. Breaking changes expected before 1.0.

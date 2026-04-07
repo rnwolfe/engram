@@ -1,8 +1,9 @@
 # AI Provider Integration — Spec
 
 **Phase**: 1 (completion)
-**Status**: Draft
+**Status**: Implemented
 **Proposed**: 2026-04-07
+**Implemented**: 2026-04-07
 **Vision fit**: Completes principle 5 — "structurally sound without AI, queryable with AI" — by adding the pluggable provider layer that enables semantic entity extraction and vector embeddings without requiring AI.
 
 ## Strategic Rationale

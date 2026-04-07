@@ -63,10 +63,10 @@ export interface SearchInput {
   scope?: string;
 }
 
-export function handleSearch(
+export async function handleSearch(
   graph: EngramGraph,
   input: SearchInput,
-): SearchResult[] {
+): Promise<SearchResult[]> {
   return search(graph, input.query, {
     limit: input.limit,
     mode: input.mode,

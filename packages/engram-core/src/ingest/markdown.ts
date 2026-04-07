@@ -3,13 +3,16 @@
  *
  * Reads markdown files (or globs) and creates episodes with source_type='document'.
  * No AI/entity extraction — just raw episode creation.
+ * Optionally generates embeddings post-ingest when provider is set.
  */
 
 import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import type { AIProvider } from "../ai/provider.js";
 import type { EngramGraph } from "../format/index.js";
 import { ENGINE_VERSION } from "../format/version.js";
+import { storeEmbedding } from "../graph/embeddings.js";
 import { addEpisode } from "../graph/episodes.js";
 import type { IngestResult } from "./git.js";
 
@@ -20,6 +23,8 @@ import type { IngestResult } from "./git.js";
 export interface MarkdownIngestOpts {
   owner_id?: string;
   actor?: string;
+  /** AI provider for post-ingest embedding generation (best-effort, never blocks ingest) */
+  provider?: AIProvider;
 }
 
 // ---------------------------------------------------------------------------
@@ -91,6 +96,7 @@ export async function ingestMarkdown(
   };
 
   const paths = await expandPaths(pathOrGlob);
+  const newEpisodeIds: string[] = [];
 
   for (const filePath of paths) {
     const absolutePath = path.resolve(filePath);
@@ -123,7 +129,7 @@ export async function ingestMarkdown(
     const content = fs.readFileSync(absolutePath, "utf-8");
     const timestamp = stat.mtime.toISOString();
 
-    addEpisode(graph, {
+    const episode = addEpisode(graph, {
       source_type: "document",
       source_ref: absolutePath,
       content,
@@ -138,8 +144,70 @@ export async function ingestMarkdown(
       },
     });
 
+    newEpisodeIds.push(episode.id);
     counts.episodesCreated++;
   }
 
+  // Post-ingest: generate embeddings for new episodes (best-effort, never blocks)
+  if (opts.provider && newEpisodeIds.length > 0) {
+    await generateEpisodeEmbeddings(graph, opts.provider, newEpisodeIds);
+  }
+
   return counts;
+}
+
+/**
+ * Generate embeddings for a list of episode IDs.
+ * Never throws — failures are logged and skipped.
+ */
+async function generateEpisodeEmbeddings(
+  graph: EngramGraph,
+  provider: AIProvider,
+  episodeIds: string[],
+): Promise<void> {
+  interface EpisodeContentRow {
+    id: string;
+    content: string;
+  }
+
+  const rows: EpisodeContentRow[] = [];
+  for (const id of episodeIds) {
+    const row = graph.db
+      .query<EpisodeContentRow, [string]>(
+        "SELECT id, content FROM episodes WHERE id = ?",
+      )
+      .get(id);
+    if (row) rows.push(row);
+  }
+
+  if (rows.length === 0) return;
+
+  try {
+    const texts = rows.map((r) => r.content);
+    const embeddings = await provider.embed(texts);
+
+    for (let i = 0; i < rows.length; i++) {
+      const embedding = embeddings[i];
+      if (!embedding || embedding.length === 0) continue;
+
+      try {
+        storeEmbedding(
+          graph,
+          rows[i].id,
+          "episode",
+          "provider",
+          embedding,
+          rows[i].content.slice(0, 500),
+        );
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(
+          `[engram] generateEpisodeEmbeddings: skip ${rows[i].id}: ${msg}`,
+        );
+      }
+    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[engram] ingestMarkdown: provider error: ${msg}`);
+  }
 }

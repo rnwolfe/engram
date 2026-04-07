@@ -220,17 +220,19 @@ describe("computeCompositeScore", () => {
     expect(computeCompositeScore(components, "fulltext")).toBe(0);
   });
 
-  test("hybrid mode produces different weights than fulltext", () => {
+  test("hybrid mode produces different scores than fulltext when vector_score differs", () => {
+    // With vector_score > 0, hybrid mode should produce higher scores
+    // because hybrid allocates 0.25 weight to vector vs fulltext's 0.0
     const components = {
       fts_score: 0.5,
-      graph_score: 1.0,
+      graph_score: 0.5,
       temporal_score: 0.5,
       evidence_score: 0.5,
-      vector_score: 0.0,
+      vector_score: 1.0, // high vector score
     };
     const ftScore = computeCompositeScore(components, "fulltext");
     const hybridScore = computeCompositeScore(components, "hybrid");
-    // Hybrid boosts graph_score, so hybrid should be higher when graph_score=1.0
+    // Hybrid gives weight to vector_score, so hybrid > fulltext when vector_score=1.0
     expect(hybridScore).toBeGreaterThan(ftScore);
   });
 });
@@ -240,15 +242,15 @@ describe("computeCompositeScore", () => {
 // ---------------------------------------------------------------------------
 
 describe("search", () => {
-  test("returns empty array for empty query", () => {
+  test("returns empty array for empty query", async () => {
     seedGraph(graph);
-    expect(search(graph, "")).toEqual([]);
-    expect(search(graph, "   ")).toEqual([]);
+    expect(await search(graph, "")).toEqual([]);
+    expect(await search(graph, "   ")).toEqual([]);
   });
 
-  test("finds entities by canonical name", () => {
+  test("finds entities by canonical name", async () => {
     seedGraph(graph);
-    const results = search(graph, "AuthService");
+    const results = await search(graph, "AuthService");
     expect(results.length).toBeGreaterThan(0);
     const entityResult = results.find(
       (r) => r.type === "entity" && r.content === "AuthService",
@@ -256,9 +258,9 @@ describe("search", () => {
     expect(entityResult).toBeDefined();
   });
 
-  test("finds entities by summary text", () => {
+  test("finds entities by summary text", async () => {
     seedGraph(graph);
-    const results = search(graph, "JWT authentication");
+    const results = await search(graph, "JWT authentication");
     expect(results.length).toBeGreaterThan(0);
     const entityResult = results.find(
       (r) => r.type === "entity" && r.content === "AuthService",
@@ -266,35 +268,35 @@ describe("search", () => {
     expect(entityResult).toBeDefined();
   });
 
-  test("finds edges by fact text", () => {
+  test("finds edges by fact text", async () => {
     seedGraph(graph);
-    const results = search(graph, "depends credential storage");
+    const results = await search(graph, "depends credential storage");
     expect(results.length).toBeGreaterThan(0);
     const edgeResult = results.find((r) => r.type === "edge");
     expect(edgeResult).toBeDefined();
     expect(edgeResult?.edge_kind).toBe("observed");
   });
 
-  test("finds episodes by content", () => {
+  test("finds episodes by content", async () => {
     seedGraph(graph);
-    const results = search(graph, "PostgreSQL database");
+    const results = await search(graph, "PostgreSQL database");
     expect(results.length).toBeGreaterThan(0);
     const epResult = results.find((r) => r.type === "episode");
     expect(epResult).toBeDefined();
   });
 
-  test("results are sorted by score descending", () => {
+  test("results are sorted by score descending", async () => {
     seedGraph(graph);
-    const results = search(graph, "database");
+    const results = await search(graph, "database");
     expect(results.length).toBeGreaterThan(1);
     for (let i = 1; i < results.length; i++) {
       expect(results[i].score).toBeLessThanOrEqual(results[i - 1].score);
     }
   });
 
-  test("results include score_components", () => {
+  test("results include score_components", async () => {
     seedGraph(graph);
-    const results = search(graph, "AuthService");
+    const results = await search(graph, "AuthService");
     expect(results.length).toBeGreaterThan(0);
     const r = results[0];
     expect(r.score_components).toBeDefined();
@@ -302,9 +304,9 @@ describe("search", () => {
     expect(r.score_components.vector_score).toBe(0.0);
   });
 
-  test("results include provenance", () => {
+  test("results include provenance", async () => {
     seedGraph(graph);
-    const results = search(graph, "AuthService");
+    const results = await search(graph, "AuthService");
     const entityResult = results.find(
       (r) => r.type === "entity" && r.content === "AuthService",
     );
@@ -312,9 +314,9 @@ describe("search", () => {
     expect(entityResult?.provenance).toHaveLength(1);
   });
 
-  test("entity with multiple evidence has non-zero evidence_score", () => {
+  test("entity with multiple evidence has non-zero evidence_score", async () => {
     seedGraph(graph);
-    const results = search(graph, "database");
+    const results = await search(graph, "database");
     const dbResult = results.find(
       (r) => r.type === "entity" && r.content === "DatabaseModule",
     );
@@ -322,9 +324,9 @@ describe("search", () => {
     expect(dbResult?.score_components.evidence_score).toBeGreaterThan(0);
   });
 
-  test("entity with edges has non-zero graph_score", () => {
+  test("entity with edges has non-zero graph_score", async () => {
     seedGraph(graph);
-    const results = search(graph, "AuthService");
+    const results = await search(graph, "AuthService");
     const entityResult = results.find(
       (r) => r.type === "entity" && r.content === "AuthService",
     );
@@ -332,25 +334,25 @@ describe("search", () => {
     expect(entityResult?.score_components.graph_score).toBeGreaterThan(0);
   });
 
-  test("respects limit option", () => {
+  test("respects limit option", async () => {
     seedGraph(graph);
-    const results = search(graph, "database", { limit: 1 });
+    const results = await search(graph, "database", { limit: 1 });
     expect(results).toHaveLength(1);
   });
 
-  test("respects min_confidence filter", () => {
+  test("respects min_confidence filter", async () => {
     seedGraph(graph);
-    const allResults = search(graph, "database");
-    const filteredResults = search(graph, "database", { min_confidence: 0.99 });
+    const allResults = await search(graph, "database");
+    const filteredResults = await search(graph, "database", { min_confidence: 0.99 });
     expect(filteredResults.length).toBeLessThanOrEqual(allResults.length);
     for (const r of filteredResults) {
       expect(r.score).toBeGreaterThanOrEqual(0.99);
     }
   });
 
-  test("respects entity_types filter", () => {
+  test("respects entity_types filter", async () => {
     seedGraph(graph);
-    const results = search(graph, "service module database authentication", {
+    const results = await search(graph, "service module database authentication", {
       entity_types: ["service"],
     });
     const entityResults = results.filter((r) => r.type === "entity");
@@ -360,7 +362,7 @@ describe("search", () => {
     }
   });
 
-  test("respects edge_kinds filter", () => {
+  test("respects edge_kinds filter", async () => {
     const { ep1, authService, dbModule } = seedGraph(graph);
 
     // Add an inferred edge
@@ -376,10 +378,10 @@ describe("search", () => {
       [{ episode_id: ep1.id, extractor: "cochange-analyzer" }],
     );
 
-    const observedResults = search(graph, "changes commits", {
+    const observedResults = await search(graph, "changes commits", {
       edge_kinds: ["observed"],
     });
-    const inferredResults = search(graph, "changes commits", {
+    const inferredResults = await search(graph, "changes commits", {
       edge_kinds: ["inferred"],
     });
 
@@ -392,7 +394,7 @@ describe("search", () => {
     }
   });
 
-  test("respects valid_at temporal filter for edges", () => {
+  test("respects valid_at temporal filter for edges", async () => {
     const ep = addEpisode(graph, {
       source_type: "manual",
       source_ref: null,
@@ -427,21 +429,21 @@ describe("search", () => {
     );
 
     // Should find edge when querying within validity window
-    const inWindow = search(graph, "legacy authentication", {
+    const inWindow = await search(graph, "legacy authentication", {
       valid_at: "2024-02-15T00:00:00Z",
     });
     const edgeResult = inWindow.find((r) => r.type === "edge");
     expect(edgeResult).toBeDefined();
 
     // Should NOT find edge when querying outside validity window
-    const outsideWindow = search(graph, "legacy authentication", {
+    const outsideWindow = await search(graph, "legacy authentication", {
       valid_at: "2024-06-01T00:00:00Z",
     });
     const edgeResult2 = outsideWindow.find((r) => r.type === "edge");
     expect(edgeResult2).toBeUndefined();
   });
 
-  test("excludes invalidated edges by default", () => {
+  test("excludes invalidated edges by default", async () => {
     const ep = addEpisode(graph, {
       source_type: "manual",
       source_ref: null,
@@ -478,34 +480,46 @@ describe("search", () => {
       edge.id,
     ]);
 
-    const defaultResults = search(graph, "cryptographic operations");
+    const defaultResults = await search(graph, "cryptographic operations");
     const edgeDefault = defaultResults.find((r) => r.type === "edge");
     expect(edgeDefault).toBeUndefined();
 
-    const includeInvalidated = search(graph, "cryptographic operations", {
+    const includeInvalidated = await search(graph, "cryptographic operations", {
       include_invalidated: true,
     });
     const edgeIncluded = includeInvalidated.find((r) => r.type === "edge");
     expect(edgeIncluded).toBeDefined();
   });
 
-  test("hybrid mode returns same results as fulltext for v0.1", () => {
+  test("hybrid mode with null provider returns same results as fulltext", async () => {
     seedGraph(graph);
-    const ftResults = search(graph, "database", { mode: "fulltext" });
-    const hybridResults = search(graph, "database", { mode: "hybrid" });
-    // Both should return results with same IDs (order may differ slightly)
+    const ftResults = await search(graph, "database", { mode: "fulltext" });
+    const hybridResults = await search(graph, "database", { mode: "hybrid" });
+    // Both should return results with same IDs (order may differ slightly due to weights)
     const ftIds = new Set(ftResults.map((r) => r.id));
     const hybridIds = new Set(hybridResults.map((r) => r.id));
     expect(ftIds).toEqual(hybridIds);
   });
 
-  test("returns empty array for no matches", () => {
+  test("search with NullProvider returns same results as FTS-only", async () => {
     seedGraph(graph);
-    const results = search(graph, "xyznonexistentterm12345");
+    const { NullProvider } = await import("../../src/ai/index.js");
+    const provider = new NullProvider();
+    const ftsResults = await search(graph, "database");
+    const withProviderResults = await search(graph, "database", { provider });
+    // Same IDs (NullProvider provides no embeddings, so vector_score=0 for all)
+    const ftsIds = new Set(ftsResults.map((r) => r.id));
+    const providerIds = new Set(withProviderResults.map((r) => r.id));
+    expect(ftsIds).toEqual(providerIds);
+  });
+
+  test("returns empty array for no matches", async () => {
+    seedGraph(graph);
+    const results = await search(graph, "xyznonexistentterm12345");
     expect(results).toEqual([]);
   });
 
-  test("episode content is truncated to snippet", () => {
+  test("episode content is truncated to snippet", async () => {
     const ep = addEpisode(graph, {
       source_type: "manual",
       source_ref: null,
@@ -520,16 +534,16 @@ describe("search", () => {
     );
 
     // Search for content that exists in the long episode
-    const results = search(graph, "AAAAAAAAAA");
+    const results = await search(graph, "AAAAAAAAAA");
     const epResult = results.find((r) => r.type === "episode");
     if (epResult) {
       expect(epResult.content.length).toBeLessThanOrEqual(201); // 200 chars + ellipsis
     }
   });
 
-  test("episode provenance is its own ID", () => {
+  test("episode provenance is its own ID", async () => {
     seedGraph(graph);
-    const results = search(graph, "PostgreSQL");
+    const results = await search(graph, "PostgreSQL");
     const epResult = results.find((r) => r.type === "episode");
     expect(epResult).toBeDefined();
     expect(epResult?.provenance).toEqual([epResult?.id]);

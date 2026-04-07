@@ -4,9 +4,12 @@
  * Searches across entities, edges, and episodes using FTS5.
  * Scores results using a composite of FTS rank, evidence strength,
  * temporal recency, and graph connectivity.
+ * When provider is set, also performs vector similarity search.
  */
 
+import type { AIProvider } from "../ai/provider.js";
 import type { EngramGraph } from "../format/index.js";
+import { findSimilar } from "../graph/embeddings.js";
 import type { ScoreComponents } from "./scoring.js";
 import {
   computeCompositeScore,
@@ -26,6 +29,7 @@ export interface SearchOpts {
   edge_kinds?: string[]; // 'observed' | 'inferred' | 'asserted' (edges only)
   include_invalidated?: boolean; // default false
   mode?: "fulltext" | "hybrid"; // default 'fulltext'
+  provider?: AIProvider; // when set, enables vector similarity search
 }
 
 export interface SearchResult {
@@ -246,12 +250,13 @@ function getEntityEdgeCount(graph: EngramGraph, entityId: string): number {
 /**
  * Search the graph using full-text search across entities, edges, and episodes.
  * Returns results sorted by composite score descending.
+ * When opts.provider is set, also performs vector similarity search and merges results.
  */
-export function search(
+export async function search(
   graph: EngramGraph,
   query: string,
   opts: SearchOpts = {},
-): SearchResult[] {
+): Promise<SearchResult[]> {
   const limit = opts.limit ?? 20;
   const minConfidence = opts.min_confidence ?? 0.0;
   const mode = opts.mode ?? "fulltext";
@@ -296,6 +301,24 @@ export function search(
     episodeRows.map((r) => r.rank),
   );
 
+  // Build vector similarity map when provider is set
+  const vectorScoreMap = new Map<string, number>();
+  if (opts.provider) {
+    try {
+      const queryEmbeddings = await opts.provider.embed([query]);
+      if (queryEmbeddings.length > 0 && queryEmbeddings[0].length > 0) {
+        const similar = findSimilar(graph, queryEmbeddings[0], { limit: 100 });
+        for (const result of similar) {
+          vectorScoreMap.set(result.target_id, result.score);
+        }
+      }
+    } catch {
+      // Provider failure is non-fatal — fall back to FTS-only
+    }
+  }
+
+  const effectiveMode = opts.provider ? "hybrid" : mode;
+
   const results: SearchResult[] = [];
 
   // Build entity results
@@ -307,16 +330,17 @@ export function search(
     const evidenceScore = normalizeEvidenceCount(provenance.length);
     const edgeCount = getEntityEdgeCount(graph, row.id);
     const graphScore = normalizeGraphScore(edgeCount);
+    const vectorScore = vectorScoreMap.get(row.id) ?? 0.0;
 
     const components: ScoreComponents = {
       fts_score: ftsScore,
       graph_score: graphScore,
       temporal_score: temporalScore,
       evidence_score: evidenceScore,
-      vector_score: 0.0,
+      vector_score: vectorScore,
     };
 
-    const score = computeCompositeScore(components, mode);
+    const score = computeCompositeScore(components, effectiveMode);
 
     results.push({
       type: "entity",
@@ -335,16 +359,17 @@ export function search(
     const temporalScore = computeTemporalScore(row.created_at, now);
     const provenance = getEdgeProvenance(graph, row.id);
     const evidenceScore = normalizeEvidenceCount(provenance.length);
+    const vectorScore = vectorScoreMap.get(row.id) ?? 0.0;
 
     const components: ScoreComponents = {
       fts_score: ftsScore,
       graph_score: 0.0,
       temporal_score: temporalScore,
       evidence_score: evidenceScore,
-      vector_score: 0.0,
+      vector_score: vectorScore,
     };
 
-    const score = computeCompositeScore(components, mode);
+    const score = computeCompositeScore(components, effectiveMode);
 
     results.push({
       type: "edge",
@@ -362,16 +387,17 @@ export function search(
     const row = episodeRows[i];
     const ftsScore = episodeNormalizedRanks[i];
     const temporalScore = computeTemporalScore(row.timestamp, now);
+    const vectorScore = vectorScoreMap.get(row.id) ?? 0.0;
 
     const components: ScoreComponents = {
       fts_score: ftsScore,
       graph_score: 0.0,
       temporal_score: temporalScore,
       evidence_score: 1.0,
-      vector_score: 0.0,
+      vector_score: vectorScore,
     };
 
-    const score = computeCompositeScore(components, mode);
+    const score = computeCompositeScore(components, effectiveMode);
 
     // Truncate content to a reasonable snippet
     const snippet =
