@@ -46,6 +46,8 @@ export {
   getEvidenceForEntity,
   resolveEntity,
 } from "./graph/index.js";
+export type { GitIngestOpts, IngestResult } from "./ingest/git.js";
+export { ingestGitRepo } from "./ingest/git.js";
 export {
   checkActiveEdgeConflict,
   getFactHistory,
