@@ -253,6 +253,7 @@ describe("generateReport", () => {
   ): BenchmarkResult => ({
     baseline: "test",
     category: "ownership",
+    query_type: "keyword",
     question_id: "test-001",
     question: "Who owns X?",
     retrieved_entities: [],
@@ -306,6 +307,7 @@ describe("printReport", () => {
     const result: BenchmarkResult = {
       baseline: "vcs-only",
       category: "ownership",
+      query_type: "keyword",
       question_id: "fastify-own-001",
       question: "Who is the primary author of fastify/fastify.js?",
       retrieved_entities: ["Matteo Collina"],
@@ -324,6 +326,7 @@ describe("vcs-only runner", () => {
     const question: GroundTruthQuestion = {
       id: "test-own-001",
       category: "ownership",
+      query_type: "keyword",
       question: "Matteo Collina fastify",
       expected_entities: ["Matteo Collina", "fastify/fastify.js"],
     };
@@ -346,6 +349,7 @@ describe("vcs-only runner", () => {
     const question: GroundTruthQuestion = {
       id: "test-own-002",
       category: "ownership",
+      query_type: "keyword",
       // Use just the entity name so FTS matches the canonical_name directly
       question: "Matteo Collina",
       expected_entities: ["Matteo Collina"],
@@ -378,6 +382,7 @@ describe("grep-baseline runner", () => {
     const question: GroundTruthQuestion = {
       id: "test-bus-001",
       category: "bus_factor",
+      query_type: "keyword",
       question: "logger sole contributor Matteo Collina bus factor",
       expected_entities: ["lib/logger.js"],
     };
@@ -398,6 +403,7 @@ describe("grep-baseline runner", () => {
     const question: GroundTruthQuestion = {
       id: "test-bus-002",
       category: "bus_factor",
+      query_type: "keyword",
       question: "logger sole contributor",
       expected_entities: ["lib/logger.js"],
     };
@@ -445,6 +451,7 @@ describe("grep-baseline runner", () => {
     const question: GroundTruthQuestion = {
       id: "test-trunc-regression",
       category: "ownership",
+      query_type: "keyword",
       question: entityName,
       expected_entities: [entityName],
     };
@@ -460,39 +467,40 @@ describe("grep-baseline runner", () => {
 // ─── Dataset sanity check ─────────────────────────────────────────────────────
 
 describe("FASTIFY_QUESTIONS dataset", () => {
-  test("has at least 20 questions", () => {
-    expect(FASTIFY_QUESTIONS.length).toBeGreaterThanOrEqual(20);
+  test("has at least 40 questions", () => {
+    expect(FASTIFY_QUESTIONS.length).toBeGreaterThanOrEqual(40);
   });
 
   test("all questions have required fields", () => {
     for (const q of FASTIFY_QUESTIONS) {
       expect(q.id).toBeTruthy();
       expect(["ownership", "bus_factor", "co_change"]).toContain(q.category);
+      expect(["keyword", "relational", "graph_traversal"]).toContain(
+        q.query_type,
+      );
       expect(q.question).toBeTruthy();
       expect(Array.isArray(q.expected_entities)).toBe(true);
       expect(q.expected_entities.length).toBeGreaterThan(0);
     }
   });
 
-  test("has exactly 7 ownership questions", () => {
-    const ownership = FASTIFY_QUESTIONS.filter(
-      (q) => q.category === "ownership",
-    );
-    expect(ownership.length).toBe(7);
+  test("has 20 keyword questions", () => {
+    const keyword = FASTIFY_QUESTIONS.filter((q) => q.query_type === "keyword");
+    expect(keyword.length).toBe(20);
   });
 
-  test("has exactly 7 bus_factor questions", () => {
-    const busFactor = FASTIFY_QUESTIONS.filter(
-      (q) => q.category === "bus_factor",
+  test("has at least 12 relational questions", () => {
+    const relational = FASTIFY_QUESTIONS.filter(
+      (q) => q.query_type === "relational",
     );
-    expect(busFactor.length).toBe(7);
+    expect(relational.length).toBeGreaterThanOrEqual(12);
   });
 
-  test("has exactly 6 co_change questions", () => {
-    const coChange = FASTIFY_QUESTIONS.filter(
-      (q) => q.category === "co_change",
+  test("has at least 8 graph_traversal questions", () => {
+    const graphTraversal = FASTIFY_QUESTIONS.filter(
+      (q) => q.query_type === "graph_traversal",
     );
-    expect(coChange.length).toBe(6);
+    expect(graphTraversal.length).toBeGreaterThanOrEqual(8);
   });
 
   test("question IDs are unique", () => {

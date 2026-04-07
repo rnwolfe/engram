@@ -102,6 +102,7 @@ export function runQuestion(
   return {
     baseline: BASELINE_NAME,
     category: question.category,
+    query_type: question.query_type,
     question_id: question.id,
     question: question.question,
     retrieved_entities: retrievedEntities,

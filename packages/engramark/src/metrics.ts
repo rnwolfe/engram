@@ -16,6 +16,7 @@ export interface RetrievalMetrics {
 export interface BenchmarkResult {
   baseline: string;
   category: string;
+  query_type: string;
   question_id: string;
   question: string;
   retrieved_entities: string[];

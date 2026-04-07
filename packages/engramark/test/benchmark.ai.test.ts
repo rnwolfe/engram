@@ -191,6 +191,7 @@ describe("ai-enhanced runner", () => {
     const question: GroundTruthQuestion = {
       id: "ai-test-001",
       category: "ownership",
+      query_type: "keyword",
       question: "Matteo Collina fastify",
       expected_entities: ["Matteo Collina", "fastify/fastify.js"],
     };
@@ -217,12 +218,14 @@ describe("ai-enhanced runner", () => {
         {
           id: "ai-test-002",
           category: "ownership",
+          query_type: "keyword",
           question: "Matteo Collina",
           expected_entities: ["Matteo Collina"],
         },
         {
           id: "ai-test-003",
           category: "ownership",
+          query_type: "keyword",
           question: "Tomas Della Vedova",
           expected_entities: ["Tomas Della Vedova"],
         },
@@ -247,6 +250,7 @@ describe("ai-enhanced runner", () => {
       const question: GroundTruthQuestion = {
         id: "ai-test-004",
         category: "ownership",
+        query_type: "keyword",
         question: "Matteo Collina fastify",
         expected_entities: ["Matteo Collina"],
       };
@@ -456,6 +460,7 @@ describe("runners registry", () => {
       {
         id: "reg-test-001",
         category: "ownership",
+        query_type: "keyword",
         question: "Matteo Collina",
         expected_entities: ["Matteo Collina"],
       },
@@ -470,6 +475,7 @@ describe("runners registry", () => {
       {
         id: "reg-test-002",
         category: "ownership",
+        query_type: "keyword",
         question: "Matteo Collina",
         expected_entities: ["Matteo Collina"],
       },
@@ -487,6 +493,7 @@ describe("runners registry", () => {
         {
           id: "reg-test-003",
           category: "ownership",
+          query_type: "keyword",
           question: "Matteo Collina",
           expected_entities: ["Matteo Collina"],
         },
@@ -507,6 +514,7 @@ describe("runners registry", () => {
       {
         id: "reg-test-004",
         category: "ownership",
+        query_type: "keyword",
         question: "Matteo Collina",
         expected_entities: ["Matteo Collina"],
       },
