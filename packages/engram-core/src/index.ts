@@ -54,6 +54,12 @@ export type { MarkdownIngestOpts } from "./ingest/markdown.js";
 export { ingestMarkdown } from "./ingest/markdown.js";
 export type { TextIngestOpts } from "./ingest/text.js";
 export { ingestText } from "./ingest/text.js";
+export type {
+  ScoreComponents,
+  SearchOpts,
+  SearchResult,
+} from "./retrieval/index.js";
+export { search } from "./retrieval/index.js";
 export {
   checkActiveEdgeConflict,
   getFactHistory,
