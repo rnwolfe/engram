@@ -1,7 +1,7 @@
 {
   "template": "rnwolfe/forge",
-  "commit": "",
-  "synced_at": null,
+  "commit": "f061e880c99644e0b9c2e02750bf1cf0a347feea",
+  "synced_at": "2026-04-06T00:00:00Z",
   "synced_paths": [
     ".claude/skills/",
     ".claude/settings.json",
