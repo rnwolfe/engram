@@ -14,6 +14,10 @@
       "bun": "./src/metrics.ts",
       "default": "./dist/metrics.js"
     },
+    "./baseline": {
+      "bun": "./src/baseline.ts",
+      "default": "./dist/baseline.js"
+    },
     "./runners/vcs-only": {
       "bun": "./src/runners/vcs-only.ts",
       "default": "./dist/runners/vcs-only.js"
@@ -22,13 +26,21 @@
       "bun": "./src/runners/grep-baseline.ts",
       "default": "./dist/runners/grep-baseline.js"
     },
+    "./runners/ai-enhanced": {
+      "bun": "./src/runners/ai-enhanced.ts",
+      "default": "./dist/runners/ai-enhanced.js"
+    },
+    "./runners": {
+      "bun": "./src/runners/index.ts",
+      "default": "./dist/runners/index.js"
+    },
     "./datasets/fastify": {
       "bun": "./src/datasets/fastify/questions.ts",
       "default": "./dist/datasets/fastify/questions.js"
     }
   },
   "scripts": {
-    "build": "bun build src/report.ts src/metrics.ts src/runners/vcs-only.ts src/runners/grep-baseline.ts src/datasets/fastify/questions.ts --outdir dist --target node",
+    "build": "bun build src/report.ts src/metrics.ts src/baseline.ts src/runners/vcs-only.ts src/runners/grep-baseline.ts src/runners/ai-enhanced.ts src/runners/index.ts src/datasets/fastify/questions.ts --outdir dist --target node",
     "test": "bun test",
     "bench": "bun run src/report.ts"
   },
