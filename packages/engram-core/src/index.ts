@@ -55,6 +55,11 @@ export { ingestMarkdown } from "./ingest/markdown.js";
 export type { TextIngestOpts } from "./ingest/text.js";
 export { ingestText } from "./ingest/text.js";
 export type {
+  DecayCategory,
+  DecayItem,
+  DecayOpts,
+  DecayReport,
+  DecaySeverity,
   PathResult,
   ScoreComponents,
   SearchOpts,
@@ -62,7 +67,12 @@ export type {
   SubGraph,
   TraversalOpts,
 } from "./retrieval/index.js";
-export { getNeighbors, getPath, search } from "./retrieval/index.js";
+export {
+  getDecayReport,
+  getNeighbors,
+  getPath,
+  search,
+} from "./retrieval/index.js";
 export type { TemporalSnapshot } from "./temporal/index.js";
 export {
   checkActiveEdgeConflict,
