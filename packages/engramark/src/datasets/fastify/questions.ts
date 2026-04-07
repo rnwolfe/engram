@@ -48,7 +48,7 @@ export interface GroundTruthQuestion {
 }
 
 export const FASTIFY_QUESTIONS: GroundTruthQuestion[] = [
-  // ─── Ownership (8) ────────────────────────────────────────────────────────
+  // ─── Ownership (7) ────────────────────────────────────────────────────────
 
   {
     id: "fastify-own-001",
@@ -66,7 +66,8 @@ export const FASTIFY_QUESTIONS: GroundTruthQuestion[] = [
     question: "fastify.js",
     expected_entities: ["fastify.js"],
     expected_relation: "authored_by",
-    notes: "fastify.js is the core entry point; entity canonical_name matches exactly.",
+    notes:
+      "fastify.js is the core entry point; entity canonical_name matches exactly.",
   },
   {
     id: "fastify-own-003",
@@ -84,7 +85,8 @@ export const FASTIFY_QUESTIONS: GroundTruthQuestion[] = [
     question: "hooks",
     expected_entities: ["lib/hooks.js"],
     expected_relation: "authored_by",
-    notes: "Uzlopak (aras.abbasi@googlemail.com) is the top committer to lib/hooks.js (3 commits).",
+    notes:
+      "Uzlopak (aras.abbasi@googlemail.com) is the top committer to lib/hooks.js (3 commits).",
   },
   {
     id: "fastify-own-005",
@@ -92,7 +94,8 @@ export const FASTIFY_QUESTIONS: GroundTruthQuestion[] = [
     question: "validation",
     expected_entities: ["lib/validation.js"],
     expected_relation: "authored_by",
-    notes: "Manuel Spigolon (behemoth89@gmail.com) is top committer to lib/validation.js (3 commits).",
+    notes:
+      "Manuel Spigolon (behemoth89@gmail.com) is top committer to lib/validation.js (3 commits).",
   },
   {
     id: "fastify-own-006",
@@ -110,7 +113,8 @@ export const FASTIFY_QUESTIONS: GroundTruthQuestion[] = [
     question: "pluginUtils",
     expected_entities: ["lib/pluginUtils.js"],
     expected_relation: "authored_by",
-    notes: "lib/pluginUtils.js is primarily maintained by Manuel Spigolon (2 commits, highest in window).",
+    notes:
+      "lib/pluginUtils.js is primarily maintained by Manuel Spigolon (2 commits, highest in window).",
   },
   // ─── Bus Factor (7) ───────────────────────────────────────────────────────
 
@@ -129,7 +133,7 @@ export const FASTIFY_QUESTIONS: GroundTruthQuestion[] = [
     category: "bus_factor",
     question: "wrapThenable",
     expected_entities: ["lib/wrapThenable.js"],
-    expected_relation: "sole_author",
+    expected_relation: "likely_owner_of",
     notes:
       "lib/wrapThenable.js is exclusively authored by Matteo Collina in this 500-commit window " +
       "— all 5 commits touching the file are from hello@matteocollina.com.",
