@@ -6,17 +6,17 @@
 # Documentation: https://github.com/rnwolfe/forge
 
 [project]
-name = ""                          # Project name (e.g., "myproject")
-repo = ""                          # GitHub org/repo (e.g., "org/myproject")
-description = ""                   # One-line project description
+name = "engram"                    # Project name (e.g., "myproject")
+repo = "rnwolfe/engram"            # GitHub org/repo (e.g., "org/myproject")
+description = "A local-first temporal knowledge graph engine for developer memory"
 base_branch = "main"               # Default branch for PRs
 
 [stack]
-language = ""                      # Primary language: go, node, python, rust, java, etc.
-build_command = ""                 # Build command (e.g., "make build", "npm run build")
-test_command = ""                  # Test command (e.g., "make test", "npm test")
-lint_command = ""                  # Lint command (optional, e.g., "go vet ./...", "npm run lint")
-release_tool = "none"              # Release tool: goreleaser, npm, cargo, pypi, docker, none
+language = "node"                  # Primary language: go, node, python, rust, java, etc.
+build_command = "bun run build"    # Build command (e.g., "make build", "npm run build")
+test_command = "bun test"          # Test command (e.g., "make test", "npm test")
+lint_command = "bun run lint"      # Lint command (optional, e.g., "go vet ./...", "npm run lint")
+release_tool = "github-releases"   # Release tool: goreleaser, npm, cargo, pypi, docker, none
 
 [gating]
 human_merge_required = true        # Require human to merge PRs (Level 1-2)
@@ -40,8 +40,8 @@ implement_timeout_minutes = 60     # Timeout for implementation workflow
 review_timeout_minutes = 45        # Timeout for review-fix workflow
 
 [trust]
-trusted_users = []                 # GitHub logins that can trigger autodev via backlog/ready label
-human_reviewer = ""                # GitHub login for CODEOWNERS (auto-added by GitHub, removed from autodev PRs)
+trusted_users = ["rnwolfe"]        # GitHub logins that can trigger autodev via backlog/ready label
+human_reviewer = "rnwolfe"         # GitHub login for CODEOWNERS (auto-added by GitHub, removed from autodev PRs)
 
 [commits]
 convention = "conventional"    # Commit message format enforced by commitlint
