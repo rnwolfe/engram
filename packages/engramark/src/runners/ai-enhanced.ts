@@ -30,6 +30,10 @@ export async function runQuestion(
 ): Promise<BenchmarkResult> {
   const start = performance.now();
 
+  // NOTE: limit: 10 fetches mixed result types (entities + episodes). Only
+  // entity-typed results count toward recall. In practice this yields at least
+  // 5 entity results for typical graphs, but on sparse graphs the effective
+  // recall pool may be smaller than the k=5 cutoff used in computeMetrics.
   const results = await search(graph, question.question, {
     limit: 10,
     mode: "hybrid",

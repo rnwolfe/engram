@@ -72,7 +72,21 @@ export function saveBaseline(reports: BenchmarkReport[], path: string): void {
  */
 export function loadBaseline(path: string): BaselineFile {
   const raw = readFileSync(path, "utf-8");
-  return JSON.parse(raw) as BaselineFile;
+  const parsed = JSON.parse(raw);
+
+  if (
+    typeof parsed !== "object" ||
+    parsed === null ||
+    typeof parsed.recorded_at !== "string" ||
+    typeof parsed.strategies !== "object" ||
+    parsed.strategies === null
+  ) {
+    throw new Error(
+      `Invalid baseline file at "${path}": expected { recorded_at: string, strategies: object }`,
+    );
+  }
+
+  return parsed as BaselineFile;
 }
 
 // ─── Regression Detection ─────────────────────────────────────────────────────

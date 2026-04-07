@@ -66,7 +66,7 @@ class MockAIProvider implements AIProvider {
     });
   }
 
-  async extractEntities(): Promise<[]> {
+  async extractEntities(_text: string): Promise<[]> {
     return [];
   }
 
@@ -87,7 +87,7 @@ class NullEmbedProvider implements AIProvider {
     return [];
   }
 
-  async extractEntities(): Promise<[]> {
+  async extractEntities(_text: string): Promise<[]> {
     return [];
   }
 }
@@ -497,7 +497,9 @@ describe("runners registry", () => {
         expected_entities: ["Matteo Collina"],
       },
     ];
-    expect(runStrategy("ai-enhanced", graph, questions)).rejects.toThrow();
+    await expect(
+      runStrategy("ai-enhanced", graph, questions),
+    ).rejects.toThrow();
   });
 
   test("generateReport is re-exported from report.ts", () => {
