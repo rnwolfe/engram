@@ -55,13 +55,18 @@ export { ingestMarkdown } from "./ingest/markdown.js";
 export type { TextIngestOpts } from "./ingest/text.js";
 export { ingestText } from "./ingest/text.js";
 export type {
+  PathResult,
   ScoreComponents,
   SearchOpts,
   SearchResult,
+  SubGraph,
+  TraversalOpts,
 } from "./retrieval/index.js";
-export { search } from "./retrieval/index.js";
+export { getNeighbors, getPath, search } from "./retrieval/index.js";
+export type { TemporalSnapshot } from "./temporal/index.js";
 export {
   checkActiveEdgeConflict,
   getFactHistory,
+  getSnapshot,
   supersedeEdge,
 } from "./temporal/index.js";
