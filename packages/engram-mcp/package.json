@@ -4,6 +4,12 @@
   "description": "MCP server for engram temporal knowledge graph",
   "type": "module",
   "main": "dist/server.js",
+  "exports": {
+    ".": {
+      "bun": "./src/server.ts",
+      "default": "./dist/server.js"
+    }
+  },
   "scripts": {
     "build": "bun build src/server.ts --outdir dist --target node",
     "test": "bun test"
