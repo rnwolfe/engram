@@ -31,6 +31,7 @@ import { join, resolve } from "node:path";
 
 import {
   closeGraph,
+  createGraph,
   createProvider,
   ingestGitRepo,
   NullProvider,
@@ -147,7 +148,7 @@ if (cachedPath) {
       [
         "clone",
         "--depth",
-        "1",
+        "500",
         "--branch",
         FASTIFY_TAG,
         FASTIFY_REPO_URL,
@@ -164,9 +165,8 @@ if (cachedPath) {
   const cloneMs = (performance.now() - cloneStart).toFixed(0);
   console.log(`[bench] Clone complete in ${cloneMs}ms`);
 
-  // Create an in-memory graph for this run
-  graphPath = ":memory:";
-  const graph = openGraph(graphPath);
+  // Create a fresh in-memory graph for this run
+  const graph = createGraph(":memory:");
 
   console.log("[bench] Ingesting git history...");
   const ingestStart = performance.now();
