@@ -7,13 +7,20 @@
 export const FORMAT_VERSION = "0.1.0";
 export const ENGINE_VERSION = "0.1.0";
 
-export type { CreateOpts, EngramGraph } from "./format/index.js";
+export type {
+  CreateOpts,
+  EngramGraph,
+  VerifyResult,
+  Violation,
+  ViolationSeverity,
+} from "./format/index.js";
 export {
   closeGraph,
   createGraph,
   EngramFormatError,
   openGraph,
   SCHEMA_DDL,
+  verifyGraph,
 } from "./format/index.js";
 export type {
   Alias,
