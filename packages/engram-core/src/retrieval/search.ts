@@ -342,7 +342,7 @@ export async function search(
   ]);
   const traversed: TraversedEntity[] = graphSearch(graph, seeds, {
     maxHops,
-    validAt: opts.valid_at,
+    valid_at: opts.valid_at,
   });
 
   const results: SearchResult[] = [];
@@ -404,8 +404,8 @@ export async function search(
 
     // Distance decay: 1-hop entities score higher than 2-hop
     const distanceDecay = 1.0 / t.hops;
-    // Proxy FTS score: seed's FTS score attenuated by distance and edge confidence
-    const proxyFtsScore = t.seedFtsScore * distanceDecay * t.maxEdgeConfidence;
+    // Proxy FTS score: seed's FTS score attenuated by distance and path confidence
+    const proxyFtsScore = t.seedFtsScore * distanceDecay * t.minPathConfidence;
 
     // Indirect vector score via evidence chain (same logic as direct FTS entities)
     let vectorScore = 0.0;

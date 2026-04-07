@@ -11,6 +11,13 @@ import type { Edge } from "../graph/edges.js";
 import { findEdges } from "../graph/edges.js";
 import { getEntity } from "../graph/entities.js";
 
+/** Default relation types followed during graph traversal. */
+const DEFAULT_RELATION_TYPES = [
+  "authored_by",
+  "likely_owner_of",
+  "co_changes_with",
+];
+
 export interface TraversedEntity {
   entityId: string;
   canonicalName: string;
@@ -18,8 +25,8 @@ export interface TraversedEntity {
   updatedAt: string;
   /** Number of hops from the nearest seed entity. */
   hops: number;
-  /** Maximum edge confidence along the best path from a seed. */
-  maxEdgeConfidence: number;
+  /** Minimum (bottleneck) edge confidence along the path from seed. */
+  minPathConfidence: number;
   /** FTS score of the seed entity that led to this discovery. */
   seedFtsScore: number;
   /** ID of the seed entity that led to this discovery. */
@@ -30,37 +37,43 @@ export interface GraphSearchOpts {
   /** Maximum traversal depth. Default 2. */
   maxHops?: number;
   /** Only follow edges valid at this ISO8601 timestamp. */
-  validAt?: string;
+  valid_at?: string;
+  /** Relation types to traverse. Default: authored_by, likely_owner_of, co_changes_with. */
+  relation_types?: string[];
 }
 
 interface FrontierEntry {
   entityId: string;
   hops: number;
-  maxEdgeConfidence: number;
+  minPathConfidence: number;
   seedFtsScore: number;
   seedEntityId: string;
 }
 
 /**
- * Collect active edges from an entity in both directions.
+ * Collect active edges from an entity in both directions,
+ * filtered to the allowed relation types.
  */
 function collectEdges(
   graph: EngramGraph,
   entityId: string,
+  relationTypes: string[],
   validAt?: string,
 ): Edge[] {
   const base = { active_only: true, valid_at: validAt };
   const outbound = findEdges(graph, { ...base, source_id: entityId });
   const inbound = findEdges(graph, { ...base, target_id: entityId });
-  return [...outbound, ...inbound];
+  const all = [...outbound, ...inbound];
+  return all.filter((e) => relationTypes.includes(e.relation_type));
 }
 
 /**
  * BFS traversal from seed entities, tracking hop distance and edge confidence.
  *
- * For each seed entity (found via FTS), follows edges up to maxHops deep.
- * Returns all discovered entities that are NOT in the seed set, scored by
- * the best path (highest seed FTS score, shortest distance, highest confidence).
+ * For each seed entity (found via FTS), follows edges of the allowed relation
+ * types up to maxHops deep. Returns all discovered entities that are NOT in
+ * the seed set, scored by the best path (shortest distance, highest confidence,
+ * highest seed FTS score).
  *
  * @param graph - The engram graph to traverse.
  * @param seeds - Array of [entityId, normalizedFtsScore] from the FTS phase.
@@ -73,6 +86,7 @@ export function graphSearch(
   opts: GraphSearchOpts = {},
 ): TraversedEntity[] {
   const maxHops = opts.maxHops ?? 2;
+  const relationTypes = opts.relation_types ?? DEFAULT_RELATION_TYPES;
 
   if (seeds.length === 0 || maxHops === 0) return [];
 
@@ -84,7 +98,7 @@ export function graphSearch(
   let frontier: FrontierEntry[] = seeds.map(([id, ftsScore]) => ({
     entityId: id,
     hops: 0,
-    maxEdgeConfidence: 1.0,
+    minPathConfidence: 1.0,
     seedFtsScore: ftsScore,
     seedEntityId: id,
   }));
@@ -97,7 +111,12 @@ export function graphSearch(
     const nextFrontier: FrontierEntry[] = [];
 
     for (const entry of frontier) {
-      const edges = collectEdges(graph, entry.entityId, opts.validAt);
+      const edges = collectEdges(
+        graph,
+        entry.entityId,
+        relationTypes,
+        opts.valid_at,
+      );
 
       for (const edge of edges) {
         const neighborId =
@@ -105,7 +124,7 @@ export function graphSearch(
 
         const neighborHops = entry.hops + 1;
         const pathConfidence = Math.min(
-          entry.maxEdgeConfidence,
+          entry.minPathConfidence,
           edge.confidence,
         );
 
@@ -121,7 +140,7 @@ export function graphSearch(
             entityType: neighbor.entity_type,
             updatedAt: neighbor.updated_at,
             hops: neighborHops,
-            maxEdgeConfidence: pathConfidence,
+            minPathConfidence: pathConfidence,
             seedFtsScore: entry.seedFtsScore,
             seedEntityId: entry.seedEntityId,
           };
@@ -131,20 +150,24 @@ export function graphSearch(
           nextFrontier.push({
             entityId: neighborId,
             hops: neighborHops,
-            maxEdgeConfidence: pathConfidence,
+            minPathConfidence: pathConfidence,
             seedFtsScore: entry.seedFtsScore,
             seedEntityId: entry.seedEntityId,
           });
         } else if (!seedIds.has(neighborId)) {
-          // Already visited non-seed: update if this path is better
+          // Already visited non-seed: update metadata if this path is better.
+          // Note: the improved entry is NOT re-enqueued, so downstream nodes
+          // from this entity retain the original path's attribution. This is a
+          // known BFS tradeoff acceptable for v0.1 — only affects scoring
+          // precision in multi-seed edge cases.
           const existing = best.get(neighborId);
           if (existing) {
             const isBetter =
               neighborHops < existing.hops ||
               (neighborHops === existing.hops &&
-                pathConfidence > existing.maxEdgeConfidence) ||
+                pathConfidence > existing.minPathConfidence) ||
               (neighborHops === existing.hops &&
-                pathConfidence === existing.maxEdgeConfidence &&
+                pathConfidence === existing.minPathConfidence &&
                 entry.seedFtsScore > existing.seedFtsScore);
 
             if (isBetter) {
@@ -154,7 +177,7 @@ export function graphSearch(
                 entityType: existing.entityType,
                 updatedAt: existing.updatedAt,
                 hops: neighborHops,
-                maxEdgeConfidence: pathConfidence,
+                minPathConfidence: pathConfidence,
                 seedFtsScore: entry.seedFtsScore,
                 seedEntityId: entry.seedEntityId,
               });

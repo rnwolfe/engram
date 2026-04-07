@@ -31,10 +31,14 @@ interface GraphFixture {
 
 /**
  * Build a small graph that mirrors the Fastify benchmark pattern:
- *   person --likely_owner_of--> fileA
- *   person --likely_owner_of--> fileB
+ *   fileA  --likely_owner_of--> person
+ *   fileB  --likely_owner_of--> person
  *   fileA  --co_changes_with--> fileC
  *   unrelated (no edges to person)
+ *
+ * Note: in production, ingestGitRepo creates likely_owner_of edges with
+ * source_id = file, target_id = owner. The fixture uses person→file for
+ * simplicity; graphSearch traverses both directions so the result is the same.
  */
 function seedGraphFixture(g: EngramGraph): GraphFixture {
   const ep1 = addEpisode(g, {
@@ -209,9 +213,9 @@ describe("graphSearch", () => {
     const fileC = results.find((r) => r.canonicalName === "lib/fileC.js");
 
     // fileA: direct edge confidence 0.9
-    expect(fileA?.maxEdgeConfidence).toBe(0.9);
+    expect(fileA?.minPathConfidence).toBe(0.9);
     // fileC: path is person->fileA(0.9)->fileC(0.8), min = 0.8
-    expect(fileC?.maxEdgeConfidence).toBe(0.8);
+    expect(fileC?.minPathConfidence).toBe(0.8);
   });
 
   test("propagates seed FTS score", () => {
@@ -263,18 +267,38 @@ describe("graphSearch", () => {
     // Within validity window: should find TemporalB
     const inWindow = graphSearch(graph, [[entityA.id, 1.0]], {
       maxHops: 1,
-      validAt: "2024-02-15T00:00:00Z",
+      valid_at: "2024-02-15T00:00:00Z",
     });
     expect(inWindow.map((r) => r.canonicalName)).toContain("TemporalB");
 
     // Outside validity window: should NOT find TemporalB
     const outsideWindow = graphSearch(graph, [[entityA.id, 1.0]], {
       maxHops: 1,
-      validAt: "2024-06-01T00:00:00Z",
+      valid_at: "2024-06-01T00:00:00Z",
     });
     expect(outsideWindow.map((r) => r.canonicalName)).not.toContain(
       "TemporalB",
     );
+  });
+
+  test("filters by relation_types — only follows specified edge types", () => {
+    const { person } = seedGraphFixture(graph);
+
+    // Only follow co_changes_with — person has no co_changes_with edges directly
+    const cochangeOnly = graphSearch(graph, [[person.id, 1.0]], {
+      maxHops: 1,
+      relation_types: ["co_changes_with"],
+    });
+    expect(cochangeOnly).toHaveLength(0);
+
+    // Only follow likely_owner_of — should find fileA and fileB
+    const ownerOnly = graphSearch(graph, [[person.id, 1.0]], {
+      maxHops: 1,
+      relation_types: ["likely_owner_of"],
+    });
+    const names = ownerOnly.map((r) => r.canonicalName).sort();
+    expect(names).toContain("lib/fileA.js");
+    expect(names).toContain("lib/fileB.js");
   });
 
   test("handles multiple seeds", () => {
