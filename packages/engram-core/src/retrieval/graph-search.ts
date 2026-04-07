@@ -49,7 +49,7 @@ function collectEdges(
   entityId: string,
   validAt?: string,
 ): Edge[] {
-  const base = { active_only: true as const, valid_at: validAt };
+  const base = { active_only: true, valid_at: validAt };
   const outbound = findEdges(graph, { ...base, source_id: entityId });
   const inbound = findEdges(graph, { ...base, target_id: entityId });
   return [...outbound, ...inbound];

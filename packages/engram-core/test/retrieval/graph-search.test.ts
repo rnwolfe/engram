@@ -224,6 +224,59 @@ describe("graphSearch", () => {
     }
   });
 
+  test("respects validAt — excludes expired edges from traversal", () => {
+    const ep = addEpisode(graph, {
+      source_type: "git",
+      source_ref: "commit-temporal",
+      content: "temporal edge test",
+      timestamp: "2024-01-01T00:00:00Z",
+    });
+
+    const entityA = addEntity(
+      graph,
+      { canonical_name: "TemporalA", entity_type: "module" },
+      [{ episode_id: ep.id, extractor: "git" }],
+    );
+
+    const entityB = addEntity(
+      graph,
+      { canonical_name: "TemporalB", entity_type: "module" },
+      [{ episode_id: ep.id, extractor: "git" }],
+    );
+
+    // Edge valid only in Q1 2024
+    addEdge(
+      graph,
+      {
+        source_id: entityA.id,
+        target_id: entityB.id,
+        relation_type: "co_changes_with",
+        edge_kind: "inferred",
+        fact: "TemporalA co-changes with TemporalB",
+        confidence: 0.9,
+        valid_from: "2024-01-01T00:00:00Z",
+        valid_until: "2024-04-01T00:00:00Z",
+      },
+      [{ episode_id: ep.id, extractor: "git" }],
+    );
+
+    // Within validity window: should find TemporalB
+    const inWindow = graphSearch(graph, [[entityA.id, 1.0]], {
+      maxHops: 1,
+      validAt: "2024-02-15T00:00:00Z",
+    });
+    expect(inWindow.map((r) => r.canonicalName)).toContain("TemporalB");
+
+    // Outside validity window: should NOT find TemporalB
+    const outsideWindow = graphSearch(graph, [[entityA.id, 1.0]], {
+      maxHops: 1,
+      validAt: "2024-06-01T00:00:00Z",
+    });
+    expect(outsideWindow.map((r) => r.canonicalName)).not.toContain(
+      "TemporalB",
+    );
+  });
+
   test("handles multiple seeds", () => {
     const { person, fileC } = seedGraphFixture(graph);
     // Seed both person and fileC; fileA reachable from both
