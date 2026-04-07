@@ -1,0 +1,93 @@
+/**
+ * decay.ts — `engram decay` command.
+ *
+ * Runs the decay detection report and prints results.
+ */
+
+import * as path from "node:path";
+import type { Command } from "commander";
+import type { DecayReport, EngramGraph } from "engram-core";
+import { closeGraph, getDecayReport, openGraph } from "engram-core";
+
+interface DecayOpts {
+  staleDays: string;
+  dormantDays: string;
+  db: string;
+}
+
+export function registerDecay(program: Command): void {
+  program
+    .command("decay")
+    .description("Show knowledge decay report")
+    .option("--stale-days <n>", "days without evidence to mark as stale", "180")
+    .option("--dormant-days <n>", "days of owner inactivity to flag", "90")
+    .option("--db <path>", "path to .engram file", ".engram")
+    .action((opts: DecayOpts) => {
+      const dbPath = path.resolve(opts.db);
+      const staleDays = parseInt(opts.staleDays, 10);
+      const dormantDays = parseInt(opts.dormantDays, 10);
+
+      if (Number.isNaN(staleDays) || staleDays < 1) {
+        console.error("Error: --stale-days must be a positive integer");
+        process.exit(1);
+      }
+      if (Number.isNaN(dormantDays) || dormantDays < 1) {
+        console.error("Error: --dormant-days must be a positive integer");
+        process.exit(1);
+      }
+
+      let graph: EngramGraph | undefined;
+      try {
+        graph = openGraph(dbPath);
+      } catch (err) {
+        console.error(
+          `Error opening graph: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        process.exit(1);
+      }
+
+      let report: DecayReport;
+      try {
+        report = getDecayReport(graph, {
+          stale_days: staleDays,
+          dormant_days: dormantDays,
+        });
+        closeGraph(graph);
+      } catch (err) {
+        console.error(
+          `Decay report failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        closeGraph(graph);
+        process.exit(1);
+        return;
+      }
+
+      console.log(`Decay Report — ${report.generated_at}`);
+      console.log(
+        `Entities: ${report.total_entities}  Edges: ${report.total_edges}`,
+      );
+      console.log("");
+      console.log("Summary:");
+      console.log(`  stale_evidence:     ${report.summary.stale_evidence}`);
+      console.log(`  contradicted:       ${report.summary.contradicted}`);
+      console.log(`  concentrated_risk:  ${report.summary.concentrated_risk}`);
+      console.log(`  dormant_owner:      ${report.summary.dormant_owner}`);
+      console.log(`  orphaned:           ${report.summary.orphaned}`);
+
+      if (report.decay_items.length === 0) {
+        console.log("\nNo decay items found.");
+        return;
+      }
+
+      console.log(`\nDecay Items (${report.decay_items.length}):`);
+      for (const item of report.decay_items) {
+        console.log(
+          `  [${item.severity.toUpperCase()}] [${item.decay_category}] ${item.name}`,
+        );
+        console.log(`    ${item.details}`);
+        if (item.last_evidence_at) {
+          console.log(`    last evidence: ${item.last_evidence_at}`);
+        }
+      }
+    });
+}
