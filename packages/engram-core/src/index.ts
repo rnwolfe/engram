@@ -46,6 +46,8 @@ export {
   getEvidenceForEntity,
   resolveEntity,
 } from "./graph/index.js";
+export type { EnrichmentAdapter, EnrichOpts } from "./ingest/adapter.js";
+export { GitHubAdapter } from "./ingest/adapters/github.js";
 export type { GitIngestOpts, IngestResult } from "./ingest/git.js";
 export { ingestGitRepo } from "./ingest/git.js";
 export {
