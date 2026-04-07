@@ -34,6 +34,7 @@ import type { BenchmarkReport } from "../src/metrics.js";
 import { compareStrategies, generateReport } from "../src/report.js";
 import { runBenchmark, runQuestion } from "../src/runners/ai-enhanced.js";
 import { ALL_STRATEGIES, runStrategy } from "../src/runners/index.js";
+import { runQuestion as runVcsOnlyQuestion } from "../src/runners/vcs-only.js";
 
 // ─── Skip guard ───────────────────────────────────────────────────────────────
 
@@ -250,13 +251,26 @@ describe("ai-enhanced runner", () => {
         expected_entities: ["Matteo Collina"],
       };
 
-      // Should not throw even when provider returns no embeddings
-      const result = await runQuestion(graph, question, provider);
+      // Should not throw even when provider returns no embeddings.
+      // More importantly, when degraded the runner must use the FTS-only path
+      // so results are identical to what vcs-only produces — not "hybrid mode
+      // with zero vectors" which would be a meaningless intermediate state.
+      const [degradedResult, vcsOnlyResult] = await Promise.all([
+        runQuestion(graph, question, provider),
+        runVcsOnlyQuestion(graph, question),
+      ]);
 
-      expect(result.baseline).toBe("ai-enhanced");
-      expect(result.latency_ms).toBeGreaterThanOrEqual(0);
-      expect(result.metrics.recall_at_k).toBeGreaterThanOrEqual(0);
-      expect(result.metrics.mrr).toBeGreaterThanOrEqual(0);
+      expect(degradedResult.baseline).toBe("ai-enhanced");
+      expect(degradedResult.latency_ms).toBeGreaterThanOrEqual(0);
+
+      // Retrieved entities must exactly match vcs-only output — true degradation.
+      expect(degradedResult.retrieved_entities).toEqual(
+        vcsOnlyResult.retrieved_entities,
+      );
+      expect(degradedResult.metrics.recall_at_k).toBe(
+        vcsOnlyResult.metrics.recall_at_k,
+      );
+      expect(degradedResult.metrics.mrr).toBe(vcsOnlyResult.metrics.mrr);
     },
   );
 });

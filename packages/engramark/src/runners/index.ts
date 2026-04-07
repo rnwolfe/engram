@@ -47,7 +47,7 @@ export async function runStrategy(
       const { runBenchmark } = await import("./ai-enhanced.js");
       if (!provider) {
         throw new Error(
-          "ai-enhanced strategy requires an AIProvider. Pass --model or set ENGRAM_AI_PROVIDER=ollama.",
+          "ai-enhanced strategy requires an AIProvider instance. Pass one as the third argument to runStrategy().",
         );
       }
       return runBenchmark(graph, questions, provider);

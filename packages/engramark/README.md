@@ -1,52 +1,63 @@
 # EngRAMark
 
-Benchmark suite for engram knowledge retrieval. Measures retrieval quality and answer accuracy against ground-truth Q&A datasets.
+Programmatic benchmark suite for engram knowledge retrieval. Measures retrieval quality (Recall@5, MRR, latency) against ground-truth Q&A datasets.
 
-## Usage
+EngRAMark is a **library / API** — it is imported and driven by scripts, not invoked as a standalone CLI. The entry point for running the full suite is `bun run bench` which executes `src/report.ts`.
+
+## Running the benchmark suite
 
 ```bash
-# Run default benchmark (vcs-only strategy)
+# Run the default benchmark script (vcs-only strategy against the Fastify dataset)
 bun run -F engramark bench
-
-# Run all strategies and print comparison table
-bun run -F engramark bench -- --all
-
-# Run a specific strategy
-bun run -F engramark bench -- --strategy ai-enhanced
-bun run -F engramark bench -- --strategy vcs-only
-bun run -F engramark bench -- --strategy grep-baseline
-
-# Override the Ollama embedding model for the ai-enhanced runner
-bun run -F engramark bench -- --strategy ai-enhanced --model mxbai-embed-large
-
-# Save current results as a baseline file
-bun run -F engramark bench -- --all --save-baseline .engramark-baseline.json
-
-# CI mode: compare against saved baseline and exit 1 on regression
-bun run -F engramark bench -- --all --ci --baseline .engramark-baseline.json
-
-# Adjust the regression threshold (default: 0.05 = 5pp absolute)
-bun run -F engramark bench -- --all --ci --baseline .engramark-baseline.json --regression-threshold 0.03
 ```
 
-## Flags
+The `bench` script runs `src/report.ts` directly via Bun. Edit that file to change which strategies are executed, which dataset is used, or whether baselines are compared.
 
-| Flag | Description |
-|------|-------------|
-| `--all` | Run all three strategies (grep-baseline, vcs-only, ai-enhanced) and print comparison table |
-| `--strategy <name>` | Run only the specified strategy: `grep-baseline`, `vcs-only`, or `ai-enhanced` |
-| `--model <name>` | Override the Ollama embedding model for the ai-enhanced runner (default: `nomic-embed-text`) |
-| `--ci` | CI mode — exit 1 if any strategy regresses beyond threshold vs baseline file |
-| `--baseline <file>` | Path to the baseline JSON file for `--ci` mode or `--save-baseline` |
-| `--save-baseline` | Write current results to the baseline file specified by `--baseline` |
-| `--regression-threshold <n>` | Absolute drop threshold (0-1) that triggers a CI regression (default: 0.05) |
+## Programmatic usage
 
-## Environment Variables
+```ts
+import { createGraph, closeGraph } from "engram-core";
+import { runStrategy, ALL_STRATEGIES } from "engramark/runners";
+import { compareStrategies } from "engramark";
+import { saveBaseline, compareToBaseline } from "engramark/baseline";
+import { FASTIFY_QUESTIONS } from "engramark/datasets/fastify";
+
+const graph = createGraph(":memory:");
+// ... ingest git data into graph ...
+
+// Run a single strategy
+const report = await runStrategy("vcs-only", graph, FASTIFY_QUESTIONS);
+
+// Run ai-enhanced (requires an AIProvider instance)
+import { OllamaProvider } from "engram-core";
+const provider = new OllamaProvider({ model: "nomic-embed-text" });
+const aiReport = await runStrategy("ai-enhanced", graph, FASTIFY_QUESTIONS, provider);
+
+// Compare all strategies
+const reports = await Promise.all(
+  ALL_STRATEGIES.map((s) =>
+    runStrategy(s, graph, FASTIFY_QUESTIONS, s === "ai-enhanced" ? provider : undefined)
+  )
+);
+compareStrategies(reports); // prints comparison table to stdout
+
+// Save results as a baseline
+saveBaseline(reports, ".engramark-baseline.json");
+
+// Compare against a saved baseline (e.g. in CI)
+import { loadBaseline } from "engramark/baseline";
+const baseline = loadBaseline(".engramark-baseline.json");
+const comparison = compareToBaseline(reports, baseline, 0.05);
+if (comparison.has_regressions) process.exit(1);
+
+closeGraph(graph);
+```
+
+## Environment variables
 
 | Variable | Description |
 |----------|-------------|
 | `SKIP_AI_BENCHMARK=1` | Skip ai-enhanced tests (for CI environments without Ollama) |
-| `ENGRAM_AI_PROVIDER` | Set to `ollama` to enable AI-enhanced mode |
 | `ENGRAM_OLLAMA_BASE_URL` | Ollama base URL (default: `http://localhost:11434`) |
 
 ## Strategies
@@ -55,7 +66,7 @@ bun run -F engramark bench -- --all --ci --baseline .engramark-baseline.json --r
 |----------|-------------|
 | `grep-baseline` | Raw FTS5 episode search — simulates `git log \| grep`. The floor. |
 | `vcs-only` | Graph-structured FTS with scoring. Default strategy. |
-| `ai-enhanced` | Hybrid FTS+vector search via OllamaProvider. Requires Ollama running locally. |
+| `ai-enhanced` | Hybrid FTS+vector search via OllamaProvider. Requires Ollama running locally. Degrades to vcs-only behavior when Ollama is unavailable. |
 
 ## Metrics
 
@@ -65,7 +76,7 @@ bun run -F engramark bench -- --all --ci --baseline .engramark-baseline.json --r
 | MRR | Mean Reciprocal Rank — 1/rank of the first correct result |
 | Avg Latency(ms) | Average query execution time |
 
-## CI Baseline File
+## CI baseline file
 
 The baseline file format (`.engramark-baseline.json`):
 
