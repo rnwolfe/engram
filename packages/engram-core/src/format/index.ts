@@ -10,3 +10,5 @@ export {
   openGraph,
 } from "./graph.js";
 export { SCHEMA_DDL } from "./schema.js";
+export type { VerifyResult, Violation, ViolationSeverity } from "./verify.js";
+export { verifyGraph } from "./verify.js";
