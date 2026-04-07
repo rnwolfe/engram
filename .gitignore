@@ -5,3 +5,5 @@ dist/
 .env.*
 *.engram
 bun.lock
+.forge/
+.claude/worktrees/
