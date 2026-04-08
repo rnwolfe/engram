@@ -13,6 +13,7 @@ import {
   NODE_COLORS,
   runCoseLayout,
 } from "./graph.js";
+import { initDecayOverlay } from "./overlay.js";
 import {
   closePanel,
   openEdgePanel,
@@ -196,10 +197,11 @@ async function init(): Promise<void> {
     updateStatsBar(data.stats.entity_count, data.stats.edge_count);
     buildLegend();
 
-    // Init filter sidebar, search, and time slider
+    // Init filter sidebar, search, time slider, and decay overlay
     initFilters(cy, data);
     initSearch(cy, openEntityPanel);
     initTimeSlider(cy, (validAt) => applyGraphSnapshot(cy, validAt));
+    initDecayOverlay(cy);
 
     hideLoading();
   } catch (err) {

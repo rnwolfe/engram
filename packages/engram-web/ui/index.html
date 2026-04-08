@@ -15,12 +15,12 @@
         <div id="search-dropdown" class="hidden"></div>
       </div>
       <div id="toolbar-actions">
-        <button id="btn-fit" title="Zoom to fit (f)">Zoom to fit</button>
-        <button id="btn-reset-layout" title="Reset layout (r)">Reset layout</button>
-        <button id="btn-decay-overlay" title="Toggle decay overlay (o)">Decay overlay</button>
-        <button id="btn-help" title="Keyboard shortcuts (?)">?</button>
+        <button id="btn-fit" title="Zoom to fit">Zoom to fit</button>
+        <button id="btn-reset-layout" title="Reset layout">Reset layout</button>
+        <button id="btn-decay-overlay" class="btn">Decay overlay</button>
       </div>
     </header>
+    <div id="decay-summary" class="hidden"></div>
 
     <div id="app">
       <!-- Main content: filter sidebar + graph canvas + detail panel -->
@@ -43,24 +43,6 @@
       <input id="time-slider" type="range" />
       <span id="time-label">Now</span>
       <button id="btn-now">Now</button>
-    </div>
-
-    <div id="help-modal" class="modal hidden">
-      <div class="modal-content">
-        <h2>Keyboard shortcuts</h2>
-        <table>
-          <tr><td><kbd>?</kbd></td><td>Show this help</td></tr>
-          <tr><td><kbd>/</kbd></td><td>Focus search</td></tr>
-          <tr><td><kbd>Esc</kbd></td><td>Close panel / modal</td></tr>
-          <tr><td><kbd>f</kbd></td><td>Zoom to fit</td></tr>
-          <tr><td><kbd>r</kbd></td><td>Reset layout</td></tr>
-          <tr><td><kbd>n</kbd></td><td>Jump to now</td></tr>
-          <tr><td><kbd>← →</kbd></td><td>Step time ±1 day</td></tr>
-          <tr><td><kbd>Shift+← →</kbd></td><td>Step time ±1 month</td></tr>
-          <tr><td><kbd>o</kbd></td><td>Toggle decay overlay</td></tr>
-        </table>
-        <button id="help-close">Close</button>
-      </div>
     </div>
 
     <script type="module" src="main.js"></script>
