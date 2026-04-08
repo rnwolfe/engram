@@ -43,6 +43,17 @@ import {
 } from "./tools/history.js";
 import { handleSearch, SEARCH_TOOL, type SearchInput } from "./tools/search.js";
 import {
+  FIND_EDGES_TOOL,
+  type FindEdgesInput,
+  GET_NEIGHBORS_TOOL,
+  GET_PATH_TOOL,
+  type GetNeighborsInput,
+  type GetPathInput,
+  handleFindEdges,
+  handleGetNeighbors,
+  handleGetPath,
+} from "./tools/traversal.js";
+import {
   ADD_EDGE_TOOL,
   ADD_EPISODE_TOOL,
   type AddEdgeInput,
@@ -59,6 +70,9 @@ const ALL_TOOLS = [
   GET_CONTEXT_TOOL,
   GET_DECAY_TOOL,
   GET_HISTORY_TOOL,
+  GET_NEIGHBORS_TOOL,
+  FIND_EDGES_TOOL,
+  GET_PATH_TOOL,
   ADD_EPISODE_TOOL,
   ADD_ENTITY_TOOL,
   ADD_EDGE_TOOL,
@@ -115,6 +129,15 @@ export function createServer(dbPath: string) {
           break;
         case "engram_add_edge":
           result = handleAddEdge(graph, input as AddEdgeInput);
+          break;
+        case "engram_get_neighbors":
+          result = handleGetNeighbors(graph, input as GetNeighborsInput);
+          break;
+        case "engram_find_edges":
+          result = handleFindEdges(graph, input as FindEdgesInput);
+          break;
+        case "engram_get_path":
+          result = handleGetPath(graph, input as GetPathInput);
           break;
         default:
           return {
