@@ -10,19 +10,26 @@
     <header id="toolbar">
       <span id="brand">engram</span>
       <span id="stats-display">Loading…</span>
+      <div id="search-container">
+        <input id="search-input" type="text" placeholder="Search entities… (/)" autocomplete="off" />
+        <div id="search-dropdown" class="hidden"></div>
+      </div>
       <div id="toolbar-actions">
-        <button id="btn-zoom-fit" title="Zoom to fit">Zoom to fit</button>
+        <button id="btn-fit" title="Zoom to fit">Zoom to fit</button>
         <button id="btn-reset-layout" title="Reset layout">Reset layout</button>
       </div>
     </header>
 
     <div id="app">
-      <div id="cy"></div>
-
-      <aside id="detail-panel" class="panel hidden">
-        <button id="panel-close" aria-label="Close panel">×</button>
-        <div id="panel-content"></div>
-      </aside>
+      <!-- Main content: filter sidebar + graph canvas + detail panel -->
+      <div id="main-content">
+        <aside id="filter-sidebar"></aside>
+        <div id="cy"></div>
+        <aside id="detail-panel" class="panel hidden">
+          <button id="panel-close" aria-label="Close panel">×</button>
+          <div id="panel-content"></div>
+        </aside>
+      </div>
     </div>
 
     <div id="legend">
