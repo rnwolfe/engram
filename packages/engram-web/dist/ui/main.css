@@ -373,3 +373,72 @@ body {
   color: #f85149;
   font-size: 0.85rem;
 }
+
+/* Decay overlay */
+
+#btn-decay-overlay.active {
+  background: #1f6feb33;
+  border-color: #1f6feb;
+  color: #58a6ff;
+}
+
+#decay-summary {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(22, 27, 34, 0.95);
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 0.4rem 1rem;
+  font-size: 0.8rem;
+  color: #c9d1d9;
+  z-index: 30;
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+#decay-summary.hidden {
+  display: none;
+}
+
+.decay-count {
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.78rem;
+  opacity: 0.9;
+  transition: opacity 0.15s;
+}
+
+.decay-count:hover {
+  opacity: 1;
+}
+
+.decay-count.active {
+  outline: 2px solid #58a6ff;
+  opacity: 1;
+}
+
+.decay-count.risk-critical {
+  background: #c0392b;
+  color: #fff;
+}
+
+.decay-count.risk-dormant {
+  background: #7f8c8d;
+  color: #fff;
+}
+
+.decay-count.risk-stale {
+  background: #f1c40f;
+  color: #333;
+}
+
+.decay-count.risk-orphaned {
+  background: #8e44ad;
+  color: #fff;
+}

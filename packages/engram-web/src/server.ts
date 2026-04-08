@@ -13,12 +13,14 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { EngramGraph } from "engram-core";
+import { handleDecay } from "./api/decay.js";
 import {
   handleEdgeDetail,
   handleEntityDetail,
   handleEpisodeDetail,
 } from "./api/detail.js";
 import { handleGraph } from "./api/graph.js";
+import { handleOwnership } from "./api/ownership-api.js";
 import { handleSearch } from "./api/search.js";
 import { handleStats } from "./api/stats.js";
 import { handleTemporalBounds } from "./api/temporal.js";
@@ -95,6 +97,28 @@ export function createHandler(graph: EngramGraph) {
         const q = url.searchParams.get("q") ?? "";
         const result = await handleSearch(graph, q);
         return json(result);
+      } catch (err) {
+        return json(
+          { error: err instanceof Error ? err.message : String(err) },
+          500,
+        );
+      }
+    }
+
+    if (pathname === "/api/decay") {
+      try {
+        return json(handleDecay(graph));
+      } catch (err) {
+        return json(
+          { error: err instanceof Error ? err.message : String(err) },
+          500,
+        );
+      }
+    }
+
+    if (pathname === "/api/ownership") {
+      try {
+        return json(handleOwnership(graph));
       } catch (err) {
         return json(
           { error: err instanceof Error ? err.message : String(err) },
