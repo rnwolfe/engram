@@ -13,6 +13,7 @@ import { registerSearch } from "./commands/search.js";
 import { registerShow } from "./commands/show.js";
 import { registerStats } from "./commands/stats.js";
 import { registerVerify } from "./commands/verify.js";
+import { registerVisualize } from "./commands/visualize.js";
 
 const program = new Command()
   .name("engram")
@@ -32,5 +33,6 @@ registerIngest(program);
 registerExport(program);
 registerVerify(program);
 registerMaintenance(program);
+registerVisualize(program);
 
 program.parse();
