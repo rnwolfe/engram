@@ -47,6 +47,11 @@ export function startServer(opts: ServerOpts): ServerHandle {
   return { graph, server, stop };
 }
 
+export {
+  handleEdgeDetail,
+  handleEntityDetail,
+  handleEpisodeDetail,
+} from "./api/detail.js";
 export { handleGraph } from "./api/graph.js";
 export { handleStats } from "./api/stats.js";
 export { handleTemporalBounds } from "./api/temporal.js";

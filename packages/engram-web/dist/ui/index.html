@@ -4,45 +4,32 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>engram — knowledge graph</title>
-    <link rel="stylesheet" href="/main.css" />
+    <link rel="stylesheet" href="main.css" />
   </head>
   <body>
+    <header id="toolbar">
+      <span id="brand">engram</span>
+      <span id="stats-display">Loading…</span>
+      <div id="toolbar-actions">
+        <button id="btn-zoom-fit" title="Zoom to fit">Zoom to fit</button>
+        <button id="btn-reset-layout" title="Reset layout">Reset layout</button>
+      </div>
+    </header>
+
     <div id="app">
-      <!-- Header -->
-      <header id="header">
-        <h1>engram</h1>
-        <div id="stats-bar">
-          <span id="stat-entities">
-            <span class="stat-value">—</span> entities
-          </span>
-          <span id="stat-edges">
-            <span class="stat-value">—</span> edges
-          </span>
-        </div>
-        <div class="toolbar-group">
-          <button id="btn-fit" class="btn" title="Zoom to fit all nodes">Zoom to fit</button>
-          <button id="btn-reset-layout" class="btn" title="Re-run force-directed layout">Reset layout</button>
-        </div>
-      </header>
-
-      <!-- Graph canvas -->
       <div id="cy"></div>
+
+      <aside id="detail-panel" class="panel hidden">
+        <button id="panel-close" aria-label="Close panel">×</button>
+        <div id="panel-content"></div>
+      </aside>
     </div>
 
-    <!-- Legend (fixed, top-right) -->
-    <aside id="legend">
-      <h3>Entity types</h3>
+    <div id="legend">
+      <strong>Types</strong>
       <div id="legend-items"></div>
-    </aside>
-
-    <!-- Loading overlay -->
-    <div id="loading">
-      <p>Loading…</p>
     </div>
 
-    <!-- Error banner -->
-    <div id="error-banner"></div>
-
-    <script src="/main.js" type="module"></script>
+    <script type="module" src="main.js"></script>
   </body>
 </html>
