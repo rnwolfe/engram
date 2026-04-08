@@ -48,6 +48,7 @@ export function startServer(opts: ServerOpts): ServerHandle {
 }
 
 export { handleGraph } from "./api/graph.js";
+export { handleSearch } from "./api/search.js";
 export { handleStats } from "./api/stats.js";
 export { handleTemporalBounds } from "./api/temporal.js";
 export { createHandler } from "./server.js";

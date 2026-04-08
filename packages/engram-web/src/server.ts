@@ -7,12 +7,14 @@
  *   GET /api/stats     → StatsResponse
  *   GET /api/graph     → GraphResponse (optional ?valid_at=ISO8601)
  *   GET /api/temporal-bounds → TemporalBoundsResponse
+ *   GET /api/search    → SearchResponse (required ?q=<text>)
  */
 
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { EngramGraph } from "engram-core";
 import { handleGraph } from "./api/graph.js";
+import { handleSearch } from "./api/search.js";
 import { handleStats } from "./api/stats.js";
 import { handleTemporalBounds } from "./api/temporal.js";
 
@@ -44,7 +46,7 @@ function serveStatic(requestPath: string): Response {
 }
 
 export function createHandler(graph: EngramGraph) {
-  return (req: Request): Response => {
+  return async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
     const pathname = url.pathname;
 
@@ -75,6 +77,19 @@ export function createHandler(graph: EngramGraph) {
     if (pathname === "/api/temporal-bounds") {
       try {
         return json(handleTemporalBounds(graph));
+      } catch (err) {
+        return json(
+          { error: err instanceof Error ? err.message : String(err) },
+          500,
+        );
+      }
+    }
+
+    if (pathname === "/api/search") {
+      try {
+        const q = url.searchParams.get("q") ?? "";
+        const result = await handleSearch(graph, q);
+        return json(result);
       } catch (err) {
         return json(
           { error: err instanceof Error ? err.message : String(err) },

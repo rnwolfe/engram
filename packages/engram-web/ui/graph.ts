@@ -123,6 +123,15 @@ export function initCytoscape(container: HTMLElement): Core {
           opacity: 1,
         },
       },
+      // Search pulse highlight
+      {
+        selector: ".pulse",
+        style: {
+          "border-width": 4,
+          "border-color": "#58a6ff",
+          "border-opacity": 1,
+        },
+      },
     ],
     layout: { name: "preset" },
     userZoomingEnabled: true,

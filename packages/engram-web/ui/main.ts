@@ -5,6 +5,7 @@
  */
 
 import type { Core } from "cytoscape";
+import { initFilters } from "./filters.js";
 import {
   attachHoverHandlers,
   buildElements,
@@ -12,6 +13,7 @@ import {
   NODE_COLORS,
   runCoseLayout,
 } from "./graph.js";
+import { initSearch } from "./search.js";
 
 // ── State ─────────────────────────────────────────────────
 
@@ -70,6 +72,22 @@ function buildLegend(): void {
       <span>${type}</span>
     `;
     legend.appendChild(item);
+  }
+}
+
+// ── Entity panel ──────────────────────────────────────────
+
+/**
+ * Open the entity detail panel for the given entity ID.
+ * Selects the corresponding node in cytoscape.
+ * Future: render a side panel with entity details.
+ */
+function openEntityPanel(id: string): void {
+  if (!cy) return;
+  const node = cy.getElementById(id);
+  if (node && node.length > 0 && !node.hidden()) {
+    cy.elements().unselect();
+    node.select();
   }
 }
 
@@ -142,6 +160,10 @@ async function init(): Promise<void> {
     runCoseLayout(cy);
     updateStatsBar(data.stats.entity_count, data.stats.edge_count);
     buildLegend();
+
+    // Init filter sidebar and search
+    initFilters(cy, data);
+    initSearch(cy, openEntityPanel);
 
     hideLoading();
   } catch (err) {

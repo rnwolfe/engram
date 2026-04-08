@@ -19,14 +19,22 @@
             <span class="stat-value">—</span> edges
           </span>
         </div>
+        <div id="search-container">
+          <input id="search-input" type="text" placeholder="Search entities… (/)" autocomplete="off" />
+          <div id="search-dropdown" class="hidden"></div>
+        </div>
         <div class="toolbar-group">
           <button id="btn-fit" class="btn" title="Zoom to fit all nodes">Zoom to fit</button>
           <button id="btn-reset-layout" class="btn" title="Re-run force-directed layout">Reset layout</button>
         </div>
       </header>
 
-      <!-- Graph canvas -->
-      <div id="cy"></div>
+      <!-- Main content: filter sidebar + graph canvas -->
+      <div id="main-content">
+        <aside id="filter-sidebar"></aside>
+        <!-- Graph canvas -->
+        <div id="cy"></div>
+      </div>
     </div>
 
     <!-- Legend (fixed, top-right) -->
