@@ -81,17 +81,20 @@ export type {
   DecayOpts,
   DecayReport,
   DecaySeverity,
+  GraphSearchOpts,
   PathResult,
   ScoreComponents,
   SearchOpts,
   SearchResult,
   SubGraph,
   TraversalOpts,
+  TraversedEntity,
 } from "./retrieval/index.js";
 export {
   getDecayReport,
   getNeighbors,
   getPath,
+  graphSearch,
   search,
 } from "./retrieval/index.js";
 export type { TemporalSnapshot } from "./temporal/index.js";

@@ -10,6 +10,11 @@ export type {
   DecaySeverity,
 } from "./decay.js";
 export { getDecayReport } from "./decay.js";
+export type {
+  GraphSearchOpts,
+  TraversedEntity,
+} from "./graph-search.js";
+export { graphSearch } from "./graph-search.js";
 export type { ScoreComponents } from "./scoring.js";
 export type { SearchOpts, SearchResult } from "./search.js";
 export { search } from "./search.js";
