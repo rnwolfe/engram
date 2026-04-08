@@ -90,6 +90,7 @@ export function initTimeSlider(
 
         if (next !== null) {
           e.preventDefault();
+          e.stopPropagation();
           next = Math.max(minMs, Math.min(maxMs, next));
           slider.value = String(next);
           label.textContent = formatDate(next);

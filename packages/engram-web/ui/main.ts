@@ -74,16 +74,24 @@ async function applyGraphSnapshot(
   const newNodes = data.nodes.filter((n) => !existingNodeIds.has(n.id));
   if (newNodes.length > 0) cy.add(buildElements(newNodes, []));
 
-  // Remove edges not in new snapshot
+  // Remove edges not in new snapshot — fade out first, then remove
   const newEdgeIds = new Set(data.edges.map((e) => e.id));
-  cy.edges()
-    .filter((e) => !newEdgeIds.has(e.id()))
-    .remove();
+  const toRemoveEdges = cy.edges().filter((e) => !newEdgeIds.has(e.id()));
+  if (toRemoveEdges.length > 0) {
+    toRemoveEdges.animate(
+      { style: { opacity: 0 } },
+      { duration: 150, complete: () => toRemoveEdges.remove() },
+    );
+  }
 
-  // Add edges that weren't present before
+  // Add edges that weren't present before — start invisible and fade in
   const existingEdgeIds = new Set(cy.edges().map((e) => e.id()));
   const toAddEdges = data.edges.filter((e) => !existingEdgeIds.has(e.id));
-  if (toAddEdges.length > 0) cy.add(buildElements([], toAddEdges));
+  if (toAddEdges.length > 0) {
+    const added = cy.add(buildElements([], toAddEdges));
+    added.style({ opacity: 0 });
+    added.animate({ style: { opacity: 1 } }, { duration: 200 });
+  }
 
   // Do NOT re-run layout — keep node positions stable
 }
