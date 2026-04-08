@@ -1,10 +1,11 @@
 /**
- * main.ts — UI entry point.
+ * main.ts — entry point for the engram graph visualization UI.
  *
- * Fetches /api/graph, initialises cytoscape, wires up toolbar buttons,
- * and connects node/edge tap events to the detail panel.
+ * Fetches /api/graph, initializes cytoscape, and wires up toolbar controls.
  */
 
+import type { Core } from "cytoscape";
+import { initFilters } from "./filters.js";
 import {
   attachHoverHandlers,
   buildElements,
@@ -18,130 +19,179 @@ import {
   openEntityPanel,
   setCytoscapeInstance,
 } from "./panels.js";
+import { initSearch } from "./search.js";
 
-interface GraphNode {
-  id: string;
-  canonical_name: string;
-  entity_type: string;
-  status: string;
-  updated_at: string;
+// ── State ─────────────────────────────────────────────────
+
+let cy: Core | null = null;
+
+// ── DOM helpers ───────────────────────────────────────────
+
+function $(id: string): HTMLElement {
+  const el = document.getElementById(id);
+  if (!el) throw new Error(`Element #${id} not found`);
+  return el;
 }
 
-interface GraphEdge {
-  id: string;
-  source_id: string;
-  target_id: string;
-  relation_type: string;
-  edge_kind: string;
-  confidence: number;
-  valid_from: string | null;
-  valid_until: string | null;
+function showLoading(msg: string): void {
+  const el = $("loading");
+  el.classList.remove("hidden");
+  const text = el.querySelector("p");
+  if (text) text.textContent = msg;
 }
+
+function hideLoading(): void {
+  $("loading").classList.add("hidden");
+}
+
+function showError(msg: string): void {
+  const banner = $("error-banner");
+  banner.textContent = msg;
+  banner.classList.add("visible");
+}
+
+// ── Stats bar ─────────────────────────────────────────────
+
+function updateStatsBar(entityCount: number, edgeCount: number): void {
+  const entitiesEl = document.getElementById("stat-entities");
+  const edgesEl = document.getElementById("stat-edges");
+  if (entitiesEl) {
+    entitiesEl.innerHTML = `<span class="stat-value">${entityCount}</span> entities`;
+  }
+  if (edgesEl) {
+    edgesEl.innerHTML = `<span class="stat-value">${edgeCount}</span> edges`;
+  }
+}
+
+// ── Legend ─────────────────────────────────────────────────
+
+function buildLegend(): void {
+  const legend = document.getElementById("legend-items");
+  if (!legend) return;
+
+  for (const [type, color] of Object.entries(NODE_COLORS)) {
+    if (type === "default") continue;
+    const item = document.createElement("div");
+    item.className = "legend-item";
+    item.innerHTML = `
+      <span class="legend-dot" style="background:${color}"></span>
+      <span>${type}</span>
+    `;
+    legend.appendChild(item);
+  }
+}
+
+// ── Data fetching ─────────────────────────────────────────
 
 interface GraphResponse {
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-  stats: { entity_count: number; edge_count: number };
+  nodes: Array<{
+    id: string;
+    canonical_name: string;
+    entity_type: string;
+    status: string;
+    updated_at: string;
+  }>;
+  edges: Array<{
+    id: string;
+    source_id: string;
+    target_id: string;
+    relation_type: string;
+    edge_kind: string;
+    confidence: number;
+    valid_from: string | null;
+    valid_until: string | null;
+  }>;
+  stats: {
+    entity_count: number;
+    edge_count: number;
+  };
 }
 
-async function loadGraph(): Promise<GraphResponse> {
+async function fetchGraph(): Promise<GraphResponse> {
   const res = await fetch("/api/graph");
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) {
+    throw new Error(`Failed to load graph: HTTP ${res.status}`);
+  }
   return res.json() as Promise<GraphResponse>;
 }
 
-function buildLegend(data: GraphResponse): void {
-  const legendEl = document.getElementById("legend-items");
-  if (!legendEl) return;
+// ── Init ──────────────────────────────────────────────────
 
-  const types = [...new Set(data.nodes.map((n) => n.entity_type))].sort();
-  legendEl.innerHTML = types
-    .map((t) => {
-      const color = NODE_COLORS[t as keyof typeof NODE_COLORS] ?? "#8b949e";
-      return `<div class="legend-item"><span class="legend-dot" style="background:${color}"></span>${t}</div>`;
-    })
-    .join("");
-}
+async function init(): Promise<void> {
+  showLoading("Loading graph data…");
 
-function updateStats(stats: {
-  entity_count: number;
-  edge_count: number;
-}): void {
-  const el = document.getElementById("stats-display");
-  if (el)
-    el.textContent = `${stats.entity_count} entities · ${stats.edge_count} edges`;
-}
-
-async function main(): Promise<void> {
-  let data: GraphResponse;
   try {
-    data = await loadGraph();
+    const data = await fetchGraph();
+
+    showLoading("Rendering graph…");
+
+    const container = document.getElementById("cy");
+    if (!container) throw new Error("Canvas container #cy not found");
+
+    cy = initCytoscape(container);
+
+    const elements = buildElements(data.nodes, data.edges);
+    cy.add(elements);
+
+    setCytoscapeInstance(cy);
+    attachHoverHandlers(cy);
+
+    // Tap handlers
+    cy.on("tap", "node", (evt) => openEntityPanel(evt.target.id() as string));
+    cy.on("tap", "edge", (evt) => openEdgePanel(evt.target.id() as string));
+    cy.on("tap", (evt) => {
+      if (evt.target === cy) closePanel();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closePanel();
+    });
+    const closeBtn = document.getElementById("panel-close");
+    if (closeBtn) closeBtn.addEventListener("click", () => closePanel());
+
+    // Double-tap on empty canvas → fit
+    cy.on("dbltap", (evt) => {
+      if (evt.target === cy) cy?.fit();
+    });
+
+    runCoseLayout(cy);
+    updateStatsBar(data.stats.entity_count, data.stats.edge_count);
+    buildLegend();
+
+    // Init filter sidebar and search
+    initFilters(cy, data);
+    initSearch(cy, openEntityPanel);
+
+    hideLoading();
   } catch (err) {
-    const el = document.getElementById("stats-display");
-    if (el) {
-      el.textContent = `Error loading graph: ${err instanceof Error ? err.message : String(err)}`;
-      el.className = "error";
-    }
-    return;
+    hideLoading();
+    showError(err instanceof Error ? err.message : String(err));
   }
+}
 
-  updateStats(data.stats);
-  buildLegend(data);
+// ── Toolbar ───────────────────────────────────────────────
 
-  const container = document.getElementById("cy");
-  if (!container) return;
-  const cy = initCytoscape(container);
-  cy.add(buildElements(data.nodes, data.edges));
-  runCoseLayout(cy);
+function wireToolbar(): void {
+  const fitBtn = document.getElementById("btn-fit");
+  const resetBtn = document.getElementById("btn-reset-layout");
 
-  // Register cytoscape instance for panel navigation
-  setCytoscapeInstance(cy);
-
-  // Toolbar buttons
-  const btnZoomFit = document.getElementById("btn-zoom-fit");
-  if (btnZoomFit) btnZoomFit.addEventListener("click", () => cy.fit());
-
-  const btnReset = document.getElementById("btn-reset-layout");
-  if (btnReset) {
-    btnReset.addEventListener("click", () => {
-      cy.layout({
-        name: "cose",
-        animate: false,
-      } as cytoscape.LayoutOptions).run();
+  if (fitBtn) {
+    fitBtn.addEventListener("click", () => {
+      cy?.fit();
     });
   }
 
-  // Hover: highlight node + incident edges, dim everything else
-  attachHoverHandlers(cy);
-
-  // Double-click on background → zoom to fit
-  cy.on("dblclick", (evt) => {
-    if (evt.target === cy) cy.fit();
-  });
-
-  // Tap a node → open entity panel
-  cy.on("tap", "node", (evt) => {
-    openEntityPanel(evt.target.id() as string);
-  });
-
-  // Tap an edge → open edge panel
-  cy.on("tap", "edge", (evt) => {
-    openEdgePanel(evt.target.id() as string);
-  });
-
-  // Tap background → close panel
-  cy.on("tap", (evt) => {
-    if (evt.target === cy) closePanel();
-  });
-
-  // Escape key → close panel
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closePanel();
-  });
-
-  // Panel close button
-  const closeBtn = document.getElementById("panel-close");
-  if (closeBtn) closeBtn.addEventListener("click", () => closePanel());
+  if (resetBtn) {
+    resetBtn.addEventListener("click", () => {
+      if (cy) {
+        runCoseLayout(cy);
+      }
+    });
+  }
 }
 
-main();
+// ── Bootstrap ─────────────────────────────────────────────
+
+document.addEventListener("DOMContentLoaded", () => {
+  wireToolbar();
+  init();
+});
