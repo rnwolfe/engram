@@ -1,7 +1,7 @@
 # Graph Visualization — Spec
 
 **Phase**: 2 (first deliverable)
-**Status**: Draft
+**Status**: Implemented
 **Proposed**: 2026-04-08
 **Vision fit**: Advances principles 2 ("compositional queries across signals") and 6 ("every claim has provenance") by making the graph visible — turning the abstract promise of a "temporal knowledge graph" into a surface a human can point at. Also delivers the explicit Phase 2 line item from `docs/internal/VISION.md`: "Rich TUI and graph visualization."
 
