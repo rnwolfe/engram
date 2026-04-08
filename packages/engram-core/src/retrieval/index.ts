@@ -15,6 +15,13 @@ export type {
   TraversedEntity,
 } from "./graph-search.js";
 export { graphSearch } from "./graph-search.js";
+export type {
+  OwnershipReport,
+  OwnershipReportOpts,
+  OwnershipRiskEntry,
+  OwnershipRiskLevel,
+} from "./ownership.js";
+export { getOwnershipReport } from "./ownership.js";
 export type { ScoreComponents } from "./scoring.js";
 export type { SearchOpts, SearchResult } from "./search.js";
 export { search } from "./search.js";

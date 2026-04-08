@@ -59,6 +59,10 @@ engram/
 │   ├── engram-mcp/           # MCP server (stdio transport)
 │   │   └── src/
 │   │       ├── tools/        # MCP tool implementations
+│   │       │   │             #   engram_search, engram_get_entity, engram_get_context,
+│   │       │   │             #   engram_get_decay, engram_get_history,
+│   │       │   │             #   engram_ownership_report,
+│   │       │   │             #   engram_add_episode, engram_add_entity, engram_add_edge
 │   │       └── server.ts     # stdio transport
 │   └── engramark/            # Benchmark suite
 │       └── src/
