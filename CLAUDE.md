@@ -253,3 +253,16 @@ When creating a PR that implements a GitHub issue:
 | `packages/engram-core/src/ai/` | AI provider layer (NullProvider, OllamaProvider, GeminiProvider) |
 | `packages/engram-core/src/ingest/git.ts` | Git VCS ingestion (the "money command" engine) |
 | `packages/engram-core/src/ingest/adapter.ts` | EnrichmentAdapter interface |
+
+## MCP Tools
+
+Tools exposed by `engram-mcp` via stdio transport:
+
+| Tool | Purpose |
+|------|---------|
+| `engram_get_entity` | Retrieve a single entity by ID with edges and evidence chain |
+| `engram_add_entity` | Add a new entity with backing evidence episode |
+| `engram_search` | Hybrid search (FTS + vector + graph) across the knowledge graph |
+| `engram_get_neighbors` | Return subgraph within N hops of an anchor entity (BFS traversal) |
+| `engram_find_edges` | Filter edges by source, target, relation type, and/or time |
+| `engram_get_path` | Find shortest path between two entities via BFS traversal |

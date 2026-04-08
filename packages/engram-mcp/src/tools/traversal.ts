@@ -92,6 +92,7 @@ export const GET_NEIGHBORS_TOOL = {
         description: "Direction of traversal (default: both)",
       },
     },
+    anyOf: [{ required: ["entity_id"] }, { required: ["canonical_name"] }],
   },
 };
 
@@ -297,6 +298,10 @@ export const GET_PATH_TOOL = {
           "ISO8601 UTC timestamp for temporal snapshot (default: now)",
       },
     },
+    allOf: [
+      { anyOf: [{ required: ["from_id"] }, { required: ["from_name"] }] },
+      { anyOf: [{ required: ["to_id"] }, { required: ["to_name"] }] },
+    ],
   },
 };
 
