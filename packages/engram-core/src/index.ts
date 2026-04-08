@@ -82,6 +82,10 @@ export type {
   DecayReport,
   DecaySeverity,
   GraphSearchOpts,
+  OwnershipReport,
+  OwnershipReportOpts,
+  OwnershipRiskEntry,
+  OwnershipRiskLevel,
   PathResult,
   ScoreComponents,
   SearchOpts,
@@ -93,6 +97,7 @@ export type {
 export {
   getDecayReport,
   getNeighbors,
+  getOwnershipReport,
   getPath,
   graphSearch,
   search,
