@@ -29,6 +29,15 @@ One command. No API tokens. No cloud. Walks your git history and builds a knowle
 
 The resulting `.engram` file is a single SQLite database you can copy, query, and back up.
 
+## Visualize your knowledge graph
+
+```bash
+engram visualize --db repo.engram
+# Opens http://127.0.0.1:7878
+```
+
+Interactive graph: pan, zoom, time slider, decay overlay, evidence drill-down.
+
 ## Enrichment
 
 ```bash

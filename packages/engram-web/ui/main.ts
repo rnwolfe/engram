@@ -208,11 +208,31 @@ async function init(): Promise<void> {
   }
 }
 
+// ── Help modal ────────────────────────────────────────────
+
+function openHelpModal(): void {
+  const modal = document.getElementById("help-modal");
+  if (modal) modal.classList.remove("hidden");
+}
+
+function closeHelpModal(): void {
+  const modal = document.getElementById("help-modal");
+  if (modal) modal.classList.add("hidden");
+}
+
+function isHelpModalOpen(): boolean {
+  const modal = document.getElementById("help-modal");
+  return modal ? !modal.classList.contains("hidden") : false;
+}
+
 // ── Toolbar ───────────────────────────────────────────────
 
 function wireToolbar(): void {
   const fitBtn = document.getElementById("btn-fit");
   const resetBtn = document.getElementById("btn-reset-layout");
+  const decayBtn = document.getElementById("btn-decay-overlay");
+  const helpBtn = document.getElementById("btn-help");
+  const helpClose = document.getElementById("help-close");
 
   if (fitBtn) {
     fitBtn.addEventListener("click", () => {
@@ -227,11 +247,93 @@ function wireToolbar(): void {
       }
     });
   }
+
+  if (decayBtn) {
+    decayBtn.addEventListener("click", () => {
+      decayBtn.classList.toggle("active");
+    });
+  }
+
+  if (helpBtn) {
+    helpBtn.addEventListener("click", () => openHelpModal());
+  }
+
+  if (helpClose) {
+    helpClose.addEventListener("click", () => closeHelpModal());
+  }
+
+  // Close modal on backdrop click
+  const modal = document.getElementById("help-modal");
+  if (modal) {
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeHelpModal();
+    });
+  }
+}
+
+// ── Global keyboard shortcuts ─────────────────────────────
+
+function wireKeyboardShortcuts(): void {
+  document.addEventListener("keydown", (e) => {
+    const tag = (e.target as HTMLElement).tagName;
+    const isInput = tag === "INPUT" || tag === "TEXTAREA";
+
+    // ? → toggle help modal (always active)
+    if (e.key === "?" && !isInput) {
+      e.preventDefault();
+      if (isHelpModalOpen()) {
+        closeHelpModal();
+      } else {
+        openHelpModal();
+      }
+      return;
+    }
+
+    // Escape → close help modal if open (panel escape handled elsewhere)
+    if (e.key === "Escape") {
+      if (isHelpModalOpen()) {
+        closeHelpModal();
+        return;
+      }
+    }
+
+    // Skip remaining shortcuts when focus is in an input
+    if (isInput) return;
+
+    // f → zoom to fit
+    if (e.key === "f") {
+      e.preventDefault();
+      cy?.fit();
+      return;
+    }
+
+    // r → reset layout
+    if (e.key === "r") {
+      e.preventDefault();
+      if (cy) runCoseLayout(cy);
+      return;
+    }
+
+    // n → jump to now
+    if (e.key === "n") {
+      e.preventDefault();
+      document.getElementById("btn-now")?.click();
+      return;
+    }
+
+    // o → toggle decay overlay
+    if (e.key === "o") {
+      e.preventDefault();
+      document.getElementById("btn-decay-overlay")?.click();
+      return;
+    }
+  });
 }
 
 // ── Bootstrap ─────────────────────────────────────────────
 
 document.addEventListener("DOMContentLoaded", () => {
   wireToolbar();
+  wireKeyboardShortcuts();
   init();
 });
