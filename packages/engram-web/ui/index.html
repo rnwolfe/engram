@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>engram — knowledge graph</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+        background: #0d1117;
+        color: #c9d1d9;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        gap: 1rem;
+      }
+      h1 { font-size: 1.5rem; font-weight: 600; color: #58a6ff; }
+      #status { font-size: 1rem; color: #8b949e; }
+      #stats { font-size: 1.25rem; color: #c9d1d9; }
+      .error { color: #f85149; }
+    </style>
+  </head>
+  <body>
+    <h1>engram</h1>
+    <div id="stats">Loading...</div>
+    <div id="status">rendering coming soon</div>
+    <script>
+      async function loadStats() {
+        try {
+          const res = await fetch('/api/stats');
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const data = await res.json();
+          document.getElementById('stats').textContent =
+            `engram — ${data.entity_count} entities, ${data.edge_count} edges — rendering coming soon`;
+        } catch (err) {
+          document.getElementById('stats').className = 'error';
+          document.getElementById('stats').textContent = 'Error loading stats: ' + err.message;
+        }
+      }
+      loadStats();
+    </script>
+  </body>
+</html>
