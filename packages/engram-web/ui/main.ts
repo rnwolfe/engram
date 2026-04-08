@@ -13,6 +13,12 @@ import {
   NODE_COLORS,
   runCoseLayout,
 } from "./graph.js";
+import {
+  closePanel,
+  openEdgePanel,
+  openEntityPanel,
+  setCytoscapeInstance,
+} from "./panels.js";
 import { initSearch } from "./search.js";
 
 // ── State ─────────────────────────────────────────────────
@@ -75,22 +81,6 @@ function buildLegend(): void {
   }
 }
 
-// ── Entity panel ──────────────────────────────────────────
-
-/**
- * Open the entity detail panel for the given entity ID.
- * Selects the corresponding node in cytoscape.
- * Future: render a side panel with entity details.
- */
-function openEntityPanel(id: string): void {
-  if (!cy) return;
-  const node = cy.getElementById(id);
-  if (node && node.length > 0 && !node.hidden()) {
-    cy.elements().unselect();
-    node.select();
-  }
-}
-
 // ── Data fetching ─────────────────────────────────────────
 
 interface GraphResponse {
@@ -143,19 +133,25 @@ async function init(): Promise<void> {
     const elements = buildElements(data.nodes, data.edges);
     cy.add(elements);
 
-    // Node click handler
-    cy.on("tap", "node", (evt) => {
-      console.log("node clicked:", evt.target.data());
+    setCytoscapeInstance(cy);
+    attachHoverHandlers(cy);
+
+    // Tap handlers
+    cy.on("tap", "node", (evt) => openEntityPanel(evt.target.id() as string));
+    cy.on("tap", "edge", (evt) => openEdgePanel(evt.target.id() as string));
+    cy.on("tap", (evt) => {
+      if (evt.target === cy) closePanel();
     });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closePanel();
+    });
+    const closeBtn = document.getElementById("panel-close");
+    if (closeBtn) closeBtn.addEventListener("click", () => closePanel());
 
     // Double-tap on empty canvas → fit
     cy.on("dbltap", (evt) => {
-      if (evt.target === cy) {
-        cy?.fit();
-      }
+      if (evt.target === cy) cy?.fit();
     });
-
-    attachHoverHandlers(cy);
 
     runCoseLayout(cy);
     updateStatsBar(data.stats.entity_count, data.stats.edge_count);

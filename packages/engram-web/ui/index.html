@@ -4,53 +4,39 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>engram — knowledge graph</title>
-    <link rel="stylesheet" href="/main.css" />
+    <link rel="stylesheet" href="main.css" />
   </head>
   <body>
-    <div id="app">
-      <!-- Header -->
-      <header id="header">
-        <h1>engram</h1>
-        <div id="stats-bar">
-          <span id="stat-entities">
-            <span class="stat-value">—</span> entities
-          </span>
-          <span id="stat-edges">
-            <span class="stat-value">—</span> edges
-          </span>
-        </div>
-        <div id="search-container">
-          <input id="search-input" type="text" placeholder="Search entities… (/)" autocomplete="off" />
-          <div id="search-dropdown" class="hidden"></div>
-        </div>
-        <div class="toolbar-group">
-          <button id="btn-fit" class="btn" title="Zoom to fit all nodes">Zoom to fit</button>
-          <button id="btn-reset-layout" class="btn" title="Re-run force-directed layout">Reset layout</button>
-        </div>
-      </header>
+    <header id="toolbar">
+      <span id="brand">engram</span>
+      <span id="stats-display">Loading…</span>
+      <div id="search-container">
+        <input id="search-input" type="text" placeholder="Search entities… (/)" autocomplete="off" />
+        <div id="search-dropdown" class="hidden"></div>
+      </div>
+      <div id="toolbar-actions">
+        <button id="btn-fit" title="Zoom to fit">Zoom to fit</button>
+        <button id="btn-reset-layout" title="Reset layout">Reset layout</button>
+      </div>
+    </header>
 
-      <!-- Main content: filter sidebar + graph canvas -->
+    <div id="app">
+      <!-- Main content: filter sidebar + graph canvas + detail panel -->
       <div id="main-content">
         <aside id="filter-sidebar"></aside>
-        <!-- Graph canvas -->
         <div id="cy"></div>
+        <aside id="detail-panel" class="panel hidden">
+          <button id="panel-close" aria-label="Close panel">×</button>
+          <div id="panel-content"></div>
+        </aside>
       </div>
     </div>
 
-    <!-- Legend (fixed, top-right) -->
-    <aside id="legend">
-      <h3>Entity types</h3>
+    <div id="legend">
+      <strong>Types</strong>
       <div id="legend-items"></div>
-    </aside>
-
-    <!-- Loading overlay -->
-    <div id="loading">
-      <p>Loading…</p>
     </div>
 
-    <!-- Error banner -->
-    <div id="error-banner"></div>
-
-    <script src="/main.js" type="module"></script>
+    <script type="module" src="main.js"></script>
   </body>
 </html>

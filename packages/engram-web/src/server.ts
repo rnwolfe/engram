@@ -13,6 +13,11 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { EngramGraph } from "engram-core";
+import {
+  handleEdgeDetail,
+  handleEntityDetail,
+  handleEpisodeDetail,
+} from "./api/detail.js";
 import { handleGraph } from "./api/graph.js";
 import { handleSearch } from "./api/search.js";
 import { handleStats } from "./api/stats.js";
@@ -89,6 +94,49 @@ export function createHandler(graph: EngramGraph) {
       try {
         const q = url.searchParams.get("q") ?? "";
         const result = await handleSearch(graph, q);
+        return json(result);
+      } catch (err) {
+        return json(
+          { error: err instanceof Error ? err.message : String(err) },
+          500,
+        );
+      }
+    }
+
+    // Detail routes: /api/entities/:id, /api/edges/:id, /api/episodes/:id
+    const entityMatch = pathname.match(/^\/api\/entities\/([^/]+)$/);
+    if (entityMatch) {
+      try {
+        const result = handleEntityDetail(graph, entityMatch[1]);
+        if (!result) return json({ error: "Entity not found" }, 404);
+        return json(result);
+      } catch (err) {
+        return json(
+          { error: err instanceof Error ? err.message : String(err) },
+          500,
+        );
+      }
+    }
+
+    const edgeMatch = pathname.match(/^\/api\/edges\/([^/]+)$/);
+    if (edgeMatch) {
+      try {
+        const result = handleEdgeDetail(graph, edgeMatch[1]);
+        if (!result) return json({ error: "Edge not found" }, 404);
+        return json(result);
+      } catch (err) {
+        return json(
+          { error: err instanceof Error ? err.message : String(err) },
+          500,
+        );
+      }
+    }
+
+    const episodeMatch = pathname.match(/^\/api\/episodes\/([^/]+)$/);
+    if (episodeMatch) {
+      try {
+        const result = handleEpisodeDetail(graph, episodeMatch[1]);
+        if (!result) return json({ error: "Episode not found" }, 404);
         return json(result);
       } catch (err) {
         return json(

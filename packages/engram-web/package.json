@@ -4,7 +4,7 @@
   "module": "src/index.ts",
   "type": "module",
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target node && bun build ui/main.ts --outdir dist/ui --minify && cp ui/styles.css dist/ui/main.css && cp ui/index.html dist/ui/index.html",
+    "build": "bun build src/index.ts --outdir dist --target node && bun build ui/main.ts --outdir dist/ui --minify && cp ui/main.css dist/ui/main.css && cp ui/index.html dist/ui/index.html",
     "test": "bun test"
   },
   "dependencies": {
