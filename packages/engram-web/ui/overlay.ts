@@ -125,29 +125,31 @@ function renderSummary(cy: Core, summary: DecayResponse["summary"]): void {
     return;
   }
 
-  banner.innerHTML = parts
-    .map(
-      (p) =>
-        `<span class="decay-count ${STATUS_TO_CLASS[p.status]}" data-status="${p.status}" title="Filter to ${p.label} nodes">${p.count} ${STATUS_LABELS[p.status]}</span>`,
-    )
-    .join(", ");
+  banner.textContent = "";
+
+  parts.forEach((p, i) => {
+    if (i > 0) {
+      banner.appendChild(document.createTextNode(", "));
+    }
+    const span = document.createElement("span");
+    span.className = `decay-count ${STATUS_TO_CLASS[p.status]}`;
+    span.dataset.status = p.status;
+    span.title = `Filter to ${p.label} nodes`;
+    span.textContent = `${p.count} ${STATUS_LABELS[p.status]}`;
+    span.addEventListener("click", () => {
+      applyFilter(cy, p.status);
+    });
+    banner.appendChild(span);
+  });
 
   banner.classList.remove("hidden");
-
-  // Wire click handlers
-  banner.querySelectorAll("[data-status]").forEach((el) => {
-    el.addEventListener("click", () => {
-      const status = (el as HTMLElement).dataset.status as DecayStatus;
-      applyFilter(cy, status);
-    });
-  });
 }
 
 function hideSummary(): void {
   const banner = document.getElementById("decay-summary");
   if (!banner) return;
   banner.classList.add("hidden");
-  banner.innerHTML = "";
+  banner.textContent = "";
 }
 
 // ── Legend ────────────────────────────────────────────────
@@ -171,7 +173,13 @@ function showDecayLegend(): void {
   for (const { label, color } of items) {
     const div = document.createElement("div");
     div.className = "legend-item decay-legend-item";
-    div.innerHTML = `<span class="legend-dot" style="background:${color}"></span><span>${label}</span>`;
+    const dot = document.createElement("span");
+    dot.className = "legend-dot";
+    dot.style.background = color;
+    const labelSpan = document.createElement("span");
+    labelSpan.textContent = label;
+    div.appendChild(dot);
+    div.appendChild(labelSpan);
     legendItems.appendChild(div);
   }
 }
