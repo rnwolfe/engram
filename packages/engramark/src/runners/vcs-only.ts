@@ -2,9 +2,18 @@
  * runners/vcs-only.ts — VCS-only benchmark runner.
  *
  * Uses the appropriate retrieval operation per question type:
- *   - keyword:         search() with FTS (text retrieval)
- *   - relational:      resolveEntity() + findEdges() (single-hop edge traversal)
- *   - graph_traversal: resolveEntity() + getNeighbors() (multi-hop traversal)
+ *   - keyword:         search() — FTS-backed, but will short-circuit to
+ *                      entity-anchored graph traversal when the query string
+ *                      exactly matches an entity canonical name or alias.
+ *                      That's the search() contract; the benchmark measures
+ *                      what the real retrieval API does.
+ *   - relational:      resolveEntity() + findEdges() filtered by
+ *                      question.expected_relation (single-hop edge traversal).
+ *   - graph_traversal: resolveEntity() + getNeighbors({ edge_kinds: ["inferred"] })
+ *                      — traversal is restricted to inferred edges so the
+ *                      high-fanout authored_by (observed) edges don't drown
+ *                      out the intended likely_owner_of / co_changes_with
+ *                      signal.
  */
 
 import type { EngramGraph } from "engram-core";
@@ -151,7 +160,14 @@ function runGraphQuestion(
   let retrievedEntities: string[] = [];
 
   if (anchor) {
-    const subgraph = getNeighbors(graph, anchor.id, { depth: 2 });
+    // Restrict traversal to inferred edges (likely_owner_of, co_changes_with).
+    // Without this filter, observed edges like authored_by create a high-fanout
+    // star from every person to every file they ever touched, flooding the
+    // neighbor set and drowning out the intended signal.
+    const subgraph = getNeighbors(graph, anchor.id, {
+      depth: 2,
+      edge_kinds: ["inferred"],
+    });
 
     // Exclude the anchor itself from results
     retrievedEntities = subgraph.entities

@@ -8,7 +8,8 @@
  *
  * Entity-anchored retrieval: when the query resolves to a known entity,
  * graph traversal is the primary path — connected entities are returned
- * first, with FTS results appended as a secondary source.
+ * first, followed by FTS results across entities, edges, and episodes so
+ * the cross-type contract of search() is preserved.
  */
 
 import type { AIProvider } from "../ai/provider.js";
@@ -264,8 +265,15 @@ function getEntityEdgeCount(graph: EngramGraph, entityId: string): number {
  * generic evidence/temporal scores, which would favor well-connected nodes
  * regardless of their relationship to the anchor.
  *
- * The anchor entity itself is excluded from results — it's the query, not
- * an answer. FTS results are appended as a secondary source (deduped).
+ * The anchor entity itself is included as the primary result (score 1.0),
+ * so queries that name an expected answer still return that answer first.
+ * If `opts.entity_types` is set and the anchor's type is not in the list,
+ * the anchor is omitted for consistency with the standard FTS path.
+ *
+ * FTS is appended as a secondary source (entity FTS, then edge FTS, then
+ * episode FTS — each deduped against prior results), so the contract of
+ * `search()` — returning matches across all three content types — is
+ * preserved for entity-name queries.
  */
 async function entityAnchoredSearch(
   graph: EngramGraph,
@@ -279,29 +287,40 @@ async function entityAnchoredSearch(
   const maxHops = opts.maxHops ?? 2;
 
   const anchorResults: SearchResult[] = [];
-  const anchorEntityIds = new Set<string>();
-  anchorEntityIds.add(anchor.id);
+  const seenEntityIds = new Set<string>();
+  // Always mark the anchor as seen so traversed/FTS paths don't re-emit it,
+  // even when the anchor itself is filtered out of the output by entity_types.
+  seenEntityIds.add(anchor.id);
 
-  // 1. Include the anchor entity itself. Scored at 1.0 so it appears first
-  // when the query is also an expected answer (e.g. searching for a person
-  // name and expecting that person in results).
-  const anchorProvenance = getEntityProvenance(graph, anchor.id);
-  const anchorEdgeCount = getEntityEdgeCount(graph, anchor.id);
-  const anchorComponents: ScoreComponents = {
-    fts_score: 1.0,
-    graph_score: normalizeGraphScore(anchorEdgeCount),
-    temporal_score: computeTemporalScore(anchor.updated_at, now),
-    evidence_score: normalizeEvidenceCount(anchorProvenance.length),
-    vector_score: 0.0,
-  };
-  anchorResults.push({
-    type: "entity",
-    id: anchor.id,
-    score: 1.0,
-    score_components: anchorComponents,
-    content: anchor.canonical_name,
-    provenance: anchorProvenance,
-  });
+  // Apply entity_types filter to the anchor itself for consistency with the
+  // standard FTS path, where entity_types filters every returned entity.
+  const anchorTypeAllowed =
+    !opts.entity_types ||
+    opts.entity_types.length === 0 ||
+    opts.entity_types.includes(anchor.entity_type);
+
+  // 1. Include the anchor entity itself (if its type is allowed). Scored at
+  // 1.0 so it appears first when the query is also an expected answer
+  // (e.g. searching for a person name and expecting that person in results).
+  if (anchorTypeAllowed) {
+    const anchorProvenance = getEntityProvenance(graph, anchor.id);
+    const anchorEdgeCount = getEntityEdgeCount(graph, anchor.id);
+    const anchorComponents: ScoreComponents = {
+      fts_score: 1.0,
+      graph_score: normalizeGraphScore(anchorEdgeCount),
+      temporal_score: computeTemporalScore(anchor.updated_at, now),
+      evidence_score: normalizeEvidenceCount(anchorProvenance.length),
+      vector_score: 0.0,
+    };
+    anchorResults.push({
+      type: "entity",
+      id: anchor.id,
+      score: 1.0,
+      score_components: anchorComponents,
+      content: anchor.canonical_name,
+      provenance: anchorProvenance,
+    });
+  }
 
   // 2. Traverse edges from anchor to discover connected entities
   const seeds: Array<[string, number]> = [[anchor.id, 1.0]];
@@ -321,7 +340,7 @@ async function entityAnchoredSearch(
   const maxConf2 = Math.max(...hop2.map((t) => t.minPathConfidence), 0);
 
   for (const t of traversed) {
-    if (anchorEntityIds.has(t.entityId)) continue;
+    if (seenEntityIds.has(t.entityId)) continue;
     if (
       opts.entity_types &&
       opts.entity_types.length > 0 &&
@@ -329,7 +348,7 @@ async function entityAnchoredSearch(
     )
       continue;
 
-    anchorEntityIds.add(t.entityId);
+    seenEntityIds.add(t.entityId);
 
     const provenance = getEntityProvenance(graph, t.entityId);
 
@@ -362,19 +381,37 @@ async function entityAnchoredSearch(
     });
   }
 
-  // 2. Run FTS as secondary source, deduping against anchor-discovered entities.
-  // FTS results are scored below the weakest anchor result so graph-traversed
-  // entities always rank first.
+  // 3. Run FTS as secondary source (entities, edges, episodes).
+  // FTS results are scored below the weakest anchor/traversal result so
+  // graph-traversed entities always rank first, but edge and episode FTS
+  // are still surfaced to preserve the cross-type contract of search().
   const ftsQuery = escapeFtsQuery(query);
+
   let entityRows: EntityFtsRow[] = [];
+  let edgeRows: EdgeFtsRow[] = [];
+  let episodeRows: EpisodeFtsRow[] = [];
   try {
     entityRows = searchEntities(graph, ftsQuery, opts).rows;
   } catch {
     entityRows = [];
   }
+  try {
+    edgeRows = searchEdges(graph, ftsQuery, opts).rows;
+  } catch {
+    edgeRows = [];
+  }
+  try {
+    episodeRows = searchEpisodes(graph, ftsQuery).rows;
+  } catch {
+    episodeRows = [];
+  }
 
   const entityNormalizedRanks = normalizeFtsRanks(
     entityRows.map((r) => r.rank),
+  );
+  const edgeNormalizedRanks = normalizeFtsRanks(edgeRows.map((r) => r.rank));
+  const episodeNormalizedRanks = normalizeFtsRanks(
+    episodeRows.map((r) => r.rank),
   );
   const ftsBaseline =
     anchorResults.length > 0
@@ -383,8 +420,8 @@ async function entityAnchoredSearch(
 
   for (let i = 0; i < entityRows.length; i++) {
     const row = entityRows[i];
-    if (anchorEntityIds.has(row.id)) continue;
-    anchorEntityIds.add(row.id);
+    if (seenEntityIds.has(row.id)) continue;
+    seenEntityIds.add(row.id);
 
     const ftsScore = entityNormalizedRanks[i] * ftsBaseline;
     const provenance = getEntityProvenance(graph, row.id);
@@ -404,6 +441,53 @@ async function entityAnchoredSearch(
       score_components: components,
       content: row.canonical_name,
       provenance,
+    });
+  }
+
+  // Edge FTS: scored below entity FTS (half the baseline) so text-matched
+  // edges never outrank entity-anchor / entity-FTS results.
+  const edgeBaseline = ftsBaseline * 0.5;
+  for (let i = 0; i < edgeRows.length; i++) {
+    const row = edgeRows[i];
+    const score = edgeNormalizedRanks[i] * edgeBaseline;
+    const components: ScoreComponents = {
+      fts_score: score,
+      graph_score: 0.0,
+      temporal_score: 0.0,
+      evidence_score: 0.0,
+      vector_score: 0.0,
+    };
+    anchorResults.push({
+      type: "edge",
+      id: row.id,
+      score,
+      score_components: components,
+      content: row.fact,
+      provenance: getEdgeProvenance(graph, row.id),
+      edge_kind: row.edge_kind,
+    });
+  }
+
+  // Episode FTS: scored at the same low tier as edge FTS.
+  for (let i = 0; i < episodeRows.length; i++) {
+    const row = episodeRows[i];
+    const score = episodeNormalizedRanks[i] * edgeBaseline;
+    const components: ScoreComponents = {
+      fts_score: score,
+      graph_score: 0.0,
+      temporal_score: 0.0,
+      evidence_score: 0.0,
+      vector_score: 0.0,
+    };
+    const snippet =
+      row.content.length > 200 ? `${row.content.slice(0, 200)}…` : row.content;
+    anchorResults.push({
+      type: "episode",
+      id: row.id,
+      score,
+      score_components: components,
+      content: snippet,
+      provenance: [row.id],
     });
   }
 

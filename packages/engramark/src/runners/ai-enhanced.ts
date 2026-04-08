@@ -2,9 +2,19 @@
  * runners/ai-enhanced.ts — AI-enhanced benchmark runner.
  *
  * Uses the appropriate retrieval operation per question type:
- *   - keyword:         search() with hybrid FTS+vector (or FTS-only fallback)
- *   - relational:      resolveEntity() + findEdges() (same as vcs-only)
- *   - graph_traversal: resolveEntity() + getNeighbors() (same as vcs-only)
+ *   - keyword:         search() with hybrid FTS+vector (or FTS-only fallback).
+ *                      search() will short-circuit to entity-anchored graph
+ *                      traversal when the query string exactly matches an
+ *                      entity canonical name or alias — that's the search()
+ *                      contract; the benchmark measures what the real
+ *                      retrieval API does.
+ *   - relational:      resolveEntity() + findEdges() filtered by
+ *                      question.expected_relation (same as vcs-only).
+ *   - graph_traversal: resolveEntity() + getNeighbors({ edge_kinds: ["inferred"] })
+ *                      — traversal is restricted to inferred edges
+ *                      (likely_owner_of, co_changes_with) so the high-fanout
+ *                      observed authored_by edges don't drown out the intended
+ *                      signal. Same as vcs-only.
  *
  * Relational and graph questions use identical graph operations regardless of
  * AI provider availability — the graph structure is the same. The AI-enhanced
@@ -162,7 +172,14 @@ function runGraphQuestion(
   let retrievedEntities: string[] = [];
 
   if (anchor) {
-    const subgraph = getNeighbors(graph, anchor.id, { depth: 2 });
+    // Restrict traversal to inferred edges (likely_owner_of, co_changes_with).
+    // Without this filter, observed edges like authored_by create a high-fanout
+    // star from every person to every file they ever touched, flooding the
+    // neighbor set and drowning out the intended signal.
+    const subgraph = getNeighbors(graph, anchor.id, {
+      depth: 2,
+      edge_kinds: ["inferred"],
+    });
 
     retrievedEntities = subgraph.entities
       .filter((e) => e.id !== anchor.id && e.status === "active")
