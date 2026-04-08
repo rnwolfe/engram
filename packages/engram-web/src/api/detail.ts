@@ -15,13 +15,19 @@ import {
   getEvidenceForEntity,
 } from "engram-core";
 
-export interface EvidenceSummary {
-  episode_id: string;
-  source_type: string;
-  source_ref: string | null;
-  created_at: string;
-  summary: string | null;
-}
+export type EvidenceSummary =
+  | {
+      episode_id: string;
+      status: "redacted";
+    }
+  | {
+      episode_id: string;
+      source_type: string;
+      source_ref: string | null;
+      created_at: string;
+      summary: string | null;
+      status?: string;
+    };
 
 export interface EntityDetailResponse {
   id: string;
@@ -55,16 +61,16 @@ export interface EdgeDetailResponse {
 
 export interface EpisodeDetailResponse {
   id: string;
-  source_type: string;
+  source_type: string | null;
   source_ref: string | null;
   content: string | null;
-  content_hash: string;
+  content_hash: string | null;
   actor: string | null;
   status: string;
-  timestamp: string;
-  ingested_at: string;
+  timestamp: string | null;
+  ingested_at: string | null;
   owner_id: string | null;
-  extractor_version: string;
+  extractor_version: string | null;
   metadata: string | null;
 }
 
@@ -82,13 +88,18 @@ export function handleEntityDetail(
   if (!entity) return null;
 
   const evidenceLinks = getEvidenceForEntity(graph, entityId);
-  const evidence: EvidenceSummary[] = evidenceLinks.map((link) => ({
-    episode_id: link.episode_id,
-    source_type: link.episode.source_type,
-    source_ref: link.episode.source_ref,
-    created_at: link.created_at,
-    summary: extractSummary(link.episode.content, link.episode.status),
-  }));
+  const evidence: EvidenceSummary[] = evidenceLinks.map((link) => {
+    if (link.episode.status === "redacted") {
+      return { episode_id: link.episode_id, status: "redacted" as const };
+    }
+    return {
+      episode_id: link.episode_id,
+      source_type: link.episode.source_type,
+      source_ref: link.episode.source_ref,
+      created_at: link.created_at,
+      summary: extractSummary(link.episode.content, link.episode.status),
+    };
+  });
 
   return {
     id: entity.id,
@@ -111,13 +122,18 @@ export function handleEdgeDetail(
   if (!edge) return null;
 
   const evidenceLinks = getEvidenceForEdge(graph, edgeId);
-  const evidence: EvidenceSummary[] = evidenceLinks.map((link) => ({
-    episode_id: link.episode_id,
-    source_type: link.episode.source_type,
-    source_ref: link.episode.source_ref,
-    created_at: link.created_at,
-    summary: extractSummary(link.episode.content, link.episode.status),
-  }));
+  const evidence: EvidenceSummary[] = evidenceLinks.map((link) => {
+    if (link.episode.status === "redacted") {
+      return { episode_id: link.episode_id, status: "redacted" as const };
+    }
+    return {
+      episode_id: link.episode_id,
+      source_type: link.episode.source_type,
+      source_ref: link.episode.source_ref,
+      created_at: link.created_at,
+      summary: extractSummary(link.episode.content, link.episode.status),
+    };
+  });
 
   return {
     id: edge.id,
@@ -145,12 +161,27 @@ export function handleEpisodeDetail(
   const episode = getEpisode(graph, episodeId);
   if (!episode) return null;
 
-  const isRedacted = episode.status === "redacted";
+  if (episode.status === "redacted") {
+    return {
+      id: episode.id,
+      source_type: null,
+      source_ref: null,
+      content: null,
+      content_hash: null,
+      actor: null,
+      status: "redacted",
+      timestamp: null,
+      ingested_at: null,
+      owner_id: null,
+      extractor_version: null,
+      metadata: null,
+    };
+  }
   return {
     id: episode.id,
     source_type: episode.source_type,
     source_ref: episode.source_ref,
-    content: isRedacted ? null : episode.content,
+    content: episode.content,
     content_hash: episode.content_hash,
     actor: episode.actor,
     status: episode.status,

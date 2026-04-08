@@ -89,6 +89,35 @@ describe("handleEntityDetail", () => {
     expect(result).toBeNull();
   });
 
+  test("redacted episodes in evidence list expose only episode_id and status", () => {
+    const ep = addEpisode(graph, {
+      source_type: "manual",
+      source_ref: "secret-ent-001",
+      content: "sensitive content",
+      timestamp: "2024-01-01T00:00:00Z",
+    });
+    const evidence = [{ episode_id: ep.id, extractor: "test" }];
+    const entity = addEntity(
+      graph,
+      { canonical_name: "SecretEntity", entity_type: "module" },
+      evidence,
+    );
+    graph.db
+      .query(
+        "UPDATE episodes SET status = 'redacted', content = '' WHERE id = ?",
+      )
+      .run(ep.id);
+
+    const result = handleEntityDetail(graph, entity.id);
+    expect(result).not.toBeNull();
+    expect(result?.evidence).toHaveLength(1);
+    const ev = result?.evidence[0];
+    expect(ev?.episode_id).toBe(ep.id);
+    expect((ev as { status?: string })?.status).toBe("redacted");
+    expect((ev as { source_type?: string })?.source_type).toBeUndefined();
+    expect((ev as { source_ref?: string })?.source_ref).toBeUndefined();
+  });
+
   test("includes summary truncated to 120 chars", () => {
     const longContent = "A".repeat(200);
     const ep = addEpisode(graph, {
@@ -177,6 +206,9 @@ describe("handleEpisodeDetail", () => {
     expect(result).not.toBeNull();
     expect(result?.status).toBe("redacted");
     expect(result?.content).toBeNull();
+    expect(result?.content_hash).toBeNull();
+    expect(result?.source_type).toBeNull();
+    expect(result?.source_ref).toBeNull();
   });
 
   test("returns null for unknown episode ID", () => {

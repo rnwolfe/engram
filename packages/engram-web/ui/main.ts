@@ -7,7 +7,12 @@
 
 import cytoscape from "cytoscape";
 import { buildStyles, ENTITY_TYPE_COLORS } from "./graph.js";
-import { closePanel, openEdgePanel, openEntityPanel } from "./panels.js";
+import {
+  closePanel,
+  openEdgePanel,
+  openEntityPanel,
+  setCytoscapeInstance,
+} from "./panels.js";
 
 interface GraphNode {
   id: string;
@@ -126,6 +131,9 @@ async function main(): Promise<void> {
     minZoom: 0.05,
     maxZoom: 5,
   });
+
+  // Register cytoscape instance for panel navigation
+  setCytoscapeInstance(cy);
 
   // Toolbar buttons
   const btnZoomFit = document.getElementById("btn-zoom-fit");

@@ -2,17 +2,21 @@
  * panels.ts — right-hand collapsible detail sidebar.
  *
  * Exports:
+ *   setCytoscapeInstance(cy)   → registers the cytoscape instance for graph navigation
  *   openEntityPanel(entityId)  → fetches /api/entities/:id, renders entity panel
  *   openEdgePanel(edgeId)      → fetches /api/edges/:id, renders edge panel
  *   closePanel()               → hides the panel
  */
 
+type CytoscapeInstance = Record<string, (...args: unknown[]) => unknown>;
+
 interface EvidenceSummary {
   episode_id: string;
-  source_type: string;
-  source_ref: string | null;
-  created_at: string;
-  summary: string | null;
+  source_type?: string;
+  source_ref?: string | null;
+  created_at?: string;
+  summary?: string | null;
+  status?: string;
 }
 
 interface EntityDetail {
@@ -51,6 +55,20 @@ interface EpisodeDetail {
   status: string;
   timestamp: string;
   actor: string | null;
+}
+
+let _cy: CytoscapeInstance = null;
+
+export function setCytoscapeInstance(cy: CytoscapeInstance): void {
+  _cy = cy;
+}
+
+function navigateToNode(entityId: string): void {
+  if (!_cy) return;
+  const node = _cy.getElementById(entityId);
+  if (!node || node.length === 0) return;
+  node.select();
+  _cy.animate({ fit: { eles: node, padding: 50 } }, { duration: 300 });
 }
 
 function getPanel(): HTMLElement | null {
@@ -99,6 +117,14 @@ async function fetchEpisode(episodeId: string): Promise<EpisodeDetail | null> {
 }
 
 function renderEvidenceItem(ev: EvidenceSummary, index: number): string {
+  if (ev.status === "redacted") {
+    return `
+    <div class="evidence-item evidence-item--redacted" data-episode-id="${esc(ev.episode_id)}">
+      <div class="evidence-header">
+        <span class="evidence-label">• [redacted]</span>
+      </div>
+    </div>`;
+  }
   const label = ev.source_ref
     ? `${esc(ev.source_type)} · ${esc(ev.source_ref)}`
     : esc(ev.source_type);
@@ -227,7 +253,10 @@ function attachEntityLinkHandlers(): void {
     .forEach((btn) => {
       btn.addEventListener("click", () => {
         const entityId = btn.dataset.entityId;
-        if (entityId) openEntityPanel(entityId);
+        if (entityId) {
+          navigateToNode(entityId);
+          openEntityPanel(entityId);
+        }
       });
     });
 }
@@ -252,11 +281,16 @@ export async function openEntityPanel(entityId: string): Promise<void> {
     return;
   }
 
-  // Count edges by looking up via DOM (the cytoscape instance populates edges)
-  // We derive edge counts from the evidence list length as a proxy,
-  // but they may be approximated from /api/graph data cached in window if available.
-  const outCount = 0;
-  const inCount = 0;
+  // Count edges from the cytoscape instance if available
+  let outCount = 0;
+  let inCount = 0;
+  if (_cy) {
+    const node = _cy.getElementById(entityId);
+    if (node && node.length > 0) {
+      outCount = node.outgoers("edge").length;
+      inCount = node.incomers("edge").length;
+    }
+  }
 
   showPanel(renderEntityPanel(entity, outCount, inCount));
   attachEvidenceHandlers();
