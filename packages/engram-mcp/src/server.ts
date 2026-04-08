@@ -41,6 +41,11 @@ import {
   type GetHistoryInput,
   handleGetHistory,
 } from "./tools/history.js";
+import {
+  handleOwnershipReport,
+  OWNERSHIP_TOOL,
+  type OwnershipInput,
+} from "./tools/ownership.js";
 import { handleSearch, SEARCH_TOOL, type SearchInput } from "./tools/search.js";
 import {
   FIND_EDGES_TOOL,
@@ -70,6 +75,7 @@ const ALL_TOOLS = [
   GET_CONTEXT_TOOL,
   GET_DECAY_TOOL,
   GET_HISTORY_TOOL,
+  OWNERSHIP_TOOL,
   GET_NEIGHBORS_TOOL,
   FIND_EDGES_TOOL,
   GET_PATH_TOOL,
@@ -120,6 +126,9 @@ export function createServer(dbPath: string) {
           break;
         case "engram_get_history":
           result = handleGetHistory(graph, input as GetHistoryInput);
+          break;
+        case "engram_ownership_report":
+          result = handleOwnershipReport(graph, input as OwnershipInput);
           break;
         case "engram_add_episode":
           result = handleAddEpisode(graph, input as AddEpisodeInput);

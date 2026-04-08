@@ -9,10 +9,12 @@ import { registerHistory } from "./commands/history.js";
 import { registerIngest } from "./commands/ingest.js";
 import { registerInit } from "./commands/init.js";
 import { registerMaintenance } from "./commands/maintenance.js";
+import { registerOwnership } from "./commands/ownership.js";
 import { registerSearch } from "./commands/search.js";
 import { registerShow } from "./commands/show.js";
 import { registerStats } from "./commands/stats.js";
 import { registerVerify } from "./commands/verify.js";
+import { registerVisualize } from "./commands/visualize.js";
 
 const program = new Command()
   .name("engram")
@@ -27,10 +29,12 @@ registerSearch(program);
 registerShow(program);
 registerHistory(program);
 registerDecay(program);
+registerOwnership(program);
 registerStats(program);
 registerIngest(program);
 registerExport(program);
 registerVerify(program);
 registerMaintenance(program);
+registerVisualize(program);
 
 program.parse();
