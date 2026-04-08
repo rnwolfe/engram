@@ -132,6 +132,44 @@ export function initCytoscape(container: HTMLElement): Core {
           "border-opacity": 1,
         },
       },
+      // Decay overlay risk classes
+      {
+        selector: ".risk-critical",
+        style: {
+          "background-color": "#c0392b",
+          color: "#ffffff",
+        },
+      },
+      {
+        selector: ".risk-elevated",
+        style: {
+          "background-color": "#e67e22",
+          color: "#ffffff",
+        },
+      },
+      {
+        selector: ".risk-stale",
+        style: {
+          "background-color": "#f1c40f",
+          color: "#333333",
+        },
+      },
+      {
+        selector: ".risk-dormant",
+        style: {
+          "background-color": "#7f8c8d",
+          "border-style": "dashed",
+          "border-width": 2,
+          "border-color": "#bdc3c7",
+        },
+      },
+      {
+        selector: ".risk-orphaned",
+        style: {
+          "background-color": "#8e44ad",
+          color: "#ffffff",
+        },
+      },
     ],
     layout: { name: "preset" },
     userZoomingEnabled: true,
