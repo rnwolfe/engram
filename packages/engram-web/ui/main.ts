@@ -18,6 +18,7 @@ import {
   openEntityPanel,
   setCytoscapeInstance,
 } from "./panels.js";
+import { initTimeSlider } from "./time-slider.js";
 
 interface GraphNode {
   id: string;
@@ -48,6 +49,43 @@ async function loadGraph(): Promise<GraphResponse> {
   const res = await fetch("/api/graph");
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json() as Promise<GraphResponse>;
+}
+
+async function applyGraphSnapshot(
+  cy: cytoscape.Core,
+  validAt: string | null,
+): Promise<void> {
+  const url = validAt
+    ? `/api/graph?valid_at=${encodeURIComponent(validAt)}`
+    : "/api/graph";
+  const res = await fetch(url);
+  if (!res.ok) return;
+  const data = (await res.json()) as GraphResponse;
+
+  const existingNodeIds = new Set(cy.nodes().map((n) => n.id()));
+  const newNodeIds = new Set(data.nodes.map((n) => n.id));
+
+  // Remove nodes (and their incident edges) not in new snapshot
+  cy.nodes()
+    .filter((n) => !newNodeIds.has(n.id()))
+    .remove();
+
+  // Add nodes that weren't present before
+  const newNodes = data.nodes.filter((n) => !existingNodeIds.has(n.id));
+  if (newNodes.length > 0) cy.add(buildElements(newNodes, []));
+
+  // Remove edges not in new snapshot
+  const newEdgeIds = new Set(data.edges.map((e) => e.id));
+  cy.edges()
+    .filter((e) => !newEdgeIds.has(e.id()))
+    .remove();
+
+  // Add edges that weren't present before
+  const existingEdgeIds = new Set(cy.edges().map((e) => e.id()));
+  const toAddEdges = data.edges.filter((e) => !existingEdgeIds.has(e.id));
+  if (toAddEdges.length > 0) cy.add(buildElements([], toAddEdges));
+
+  // Do NOT re-run layout — keep node positions stable
 }
 
 function buildLegend(data: GraphResponse): void {
@@ -96,6 +134,9 @@ async function main(): Promise<void> {
 
   // Register cytoscape instance for panel navigation
   setCytoscapeInstance(cy);
+
+  // Temporal time slider
+  initTimeSlider(cy, (validAt) => applyGraphSnapshot(cy, validAt));
 
   // Toolbar buttons
   const btnZoomFit = document.getElementById("btn-zoom-fit");

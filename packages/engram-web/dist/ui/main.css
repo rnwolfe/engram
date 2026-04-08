@@ -373,3 +373,48 @@ body {
   color: #f85149;
   font-size: 0.85rem;
 }
+
+/* Time slider */
+
+#time-slider-container {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 8px 1rem;
+  background: rgba(22, 27, 34, 0.92);
+  border-top: 1px solid #30363d;
+  z-index: 30;
+}
+
+#time-slider {
+  flex: 1;
+  accent-color: #58a6ff;
+  cursor: pointer;
+}
+
+#time-label {
+  font-size: 0.8rem;
+  color: #c9d1d9;
+  white-space: nowrap;
+  min-width: 6rem;
+  text-align: center;
+}
+
+#btn-now {
+  background: #21262d;
+  border: 1px solid #30363d;
+  color: #c9d1d9;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+#btn-now:hover {
+  background: #30363d;
+}
