@@ -5,8 +5,13 @@
  * and connects node/edge tap events to the detail panel.
  */
 
-import cytoscape from "cytoscape";
-import { buildStyles, ENTITY_TYPE_COLORS } from "./graph.js";
+import {
+  attachHoverHandlers,
+  buildElements,
+  initCytoscape,
+  NODE_COLORS,
+  runCoseLayout,
+} from "./graph.js";
 import {
   closePanel,
   openEdgePanel,
@@ -52,8 +57,7 @@ function buildLegend(data: GraphResponse): void {
   const types = [...new Set(data.nodes.map((n) => n.entity_type))].sort();
   legendEl.innerHTML = types
     .map((t) => {
-      const color =
-        ENTITY_TYPE_COLORS[t as keyof typeof ENTITY_TYPE_COLORS] ?? "#8b949e";
+      const color = NODE_COLORS[t as keyof typeof NODE_COLORS] ?? "#8b949e";
       return `<div class="legend-item"><span class="legend-dot" style="background:${color}"></span>${t}</div>`;
     })
     .join("");
@@ -84,53 +88,11 @@ async function main(): Promise<void> {
   updateStats(data.stats);
   buildLegend(data);
 
-  const elements = [
-    ...data.nodes.map((n) => ({
-      data: {
-        id: n.id,
-        label: n.canonical_name,
-        entity_type: n.entity_type,
-        status: n.status,
-      },
-    })),
-    ...data.edges.map((e) => ({
-      data: {
-        id: e.id,
-        source: e.source_id,
-        target: e.target_id,
-        relation_type: e.relation_type,
-        edge_kind: e.edge_kind,
-        confidence: e.confidence,
-      },
-    })),
-  ];
-
-  const cy = cytoscape({
-    container: document.getElementById("cy"),
-    elements,
-    style: buildStyles(),
-    layout: {
-      name: "cose",
-      animate: false,
-      idealEdgeLength: 80,
-      nodeOverlap: 20,
-      refresh: 20,
-      fit: true,
-      padding: 30,
-      randomize: false,
-      componentSpacing: 100,
-      nodeRepulsion: 400000,
-      edgeElasticity: 100,
-      nestingFactor: 5,
-      gravity: 80,
-      numIter: 1000,
-      initialTemp: 200,
-      coolingFactor: 0.95,
-      minTemp: 1.0,
-    } as cytoscape.LayoutOptions,
-    minZoom: 0.05,
-    maxZoom: 5,
-  });
+  const container = document.getElementById("cy");
+  if (!container) return;
+  const cy = initCytoscape(container);
+  cy.add(buildElements(data.nodes, data.edges));
+  runCoseLayout(cy);
 
   // Register cytoscape instance for panel navigation
   setCytoscapeInstance(cy);
@@ -150,17 +112,7 @@ async function main(): Promise<void> {
   }
 
   // Hover: highlight node + incident edges, dim everything else
-  cy.on("mouseover", "node", (evt) => {
-    const node = evt.target as cytoscape.NodeSingular;
-    cy.elements().addClass("dimmed");
-    node.removeClass("dimmed").addClass("highlighted");
-    node.connectedEdges().removeClass("dimmed").addClass("highlighted");
-    node.connectedEdges().connectedNodes().removeClass("dimmed");
-  });
-
-  cy.on("mouseout", "node", () => {
-    cy.elements().removeClass("dimmed").removeClass("highlighted");
-  });
+  attachHoverHandlers(cy);
 
   // Double-click on background → zoom to fit
   cy.on("dblclick", (evt) => {
@@ -169,14 +121,12 @@ async function main(): Promise<void> {
 
   // Tap a node → open entity panel
   cy.on("tap", "node", (evt) => {
-    const node = evt.target as cytoscape.NodeSingular;
-    openEntityPanel(node.id());
+    openEntityPanel(evt.target.id() as string);
   });
 
   // Tap an edge → open edge panel
   cy.on("tap", "edge", (evt) => {
-    const edge = evt.target as cytoscape.EdgeSingular;
-    openEdgePanel(edge.id());
+    openEdgePanel(evt.target.id() as string);
   });
 
   // Tap background → close panel

@@ -4,12 +4,14 @@
   "module": "src/index.ts",
   "type": "module",
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target node && bun build ui/main.ts --outdir dist/ui --target browser && cp ui/index.html dist/ui/index.html && cp ui/main.css dist/ui/main.css",
+    "build": "bun build src/index.ts --outdir dist --target node && bun build ui/main.ts --outdir dist/ui --minify && cp ui/main.css dist/ui/main.css && cp ui/index.html dist/ui/index.html",
     "test": "bun test"
   },
   "dependencies": {
-    "@types/cytoscape": "^3.31.0",
     "cytoscape": "^3.33.2",
     "engram-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/cytoscape": "^3.31.0"
   }
 }
