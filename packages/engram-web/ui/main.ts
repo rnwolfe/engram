@@ -230,7 +230,6 @@ function isHelpModalOpen(): boolean {
 function wireToolbar(): void {
   const fitBtn = document.getElementById("btn-fit");
   const resetBtn = document.getElementById("btn-reset-layout");
-  const decayBtn = document.getElementById("btn-decay-overlay");
   const helpBtn = document.getElementById("btn-help");
   const helpClose = document.getElementById("help-close");
 
@@ -245,12 +244,6 @@ function wireToolbar(): void {
       if (cy) {
         runCoseLayout(cy);
       }
-    });
-  }
-
-  if (decayBtn) {
-    decayBtn.addEventListener("click", () => {
-      decayBtn.classList.toggle("active");
     });
   }
 
