@@ -4,43 +4,32 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>engram — knowledge graph</title>
-    <style>
-      * { box-sizing: border-box; margin: 0; padding: 0; }
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
-        background: #0d1117;
-        color: #c9d1d9;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        min-height: 100vh;
-        gap: 1rem;
-      }
-      h1 { font-size: 1.5rem; font-weight: 600; color: #58a6ff; }
-      #status { font-size: 1rem; color: #8b949e; }
-      #stats { font-size: 1.25rem; color: #c9d1d9; }
-      .error { color: #f85149; }
-    </style>
+    <link rel="stylesheet" href="main.css" />
   </head>
   <body>
-    <h1>engram</h1>
-    <div id="stats">Loading...</div>
-    <div id="status">rendering coming soon</div>
-    <script>
-      async function loadStats() {
-        try {
-          const res = await fetch('/api/stats');
-          if (!res.ok) throw new Error('HTTP ' + res.status);
-          const data = await res.json();
-          document.getElementById('stats').textContent =
-            `engram — ${data.entity_count} entities, ${data.edge_count} edges — rendering coming soon`;
-        } catch (err) {
-          document.getElementById('stats').className = 'error';
-          document.getElementById('stats').textContent = 'Error loading stats: ' + err.message;
-        }
-      }
-      loadStats();
-    </script>
+    <header id="toolbar">
+      <span id="brand">engram</span>
+      <span id="stats-display">Loading…</span>
+      <div id="toolbar-actions">
+        <button id="btn-zoom-fit" title="Zoom to fit">Zoom to fit</button>
+        <button id="btn-reset-layout" title="Reset layout">Reset layout</button>
+      </div>
+    </header>
+
+    <div id="app">
+      <div id="cy"></div>
+
+      <aside id="detail-panel" class="panel hidden">
+        <button id="panel-close" aria-label="Close panel">×</button>
+        <div id="panel-content"></div>
+      </aside>
+    </div>
+
+    <div id="legend">
+      <strong>Types</strong>
+      <div id="legend-items"></div>
+    </div>
+
+    <script type="module" src="main.js"></script>
   </body>
 </html>
