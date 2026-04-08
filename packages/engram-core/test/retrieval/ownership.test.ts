@@ -123,11 +123,12 @@ describe("all-stable graph", () => {
     });
 
     const report = getOwnershipReport(graph);
+    // The entity has a likely_owner_of edge so it is a candidate; assert it
+    // appears and is classified stable (recent activity, no concentration risk,
+    // no high coupling).
     const entry = report.entries.find((e) => e.entity_id === mod.id);
-    // May or may not appear depending on whether concentrated risk detected
-    if (entry) {
-      expect(entry.risk_level).toBe("stable");
-    }
+    expect(entry).toBeDefined();
+    expect(entry?.risk_level).toBe("stable");
   });
 });
 

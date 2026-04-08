@@ -69,8 +69,11 @@ export function handleOwnershipReport(
     valid_at: input.valid_at,
   });
 
+  // Bug 3 fix: truncated should be true when the limit was actually hit (entries
+  // were cut off), not when total_entities_analyzed > effectiveLimit (which uses
+  // a count of candidates, not returned entries).
   const truncated =
-    report.total_entities_analyzed > effectiveLimit ? true : undefined;
+    report.entries.length === effectiveLimit ? true : undefined;
 
   return {
     ...report,

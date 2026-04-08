@@ -109,17 +109,25 @@ function daysSinceOwnerActivity(
   graph: EngramGraph,
   ownerId: string,
   nowMs: number,
+  validAt: string | undefined,
 ): number | null {
-  // Find the most recent authored_by edge for this owner
+  const params: unknown[] = [ownerId];
+  let temporalClause = "";
+  if (validAt) {
+    temporalClause = " AND (ed.valid_from IS NULL OR ed.valid_from <= ?)";
+    params.push(validAt);
+  }
+
+  // Find the most recent authored_by edge for this owner (capped at valid_at if provided)
   const row = graph.db
-    .query<ActivityRow, [string]>(
+    .query<ActivityRow, unknown[]>(
       `SELECT MAX(ed.valid_from) AS last_ts
        FROM edges ed
        WHERE ed.source_id = ?
          AND ed.relation_type = 'authored_by'
-         AND ed.invalidated_at IS NULL`,
+         AND ed.invalidated_at IS NULL${temporalClause}`,
     )
-    .get(ownerId);
+    .get(...params);
 
   if (!row?.last_ts) {
     // Fallback: check episodes linked via entity evidence for the owner
@@ -184,12 +192,16 @@ export function getOwnershipReport(
   const dormantDays = DORMANT_DAYS_DEFAULT;
 
   const generated_at = new Date().toISOString();
-  const nowMs = Date.now();
+  // Bug 4 fix: anchor dormancy calculation at valid_at (not wall-clock) for historical snapshots
+  const nowMs = validAt ? new Date(validAt).getTime() : Date.now();
 
   // Step 1: Get decay candidates
-  const decayReport = getDecayReport(graph, {
-    dormant_days: dormantDays,
-  });
+  // Note: we do not pass dormant_days here because dormancy is computed below
+  // via daysSinceOwnerActivity() using the owner's authored_by edges, anchored
+  // at valid_at when provided. Passing dormant_days to getDecayReport would add
+  // entity-level dormant_owner signals that are redundant and not temporally
+  // consistent with the valid_at snapshot.
+  const decayReport = getDecayReport(graph, {});
 
   // Build maps from entity_id -> decay categories
   const decayByEntity = new Map<string, Set<string>>();
@@ -258,16 +270,22 @@ export function getOwnershipReport(
     const ownerName = ownerEdge?.owner_name ?? null;
     const ownerConfidence = ownerEdge?.confidence ?? 0;
 
-    // Days since owner last activity
+    // Days since owner last activity (Bug 5 fix: pass validAt to filter authored_by edges)
     const daysSinceActivity =
-      ownerId !== null ? daysSinceOwnerActivity(graph, ownerId, nowMs) : null;
+      ownerId !== null
+        ? daysSinceOwnerActivity(graph, ownerId, nowMs, validAt)
+        : null;
 
     // Count co_changes_with edges for blast radius
     const couplingCount = countCouplingEdges(graph, entityId);
 
     // Classification
+    // Bug 1 fix: dormant owner requires a known owner (ownerId != null).
+    // Entities with no likely_owner_of edge are orphaned/unowned — not dormant-owner.
     const isDormantOwner =
-      daysSinceActivity !== null && daysSinceActivity > dormantDays;
+      ownerId !== null &&
+      daysSinceActivity !== null &&
+      daysSinceActivity > dormantDays;
     const isConcentratedRisk = decayTypes.includes("concentrated_risk");
     const isHighCoupling = couplingCount >= COUPLING_THRESHOLD;
 
@@ -320,7 +338,8 @@ export function getOwnershipReport(
 
   return {
     generated_at,
-    total_entities_analyzed: entries.length,
+    // Bug 2 fix: count unique candidates examined, not entries after the evidence filter
+    total_entities_analyzed: candidateIds.size,
     critical_count,
     elevated_count,
     stable_count,
