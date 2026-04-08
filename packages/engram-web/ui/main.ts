@@ -20,6 +20,7 @@ import {
   setCytoscapeInstance,
 } from "./panels.js";
 import { initSearch } from "./search.js";
+import { initTimeSlider } from "./time-slider.js";
 
 // ── State ─────────────────────────────────────────────────
 
@@ -65,22 +66,6 @@ function updateStatsBar(entityCount: number, edgeCount: number): void {
 
 // ── Legend ─────────────────────────────────────────────────
 
-function buildLegend(): void {
-  const legend = document.getElementById("legend-items");
-  if (!legend) return;
-
-  for (const [type, color] of Object.entries(NODE_COLORS)) {
-    if (type === "default") continue;
-    const item = document.createElement("div");
-    item.className = "legend-item";
-    item.innerHTML = `
-      <span class="legend-dot" style="background:${color}"></span>
-      <span>${type}</span>
-    `;
-    legend.appendChild(item);
-  }
-}
-
 // ── Data fetching ─────────────────────────────────────────
 
 interface GraphResponse {
@@ -113,6 +98,60 @@ async function fetchGraph(): Promise<GraphResponse> {
     throw new Error(`Failed to load graph: HTTP ${res.status}`);
   }
   return res.json() as Promise<GraphResponse>;
+}
+
+async function applyGraphSnapshot(
+  cy: cytoscape.Core,
+  validAt: string | null,
+): Promise<void> {
+  const url = validAt
+    ? `/api/graph?valid_at=${encodeURIComponent(validAt)}`
+    : "/api/graph";
+  const res = await fetch(url);
+  if (!res.ok) return;
+  const data = (await res.json()) as GraphResponse;
+
+  const existingNodeIds = new Set(cy.nodes().map((n) => n.id()));
+  const newNodeIds = new Set(data.nodes.map((n) => n.id));
+
+  cy.nodes()
+    .filter((n) => !newNodeIds.has(n.id()))
+    .remove();
+
+  const newNodes = data.nodes.filter((n) => !existingNodeIds.has(n.id));
+  if (newNodes.length > 0) cy.add(buildElements(newNodes, []));
+
+  const newEdgeIds = new Set(data.edges.map((e) => e.id));
+  const toRemoveEdges = cy.edges().filter((e) => !newEdgeIds.has(e.id()));
+  if (toRemoveEdges.length > 0) {
+    toRemoveEdges.animate(
+      { style: { opacity: 0 } },
+      { duration: 150, complete: () => toRemoveEdges.remove() },
+    );
+  }
+
+  const existingEdgeIds = new Set(cy.edges().map((e) => e.id()));
+  const toAddEdges = data.edges.filter((e) => !existingEdgeIds.has(e.id));
+  if (toAddEdges.length > 0) {
+    const added = cy.add(buildElements([], toAddEdges));
+    added.style({ opacity: 0 });
+    added.animate({ style: { opacity: 1 } }, { duration: 200 });
+  }
+}
+
+function buildLegend(data?: GraphResponse): void {
+  const legendEl = document.getElementById("legend-items");
+  if (!legendEl) return;
+
+  const types = data
+    ? [...new Set(data.nodes.map((n) => n.entity_type))].sort()
+    : Object.keys(NODE_COLORS).filter((k) => k !== "default");
+  legendEl.innerHTML = types
+    .map((t) => {
+      const color = NODE_COLORS[t as keyof typeof NODE_COLORS] ?? "#8b949e";
+      return `<div class="legend-item"><span class="legend-dot" style="background:${color}"></span>${t}</div>`;
+    })
+    .join("");
 }
 
 // ── Init ──────────────────────────────────────────────────
@@ -157,9 +196,10 @@ async function init(): Promise<void> {
     updateStatsBar(data.stats.entity_count, data.stats.edge_count);
     buildLegend();
 
-    // Init filter sidebar and search
+    // Init filter sidebar, search, and time slider
     initFilters(cy, data);
     initSearch(cy, openEntityPanel);
+    initTimeSlider(cy, (validAt) => applyGraphSnapshot(cy, validAt));
 
     hideLoading();
   } catch (err) {
