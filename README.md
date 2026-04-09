@@ -1,8 +1,9 @@
 # engram
 
-> **Early-stage experiment.** The `.engram` format and APIs are unstable and will change without notice. Use at your own risk. Not recommended for production data.
-
 > A local-first temporal knowledge graph engine for developer memory.
+
+> [!WARNING]
+> **Early-stage experiment.** The `.engram` format and APIs are unstable and will change without notice. Use at your own risk. Not recommended for production data.
 
 Git is for code. Engram is for everything you learned along the way.
 
