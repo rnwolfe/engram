@@ -4,6 +4,14 @@
 
 Git is for code. Engram is for everything you learned along the way.
 
+## Install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/rnwolfe/engram/main/install.sh | bash
+```
+
+Installs the `engram` binary to `/usr/local/bin` (or `~/.local/bin` if not writable). Supports Linux and macOS on x64 and arm64.
+
 ## What It Does
 
 Engram extracts knowledge from where it already lives — git history, code review

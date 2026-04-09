@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - target: linux-x64
+            runner: ubuntu-latest
+            bun_target: bun-linux-x64
+          - target: linux-arm64
+            runner: ubuntu-latest
+            bun_target: bun-linux-arm64
+          - target: macos-x64
+            runner: macos-13
+            bun_target: bun-darwin-x64
+          - target: macos-arm64
+            runner: macos-latest
+            bun_target: bun-darwin-arm64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Compile binary
+        run: |
+          bun build packages/engram-cli/src/cli.ts \
+            --compile \
+            --target ${{ matrix.bun_target }} \
+            --outfile engram-${{ matrix.target }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: engram-${{ matrix.target }}
+          path: engram-${{ matrix.target }}
+
+  release:
+    name: Create release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ github.ref_name }}"
+
+          gh release create "$TAG" \
+            --title "engram $TAG" \
+            --generate-notes \
+            artifacts/engram-linux-x64/engram-linux-x64 \
+            artifacts/engram-linux-arm64/engram-linux-arm64 \
+            artifacts/engram-macos-x64/engram-macos-x64 \
+            artifacts/engram-macos-arm64/engram-macos-arm64
