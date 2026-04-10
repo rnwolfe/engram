@@ -19,6 +19,8 @@ import {
   AnthropicGenerator,
   closeGraph,
   findEdges,
+  getEntity,
+  listActiveProjections,
   NullGenerator,
   openGraph,
   ProjectionCycleError,
@@ -129,6 +131,8 @@ class UsageError extends Error {
  *
  * For entity:<id>: include the entity itself, all evidence episodes, and all
  * edges touching it (as inputs).
+ *
+ * Throws UsageError if the entity does not exist.
  */
 function resolveDefaultInputs(
   graph: EngramGraph,
@@ -139,6 +143,13 @@ function resolveDefaultInputs(
   }
 
   const anchorId = anchor.id;
+
+  // Guard: verify the entity exists before building inputs
+  const entity = getEntity(graph, anchorId);
+  if (!entity) {
+    throw new UsageError(`Entity ${anchorId} not found`);
+  }
+
   const inputs: ProjectionInput[] = [];
 
   // Include the entity itself
@@ -183,6 +194,11 @@ function resolveDefaultInputs(
 /**
  * Returns a ProjectionGenerator based on the ENGRAM_AI_PROVIDER env var.
  * Always returns a generator — NullGenerator throws at generate() time.
+ *
+ * Supported providers for projection authoring: anthropic.
+ * Note: ollama and gemini are embedding/extraction providers; they do not
+ * implement ProjectionGenerator. Use ENGRAM_AI_PROVIDER=anthropic for
+ * projection authoring.
  */
 function createGenerator() {
   const provider = process.env.ENGRAM_AI_PROVIDER ?? "null";
@@ -192,6 +208,12 @@ function createGenerator() {
       return new AnthropicGenerator({
         apiKey: process.env.ANTHROPIC_API_KEY,
       });
+    case "ollama":
+    case "gemini":
+      throw new UsageError(
+        `AI provider "${provider}" does not support projection authoring. ` +
+          `Use ENGRAM_AI_PROVIDER=anthropic for engram project.`,
+      );
     default:
       return new NullGenerator();
   }
@@ -224,6 +246,16 @@ export function registerProject(program: Command): void {
     .option("--db <path>", "path to .engram file", ".engram")
     .action(async (opts: ProjectOpts) => {
       // ── Parse & validate opts ───────────────────────────────────────────────
+
+      // Validate --kind against safe identifier pattern (prevents path traversal)
+      if (!/^[a-z][a-z0-9_]*$/.test(opts.kind)) {
+        console.error(
+          `Error: --kind "${opts.kind}" is invalid. Must match /^[a-z][a-z0-9_]*$/ (lowercase letter, then lowercase letters, digits, or underscores).`,
+        );
+        process.exit(2);
+        return;
+      }
+
       let anchor: { type: AnchorType; id?: string };
       let inputs: ProjectionInput[];
 
@@ -256,7 +288,17 @@ export function registerProject(program: Command): void {
 
       // ── Resolve default inputs if none specified ────────────────────────────
       if (inputs.length === 0) {
-        inputs = resolveDefaultInputs(graph, anchor);
+        try {
+          inputs = resolveDefaultInputs(graph, anchor);
+        } catch (err) {
+          if (err instanceof UsageError) {
+            console.error(`Error: ${err.message}`);
+            closeGraph(graph);
+            process.exit(1);
+            return;
+          }
+          throw err;
+        }
 
         if (inputs.length === 0 && anchor.type !== "none") {
           console.error(
@@ -285,7 +327,18 @@ export function registerProject(program: Command): void {
       }
 
       // ── Build generator ────────────────────────────────────────────────────
-      const generator = createGenerator();
+      let generator: import("engram-core").ProjectionGenerator;
+      try {
+        generator = createGenerator();
+      } catch (err) {
+        if (err instanceof UsageError) {
+          console.error(`Error: ${err.message}`);
+          closeGraph(graph);
+          process.exit(2);
+          return;
+        }
+        throw err;
+      }
 
       // Detect NullGenerator early and provide a friendly error
       if (generator instanceof NullGenerator) {
@@ -298,8 +351,18 @@ export function registerProject(program: Command): void {
         return;
       }
 
-      // ── Record time before calling project() to detect idempotence ──────────
-      const beforeCallMs = Date.now();
+      // ── Query for existing projection before calling project() ─────────────
+      // Used for reliable idempotence detection: compare returned ID to pre-existing ID.
+      const anchorIdForQuery = anchor.id ?? null;
+      const existingBeforeCall = listActiveProjections(graph, {
+        kind: opts.kind,
+        anchor_type: anchor.type,
+        ...(anchorIdForQuery !== null ? { anchor_id: anchorIdForQuery } : {}),
+      });
+      const preExistingId =
+        existingBeforeCall.length > 0
+          ? existingBeforeCall[0].projection.id
+          : null;
 
       // ── Author the projection ──────────────────────────────────────────────
       let projection: import("engram-core").Projection;
@@ -326,11 +389,10 @@ export function registerProject(program: Command): void {
         return;
       }
 
-      // Determine result status for summary output.
-      // project() returns the existing projection when the input fingerprint
-      // matches — valid_from will be earlier than our start time in that case.
-      const projectionCreatedAt = new Date(projection.valid_from).getTime();
-      const wasIdempotent = projectionCreatedAt < beforeCallMs - 500;
+      // Determine result status: idempotent if the returned projection ID matches
+      // the pre-existing ID (same projection, fingerprint matched → no-op).
+      const wasIdempotent =
+        preExistingId !== null && projection.id === preExistingId;
 
       console.log("Projection authored successfully.\n");
       console.log(`  id:      ${projection.id}`);

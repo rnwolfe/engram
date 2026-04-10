@@ -8,6 +8,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { Command } from "commander";
 import {
+  addEdge,
+  addEntity,
   addEpisode,
   closeGraph,
   createGraph,
@@ -460,10 +462,7 @@ describe("engram project — happy path with AnthropicGenerator stub", () => {
     // The first run should report "authored"
     expect(logs1.join("\n")).toContain("authored");
 
-    // Wait a brief moment so the second run timestamp is clearly after valid_from
-    await new Promise((r) => setTimeout(r, 600));
-
-    // Second run with same inputs
+    // Second run with same inputs (no sleep needed — idempotence is detected by ID comparison)
     const logs2: string[] = [];
     console.log = (...args: unknown[]) => logs2.push(args.join(" "));
     try {
@@ -485,6 +484,257 @@ describe("engram project — happy path with AnthropicGenerator stub", () => {
     } finally {
       closeGraph(graph2);
     }
+  });
+});
+
+describe("engram project — default input resolution", () => {
+  let tmpDir: string;
+  let dbPath: string;
+
+  beforeEach(() => {
+    ({ tmpDir, dbPath } = tmpDb());
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("includes entity + evidence episodes + touching edges when --input is omitted", async () => {
+    // Set up a graph with an entity, evidence episode, and an edge touching it
+    const graph = createGraph(dbPath);
+
+    const episode = addEpisode(graph, {
+      source_type: "manual",
+      content: "evidence episode for entity",
+      timestamp: new Date().toISOString(),
+    });
+
+    const entity = addEntity(
+      graph,
+      {
+        canonical_name: "TestModule",
+        entity_type: "module",
+        summary: "A test module",
+      },
+      [{ episode_id: episode.id, extractor: "test", confidence: 1.0 }],
+    );
+
+    const episode2 = addEpisode(graph, {
+      source_type: "manual",
+      content: "another episode for edge",
+      timestamp: new Date().toISOString(),
+    });
+
+    const otherEntity = addEntity(
+      graph,
+      {
+        canonical_name: "OtherModule",
+        entity_type: "module",
+      },
+      [{ episode_id: episode2.id, extractor: "test", confidence: 1.0 }],
+    );
+
+    const edge = addEdge(
+      graph,
+      {
+        source_id: entity.id,
+        target_id: otherEntity.id,
+        relation_type: "depends_on",
+        edge_kind: "observed",
+        fact: "TestModule depends on OtherModule",
+        valid_from: new Date().toISOString(),
+      },
+      [{ episode_id: episode2.id, extractor: "test", confidence: 1.0 }],
+    );
+
+    closeGraph(graph);
+
+    // Run project with --anchor entity:<id> but WITHOUT --input
+    process.env.ENGRAM_AI_PROVIDER = "anthropic";
+
+    const program = new Command().exitOverride();
+    registerProject(program);
+
+    const logs: string[] = [];
+    const origLog = console.log;
+    console.log = (...args: unknown[]) => logs.push(args.join(" "));
+
+    try {
+      await program.parseAsync([
+        "node",
+        "engram",
+        "project",
+        "--kind",
+        "entity_summary",
+        "--anchor",
+        `entity:${entity.id}`,
+        "--dry-run",
+        "--db",
+        dbPath,
+      ]);
+    } catch {
+      // process.exit(0) throws
+    } finally {
+      console.log = origLog;
+      delete process.env.ENGRAM_AI_PROVIDER;
+    }
+
+    const output = logs.join("\n");
+
+    // The dry-run output should include the entity, the episode, and the edge
+    expect(output).toContain(`entity:${entity.id}`);
+    expect(output).toContain(`episode:${episode.id}`);
+    expect(output).toContain(`edge:${edge.id}`);
+
+    // Should have at least 3 inputs: entity + episode + edge
+    const inputsLine = logs.find((l) => l.includes("inputs:"));
+    expect(inputsLine).toBeDefined();
+    const count = Number.parseInt(
+      inputsLine?.split("inputs:")[1]?.trim() ?? "0",
+      10,
+    );
+    expect(count).toBeGreaterThanOrEqual(3);
+  });
+
+  it("exits 1 with entity-not-found error when anchor entity does not exist", async () => {
+    const graph = createGraph(dbPath);
+    closeGraph(graph);
+
+    const program = new Command().exitOverride();
+    registerProject(program);
+
+    const errs: string[] = [];
+    const origErr = console.error;
+    console.error = (...args: unknown[]) => errs.push(args.join(" "));
+
+    let exitCode: number | null = null;
+    const origExit = process.exit;
+    // biome-ignore lint/suspicious/noExplicitAny: test override
+    (process as any).exit = (code: number) => {
+      exitCode = code;
+      throw new Error(`process.exit(${code})`);
+    };
+
+    try {
+      await program.parseAsync([
+        "node",
+        "engram",
+        "project",
+        "--kind",
+        "entity_summary",
+        "--anchor",
+        "entity:nonexistent_id",
+        "--db",
+        dbPath,
+      ]);
+    } catch {
+      // expected
+    } finally {
+      console.error = origErr;
+      // biome-ignore lint/suspicious/noExplicitAny: test override
+      (process as any).exit = origExit;
+    }
+
+    expect(exitCode).toBe(1);
+    expect(errs.join(" ")).toContain("not found");
+  });
+});
+
+describe("engram project — kind validation", () => {
+  let tmpDir: string;
+  let dbPath: string;
+
+  beforeEach(() => {
+    ({ tmpDir, dbPath } = tmpDb());
+    closeGraph(createGraph(dbPath));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("exits 2 on invalid --kind with uppercase letters", async () => {
+    const program = new Command().exitOverride();
+    registerProject(program);
+
+    const errs: string[] = [];
+    const origErr = console.error;
+    console.error = (...args: unknown[]) => errs.push(args.join(" "));
+
+    let exitCode: number | null = null;
+    const origExit = process.exit;
+    // biome-ignore lint/suspicious/noExplicitAny: test override
+    (process as any).exit = (code: number) => {
+      exitCode = code;
+      throw new Error(`process.exit(${code})`);
+    };
+
+    try {
+      await program.parseAsync([
+        "node",
+        "engram",
+        "project",
+        "--kind",
+        "Entity_Summary",
+        "--anchor",
+        "none",
+        "--input",
+        "episode:fakeid",
+        "--db",
+        dbPath,
+      ]);
+    } catch {
+      // expected
+    } finally {
+      console.error = origErr;
+      // biome-ignore lint/suspicious/noExplicitAny: test override
+      (process as any).exit = origExit;
+    }
+
+    expect(exitCode).toBe(2);
+    expect(errs.join(" ")).toContain("invalid");
+  });
+
+  it("exits 2 on --kind with path traversal characters", async () => {
+    const program = new Command().exitOverride();
+    registerProject(program);
+
+    const errs: string[] = [];
+    const origErr = console.error;
+    console.error = (...args: unknown[]) => errs.push(args.join(" "));
+
+    let exitCode: number | null = null;
+    const origExit = process.exit;
+    // biome-ignore lint/suspicious/noExplicitAny: test override
+    (process as any).exit = (code: number) => {
+      exitCode = code;
+      throw new Error(`process.exit(${code})`);
+    };
+
+    try {
+      await program.parseAsync([
+        "node",
+        "engram",
+        "project",
+        "--kind",
+        "../etc/passwd",
+        "--anchor",
+        "none",
+        "--input",
+        "episode:fakeid",
+        "--db",
+        dbPath,
+      ]);
+    } catch {
+      // expected
+    } finally {
+      console.error = origErr;
+      // biome-ignore lint/suspicious/noExplicitAny: test override
+      (process as any).exit = origExit;
+    }
+
+    expect(exitCode).toBe(2);
+    expect(errs.join(" ")).toContain("invalid");
   });
 });
 
