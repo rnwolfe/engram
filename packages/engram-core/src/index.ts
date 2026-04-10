@@ -4,9 +4,6 @@
  * Public API surface. All consumer-facing types and functions are re-exported from here.
  */
 
-export const FORMAT_VERSION = "0.1.0";
-export const ENGINE_VERSION = "0.1.0";
-
 export type { AIConfig, AIProvider, EntityHint } from "./ai/index.js";
 export {
   createProvider,
@@ -25,10 +22,17 @@ export {
   closeGraph,
   createGraph,
   EngramFormatError,
+  migrate_0_1_0_to_0_2_0,
   openGraph,
   SCHEMA_DDL,
   verifyGraph,
 } from "./format/index.js";
+export {
+  ENGINE_VERSION,
+  FORMAT_VERSION,
+  MIN_READABLE_VERSION,
+  MIN_WRITABLE_VERSION,
+} from "./format/version.js";
 export type {
   Alias,
   AliasInput,

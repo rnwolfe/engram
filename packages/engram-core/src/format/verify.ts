@@ -6,7 +6,17 @@
  */
 
 import type { EngramGraph } from "./graph.js";
-import { FORMAT_VERSION } from "./version.js";
+import { FORMAT_VERSION, MIN_READABLE_VERSION } from "./version.js";
+
+function compareSemver(a: string, b: string): number {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < 3; i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
 
 export type ViolationSeverity = "error" | "warning";
 
@@ -54,10 +64,14 @@ function checkMetadata(graph: EngramGraph): Violation[] {
   }
 
   const formatVersion = found.get("format_version");
-  if (formatVersion && formatVersion !== FORMAT_VERSION) {
+  if (
+    formatVersion &&
+    (compareSemver(formatVersion, MIN_READABLE_VERSION) < 0 ||
+      compareSemver(formatVersion, FORMAT_VERSION) > 0)
+  ) {
     violations.push({
       check: "checkMetadata",
-      message: `Unrecognized format_version '${formatVersion}' (engine supports '${FORMAT_VERSION}')`,
+      message: `Unrecognized format_version '${formatVersion}' (engine supports ${MIN_READABLE_VERSION}–${FORMAT_VERSION})`,
       severity: "error",
     });
   }

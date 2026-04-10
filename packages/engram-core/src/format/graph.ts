@@ -9,7 +9,11 @@
 import { Database } from "bun:sqlite";
 import { ulid } from "ulid";
 import { SCHEMA_DDL } from "./schema.js";
-import { ENGINE_VERSION, FORMAT_VERSION } from "./version.js";
+import {
+  ENGINE_VERSION,
+  FORMAT_VERSION,
+  MIN_READABLE_VERSION,
+} from "./version.js";
 
 export interface EngramGraph {
   db: Database;
@@ -30,6 +34,31 @@ export class EngramFormatError extends Error {
     super(message);
     this.name = "EngramFormatError";
   }
+}
+
+/**
+ * Compares two semver strings. Returns negative if a < b, 0 if equal, positive if a > b.
+ * Only handles simple MAJOR.MINOR.PATCH format.
+ */
+function compareSemver(a: string, b: string): number {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < 3; i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+/**
+ * Returns true if the given format version can be opened by this engine.
+ * The readable range is [MIN_READABLE_VERSION, FORMAT_VERSION].
+ */
+function isVersionReadable(version: string): boolean {
+  return (
+    compareSemver(version, MIN_READABLE_VERSION) >= 0 &&
+    compareSemver(version, FORMAT_VERSION) <= 0
+  );
 }
 
 function applyPragmas(db: Database): void {
@@ -115,10 +144,11 @@ export function openGraph(path: string): EngramGraph {
     );
   }
 
-  if (formatVersion !== FORMAT_VERSION) {
+  // Accept any version between MIN_READABLE_VERSION and FORMAT_VERSION (inclusive).
+  if (!isVersionReadable(formatVersion)) {
     db.close();
     throw new EngramFormatError(
-      `openGraph: unsupported format_version '${formatVersion}' (expected '${FORMAT_VERSION}'): ${path}`,
+      `openGraph: unsupported format_version '${formatVersion}' (readable range: ${MIN_READABLE_VERSION}–${FORMAT_VERSION}): ${path}`,
     );
   }
 
