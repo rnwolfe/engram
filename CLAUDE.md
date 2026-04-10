@@ -55,7 +55,7 @@ engram/
 │   │   └── test/
 │   ├── engram-cli/           # CLI application
 │   │   └── src/
-│   │       └── commands/     # init, add, search, show, decay, ingest, serve, export
+│   │       └── commands/     # init, add, search, show, decay, ingest, serve, export, reconcile
 │   ├── engram-mcp/           # MCP server (stdio transport)
 │   │   └── src/
 │   │       ├── tools/        # MCP tool implementations
