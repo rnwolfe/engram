@@ -194,11 +194,11 @@ function recomputeFingerprint(
       }
       case "edge": {
         const edge = graph.db
-          .query<{ fact: string }, [string]>(
-            "SELECT fact FROM edges WHERE id = ?",
+          .query<{ fact: string; invalidated_at: string | null }, [string]>(
+            "SELECT fact, invalidated_at FROM edges WHERE id = ?",
           )
           .get(row.target_id);
-        if (edge)
+        if (edge && edge.invalidated_at === null)
           currentHash = createHash("sha256").update(edge.fact).digest("hex");
         break;
       }
@@ -569,6 +569,13 @@ export function getProjection(
           )
           .get(row.target_id);
         if (!ep || ep.status === "redacted") hasDeleted = true;
+      } else if (row.target_type === "edge") {
+        const edge = graph.db
+          .query<{ invalidated_at: string | null }, [string]>(
+            "SELECT invalidated_at FROM edges WHERE id = ?",
+          )
+          .get(row.target_id);
+        if (!edge || edge.invalidated_at !== null) hasDeleted = true;
       } else if (row.target_type === "projection") {
         const proj = graph.db
           .query<{ invalidated_at: string | null }, [string]>(
