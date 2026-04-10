@@ -4,7 +4,7 @@
 
 ## Identity
 
-**What it is**: Engram extracts knowledge from where it already lives — git history, code review discussions, commit messages, documents — and encodes it as a temporal knowledge graph: entities, relationships, and facts that track how understanding evolves over time. It's a library first, CLI second, MCP server third.
+**What it is**: Engram extracts knowledge from where it already lives — git history, code review discussions, commit messages, documents — and encodes it as a temporal knowledge graph: entities, relationships, and facts that track how understanding evolves over time. On top of that substrate, an AI-authored projection layer compiles synthesized summaries and decision pages that re-reconcile themselves as new evidence lands. It's a library first, CLI second, MCP server third.
 
 **Who it's for**: Engineers and AI agents that need grounded, evidence-backed answers about a codebase — who owns what, why decisions were made, what knowledge is decaying. The primary consumers are locally-running agents (Claude Code via MCP, Cursor) that need a knowledge substrate with provenance and temporal validity.
 
@@ -20,7 +20,7 @@
 
 4. **Evidence-first.** Episodes are immutable raw evidence. Entities and edges are derived projections supported by evidence chains. Every claim in the graph traces back to source material.
 
-5. **Structurally sound without AI, queryable with AI.** The data model doesn't depend on AI: entities, edges, temporal validity, and evidence chains are computed deterministically. But the interaction model does — compositional queries across those signals are where the graph earns its keep, and agents will compose them.
+5. **Deterministic substrate, AI-authored projections — both versioned in time.** The substrate (episodes, entities, edges, evidence chains, validity windows) is deterministic and acts as an audit ledger. On top of it sits a projection layer: AI-authored syntheses (entity summaries, decision pages, contradiction reports) that are first-class artifacts, versioned by the same temporal model as edges. The substrate is correct without AI. The projection layer is where the LLM compounds value between queries — and because every projection traces back to the substrate, *what we believed and when* becomes a first-class query. With no AI configured you still have the substrate; with AI you get a temporally-versioned wiki that re-reconciles itself as new evidence arrives.
 
 6. **Developer-native.** First-class ingestors understand git and code. Primary interface is a CLI. Integration surface is MCP. Infrastructure for engineers, not a productivity app.
 
@@ -60,6 +60,10 @@ The `.engram` format, the core engine, and the "money command":
 
 ### Phase 2 — Growth (v0.2+)
 
+- **Projection layer**: AI-authored syntheses (entity summaries, decision pages, contradiction reports) versioned by the same temporal model as edges. Every projection has an evidence chain back to the substrate and a `valid_from`/`valid_until` window. See [`docs/internal/specs/projections.md`](specs/projections.md).
+- **`engram reconcile`**: lint loop that re-evaluates active projections against new substrate state, refreshing or superseding stale ones. The Karpathy-wiki maintenance pass, made temporal.
+- **`engram export wiki`**: materialize projections to a folder of markdown files for direct human reading and git-tracked snapshots.
+- **Stale-knowledge benchmark in EngRAMark**: ground-truth `reconcile` correctness over substrate evolution — author projections at commit X, advance to commit Y, measure how well the system identifies what changed.
 - Team/tribal knowledge merging with explicit reconciliation
 - EngRAMark against Kubernetes
 - Enrichment adapters: Gerrit, Jira, Linear, GitLab
@@ -81,4 +85,5 @@ The `.engram` format, the core engine, and the "money command":
 - **Monorepo structure**: `packages/engram-core`, `packages/engram-cli`, `packages/engram-mcp`, `packages/engramark`
 - **Key differentiator vs Copilot @workspace / Sourcegraph Cody**: Provenance and temporal model. When an agent says "Alice owns auth," it can cite the commits, show the validity window, and distinguish observed from inferred.
 - **Key differentiator vs git-fame / hercules**: Compositional queries across signals (ownership + co-change + evidence strength + temporal validity), not just static reports
-- **The no-AI story**: The graph is correct and complete without AI, so when AI queries it, the answers are grounded. That's the actual differentiator.
+- **The no-AI story**: The substrate (episodes, entities, edges, evidence) is correct without AI — that's the cold-start path and the audit/compliance story. The differentiator is what sits on top: an AI-authored projection layer that compounds over time *and* is versioned by the temporal model, so the answer to "what did we believe in March about the auth refactor" is a first-class query. No other system in this space has both compounding LLM-authored synthesis and temporal versioning of that synthesis.
+- **Prior art to position against**: Karpathy's LLM wiki pattern (compounding synthesis, no temporal model, no provenance enforcement), graphify (snapshot graph with confidence labels, no temporal model, no maintenance loop), Sourcegraph Cody / Copilot @workspace (snapshot RAG, no compounding artifact). Engram's distinct claim is the union: compounding synthesis + evidence-backed substrate + temporal validity on both layers.

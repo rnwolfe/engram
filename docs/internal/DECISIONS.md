@@ -17,3 +17,61 @@ familiar to most developers.
 **Consequences**: All pipeline scripts must source `config.sh` which reads `forge.toml`.
 Adding new config keys requires updating both `forge.toml` (with defaults) and `config.sh`
 (with the awk parser call).
+
+## ADR-002 -- AI-authored projection layer with temporal versioning
+
+**Date**: 2026-04-09
+**Status**: Accepted
+**Spec**: [`docs/internal/specs/projections.md`](specs/projections.md)
+**Vision update**: Reframes principle 5 in [`VISION.md`](VISION.md).
+
+**Context**: Engram v0.1 ships a deterministic substrate (episodes, entities, edges, evidence chains, validity windows) and an AI provider layer that adds embeddings and entity extraction. The vision principle has been "structurally sound without AI, queryable with AI" — treating AI as optional polish over a substrate that is "complete" without it.
+
+The thought-leadership wave around LLM-built knowledge artifacts (Karpathy's LLM wiki gist, the graphify project) makes a stronger claim: the LLM is the *author* of a compounding knowledge artifact, not just a query interface. Their value comes from synthesis the LLM produces between queries, not from retrieval at query time. Engram's "no-AI substrate" alone is not a competitive product — it's git blame with a SQLite wrapper. Benchmarking it in isolation tests the wrong axis.
+
+But Karpathy's wiki and graphify both lack two things Engram already has: a temporal model with validity windows, and an evidence-first invariant where every claim traces back to immutable source material. If a synthesis layer is built *inside* that substrate, Engram becomes the only system in this space that can answer "what did we believe in March about the auth refactor, and when did that change?"
+
+**Decision**: Add an AI-authored **projection layer** on top of the existing substrate, governed by the same temporal and evidence model. Concretely:
+
+1. **Schema additions** (new tables, no changes to existing tables):
+   - `projections` — first-class artifacts with `kind`, polymorphic `(anchor_type, anchor_id)`, body (markdown with mandatory YAML frontmatter), `model` + `prompt_template_id` + `prompt_hash` provenance, `input_fingerprint`, `valid_from` / `valid_until` / `last_assessed_at` / `invalidated_at` / `superseded_by` (same temporal semantics as edges), `confidence`, `owner_id`.
+   - `projection_evidence` — polymorphic input/anchor links to substrate elements (`episode` | `entity` | `edge` | `projection`), with snapshot `content_hash`.
+   - `reconciliation_runs` — tracks two-phase reconcile execution (`assess` + `discover`).
+   - FTS5 over projection bodies. Embeddings reuse the existing polymorphic table.
+
+2. **Operations**:
+   - `project()` — explicit authoring primitive. Idempotent on `(anchor, kind, input_fingerprint)`. Used directly by `engram project` CLI and called under the hood by the discover phase.
+   - `reconcile()` — primary authoring + maintenance loop. Two phases: **assess** (re-evaluate existing active projections, soft-refresh or supersede) and **discover** (LLM proposes new projections from the substrate delta + coverage catalog + kind catalog). Both phases share `--max-cost` budget, support `--dry-run`, and resume from cursors in `reconciliation_runs`.
+   - `supersede()` — atomic transition, identical pattern to edge supersession.
+
+3. **Authoring model — emergent first.** The discover phase of `reconcile()` is the default authoring path (Karpathy-style: LLM decides coverage based on substrate delta + catalog of existing coverage). Explicit `project()` remains as the deterministic escape hatch and the underlying call site that discover uses — one authoring code path, two callers. Heuristic policies are deferred indefinitely; if the LLM is the authoring decider, per-file policy data has no consumer.
+
+4. **Staleness is always correct.** Read-time fingerprint check is an invariant on every projection read (cheap, O(inputs) with indexed lookups). Reconcile cadence is a cost/UX tradeoff, never a correctness tradeoff. No read path returns "fresh" when the underlying inputs have drifted.
+
+5. **Wiki export.** `engram export wiki` materializes projections to a folder of frontmatter-prefixed `.md` files, directly consumable by Jekyll/Hugo/Obsidian and trivially git-trackable.
+
+6. **Vision reframe.** Principle 5 changes from "structurally sound without AI, queryable with AI" to "deterministic substrate, AI-authored projections — both versioned in time." The substrate remains correct without AI as the cold-start / audit path. The projection layer is where the LLM compounds value between queries. (Already applied to `VISION.md`.)
+
+**Alternatives considered**:
+- *Status quo (no projection layer).* Rejected: leaves Engram as a substrate with no compounding artifact, conceding the entire "LLM as author" axis to graphify and Karpathy-style wikis. EngRAMark would benchmark against an axis no one cares about.
+- *Markdown wiki as a sibling to `.engram` (Karpathy-faithful).* Rejected: loses temporal versioning of the synthesis, loses provenance enforcement, loses replay against substrate updates. The whole point of the temporal model is to lift it onto the synthesis layer.
+- *Heuristic-policy-first authoring.* Rejected: heuristic thresholds are an optimization of what the LLM would do anyway. Starting with the optimization risks shaping the schema around assumptions the LLM doesn't share, and the more interesting kinds (`decision_page`, `contradiction_report`, `topic_cluster`) don't fit the threshold model at all.
+- *Always-supersede on any input change (no soft refresh).* Rejected: would generate churn in the supersession history for projections that were never wrong, making belief-history queries noisy.
+- *Per-target evidence tables (mirror of `entity_evidence` / `edge_evidence`).* Rejected: evidence can target four kinds including projections themselves; polymorphic `(target_type, target_id)` matches the existing `embeddings` precedent and yields one evidence chain per projection instead of three to JOIN.
+
+**Consequences**:
+
+*Positive*
+- Engram gains a compounding artifact aligned with the LLM-wiki thought-leadership wave.
+- The temporal model becomes load-bearing rather than niche — "what did we believe at time T" is now a first-class capability across both edges and synthesis.
+- EngRAMark gets a benchmark category nobody else can attempt: stale-knowledge detection over substrate evolution.
+- Schema additions are additive — no migration of existing tables, no rewrite of evidence model.
+
+*Negative / cost*
+- Reconcile becomes a two-phase LLM operation; cost ceiling matters more than for read-only queries. Mitigated by `--max-cost`, `--dry-run`, and cursor-resumable runs.
+- The discover-phase prompt is load-bearing and untested. A research spike is required before committing the discover phase to production.
+- A kind catalog with name + description + when-to-use guidance must be authored and maintained alongside engram-core releases.
+- `verifyGraph()` gains three new invariants (evidence required, supersession chains acyclic, projection-dependency DAG); verify test cost grows.
+
+*Carried over*
+- All existing principles, schema, operations, and the AI provider layer (#31) remain unchanged. Projection work is gated on #31 shipping.
