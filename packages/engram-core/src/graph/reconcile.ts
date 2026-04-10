@@ -361,9 +361,9 @@ export async function reconcile(
 
       const projection: Projection = result.projection;
       const inputs = currentInputState(graph, projection.id);
-      const assessedAt = new Date().toISOString();
 
       const verdict = await generator.assess(projection, inputs);
+      const assessedAt = new Date().toISOString(); // after assess completes
 
       // Treat token usage as 1 per assess call (generators don't report tokens yet)
       budget.consume(1);
@@ -400,12 +400,18 @@ export async function reconcile(
           budget.consume(1);
 
           if (!dryRun) {
-            // Extract metadata from the generated body for supersedeProjection
+            // Recompute fingerprint from current substrate state — never inherit
+            // from the old projection or rely on generator frontmatter, which
+            // would cause the new projection to read as immediately stale.
+            const currentFingerprint = recomputeCurrentFingerprint(
+              graph,
+              projection.id,
+            );
             const newData = buildNewProjectionData(
               projection,
               generated.body,
               generated.confidence,
-              inputs,
+              currentFingerprint,
             );
             supersedeProjection(graph, projection.id, newData, inputs);
           }
@@ -459,7 +465,7 @@ function buildNewProjectionData(
   original: Projection,
   body: string,
   confidence: number,
-  _inputs: ResolvedInput[],
+  input_fingerprint: string,
 ): {
   kind: string;
   anchor_type: import("./projections-types.js").AnchorType;
@@ -480,9 +486,8 @@ function buildNewProjectionData(
     original.prompt_template_id;
   const prompt_hash =
     extractFrontmatterValue(body, "prompt_hash") ?? original.prompt_hash;
-  const input_fingerprint =
-    extractFrontmatterValue(body, "input_fingerprint") ??
-    original.input_fingerprint;
+  // input_fingerprint is passed in from caller (recomputed from substrate),
+  // not extracted from frontmatter — prevents infinite re-supersession
 
   return {
     kind: original.kind,
