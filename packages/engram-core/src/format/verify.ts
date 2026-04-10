@@ -277,7 +277,7 @@ function checkProjectionSupersessionCycles(graph: EngramGraph): Violation[] {
          SELECT c.start_id, p.superseded_by,
                 c.path || ',' || p.id,
                 c.depth + 1,
-                CASE WHEN instr(c.path, p.id) > 0 THEN 1 ELSE 0 END
+                CASE WHEN instr(',' || c.path || ',', ',' || p.id || ',') > 0 THEN 1 ELSE 0 END
          FROM chain c
          JOIN projections p ON p.id = c.current_id
          WHERE c.current_id IS NOT NULL
@@ -315,7 +315,7 @@ function checkProjectionDependencyCycles(graph: EngramGraph): Violation[] {
          SELECT d.start_id, pe.target_id,
                 d.path || ',' || pe.target_id,
                 d.depth + 1,
-                CASE WHEN instr(d.path, pe.target_id) > 0 THEN 1 ELSE 0 END
+                CASE WHEN instr(',' || d.path || ',', ',' || pe.target_id || ',') > 0 THEN 1 ELSE 0 END
          FROM dep d
          JOIN projection_evidence pe ON pe.projection_id = d.current_id
          WHERE pe.target_type = 'projection'
@@ -334,7 +334,8 @@ function checkProjectionDependencyCycles(graph: EngramGraph): Violation[] {
   for (const row of rows) {
     // Normalise the cycle path to the smallest rotation for dedup
     const parts = row.cycle_path.split(",");
-    const key = [...parts].sort().join(",");
+    // Dedup on sorted unique node set — a cycle A→B→A and B→A→B are the same cycle
+    const key = [...new Set(parts)].sort().join(",");
     if (!seen.has(key)) {
       seen.add(key);
       violations.push({
