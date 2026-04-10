@@ -171,9 +171,6 @@ export function registerReconcile(program: Command): void {
         if (phases.includes("assess")) {
           printPhaseHeader("assess");
         }
-        if (phases.includes("discover")) {
-          printPhaseHeader("discover");
-        }
 
         result = await reconcile(graph, generator, {
           scope: opts.scope,
@@ -181,10 +178,21 @@ export function registerReconcile(program: Command): void {
           maxCost,
           dryRun: opts.dryRun,
         });
+
+        if (phases.includes("discover")) {
+          printPhaseHeader("discover");
+        }
       } catch (err) {
-        console.error(
-          `\n  Reconcile failed: ${err instanceof Error ? err.message : String(err)}`,
-        );
+        const errMsg = err instanceof Error ? err.message : String(err);
+        console.error(`\n  Reconcile failed: ${errMsg}`);
+        if (
+          errMsg.includes("NullGenerator") ||
+          errMsg.includes("no AI provider configured")
+        ) {
+          console.error(
+            "\n  No AI provider configured. Set ENGRAM_AI_PROVIDER=anthropic and ANTHROPIC_API_KEY to enable projection authoring.",
+          );
+        }
         closeGraph(graph);
         process.exit(1);
       }
