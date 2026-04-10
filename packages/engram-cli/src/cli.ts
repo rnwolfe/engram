@@ -10,6 +10,7 @@ import { registerIngest } from "./commands/ingest.js";
 import { registerInit } from "./commands/init.js";
 import { registerMaintenance } from "./commands/maintenance.js";
 import { registerOwnership } from "./commands/ownership.js";
+import { registerReconcile } from "./commands/reconcile.js";
 import { registerSearch } from "./commands/search.js";
 import { registerShow } from "./commands/show.js";
 import { registerStats } from "./commands/stats.js";
@@ -35,6 +36,7 @@ registerIngest(program);
 registerExport(program);
 registerVerify(program);
 registerMaintenance(program);
+registerReconcile(program);
 registerVisualize(program);
 
 program.parse();
