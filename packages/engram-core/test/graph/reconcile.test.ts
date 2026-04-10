@@ -4,17 +4,23 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type {
+  ActiveProjectionSummary,
   AssessVerdict,
   EngramGraph,
   Projection,
   ProjectionGenerator,
+  ProjectionProposal,
   ResolvedInput,
+  SubstrateDelta,
 } from "../../src/index.js";
 import {
+  addEdge,
+  addEntity,
   addEpisode,
   closeGraph,
   createGraph,
   currentInputState,
+  listActiveProjections,
   project,
   reconcile,
   softRefresh,
@@ -23,7 +29,7 @@ import {
 // ─── MockGenerator ────────────────────────────────────────────────────────────
 
 interface MockGeneratorCall {
-  method: "generate" | "assess" | "regenerate";
+  method: "generate" | "assess" | "regenerate" | "discover";
   projectionId?: string;
 }
 
@@ -31,6 +37,7 @@ function makeMockGenerator(opts?: {
   assessVerdict?: AssessVerdict;
   regenerateBody?: string;
   tokensPerCall?: number;
+  discoverProposals?: ProjectionProposal[];
 }): ProjectionGenerator & { calls: MockGeneratorCall[] } {
   const calls: MockGeneratorCall[] = [];
 
@@ -77,6 +84,15 @@ function makeMockGenerator(opts?: {
         opts?.regenerateBody ??
         (await (this as ProjectionGenerator).generate(inputs)).body;
       return { body, confidence: 0.9 };
+    },
+
+    async discover(_ctx: {
+      delta: SubstrateDelta;
+      catalog: ActiveProjectionSummary[];
+      kinds: import("../../src/index.js").KindCatalog;
+    }): Promise<ProjectionProposal[]> {
+      calls.push({ method: "discover" });
+      return opts?.discoverProposals ?? [];
     },
   };
 }
@@ -640,5 +656,406 @@ describe("currentInputState()", () => {
 
     const inputs = currentInputState(graph, "bare-id");
     expect(inputs).toEqual([]);
+  });
+});
+
+// ─── reconcile() — discover phase ────────────────────────────────────────────
+
+describe("reconcile() — discover phase — integration", () => {
+  test("seeds substrate, discover proposals are authored, projections_discovered updated", async () => {
+    // Seed substrate with an episode
+    const ep = makeEpisode("some important event happened");
+
+    // Generator returns one valid proposal for the episode
+    const gen = makeMockGenerator({
+      discoverProposals: [
+        {
+          kind: "entity_summary",
+          anchor: null,
+          inputs: [{ type: "episode", id: ep.id }],
+          rationale: "This episode describes an important event",
+        },
+      ],
+    });
+
+    const result = await reconcile(graph, gen, { phases: ["discover"] });
+
+    expect(result.discovered).toBe(1);
+    expect(result.assessed).toBe(0);
+    expect(result.status).toBe("completed");
+
+    // Verify a projection was actually written
+    const projections = listActiveProjections(graph, {});
+    expect(projections.length).toBe(1);
+    expect(projections[0].projection.kind).toBe("entity_summary");
+
+    // Verify projections_discovered in reconciliation_runs
+    const row = graph.db
+      .query<{ projections_discovered: number }, [string]>(
+        "SELECT projections_discovered FROM reconciliation_runs WHERE id = ?",
+      )
+      .get(result.run_id);
+    expect(row?.projections_discovered).toBe(1);
+  });
+
+  test("discover phase is skipped when phases = ['assess'] only", async () => {
+    const ep = makeEpisode("some episode");
+    const gen = makeMockGenerator({
+      discoverProposals: [
+        {
+          kind: "entity_summary",
+          anchor: null,
+          inputs: [{ type: "episode", id: ep.id }],
+          rationale: "should not be called",
+        },
+      ],
+    });
+
+    const result = await reconcile(graph, gen, { phases: ["assess"] });
+
+    expect(result.discovered).toBe(0);
+    // No projections should have been authored
+    const projections = listActiveProjections(graph, {});
+    expect(projections.length).toBe(0);
+    // discover() should not have been called
+    const discoverCalls = gen.calls.filter((c) => c.method === "discover");
+    expect(discoverCalls.length).toBe(0);
+  });
+
+  test("discover phase runs when phases = ['discover'] only", async () => {
+    const ep = makeEpisode("discover only test");
+    const gen = makeMockGenerator({
+      discoverProposals: [
+        {
+          kind: "entity_summary",
+          anchor: null,
+          inputs: [{ type: "episode", id: ep.id }],
+          rationale: "a good reason",
+        },
+      ],
+    });
+
+    const result = await reconcile(graph, gen, { phases: ["discover"] });
+
+    expect(result.discovered).toBe(1);
+    const discoverCalls = gen.calls.filter((c) => c.method === "discover");
+    expect(discoverCalls.length).toBe(1);
+  });
+
+  test("cursor: dry run does not persist or advance cursor", async () => {
+    const ep = makeEpisode("ephemeral");
+    const gen = makeMockGenerator({
+      discoverProposals: [
+        {
+          kind: "entity_summary",
+          anchor: null,
+          inputs: [{ type: "episode", id: ep.id }],
+          rationale: "dry run proposal",
+        },
+      ],
+    });
+
+    // Run a dry run
+    const dryResult = await reconcile(graph, gen, {
+      phases: ["discover"],
+      dryRun: true,
+    });
+
+    // Dry run counts the proposal but does NOT author the projection
+    expect(dryResult.discovered).toBe(1);
+    const projections = listActiveProjections(graph, {});
+    expect(projections.length).toBe(0);
+
+    // Dry run row is marked dry_run=1
+    const runRow = graph.db
+      .query<{ dry_run: number; status: string }, [string]>(
+        "SELECT dry_run, status FROM reconciliation_runs WHERE id = ?",
+      )
+      .get(dryResult.run_id);
+    expect(runRow?.dry_run).toBe(1);
+    expect(runRow?.status).toBe("completed");
+
+    // Cursor for subsequent non-dry-run discover phase should still be null
+    // (no non-dry-run run has completed yet)
+    const lastNonDryRun = graph.db
+      .query<{ completed_at: string | null }, [number]>(
+        "SELECT completed_at FROM reconciliation_runs WHERE dry_run = ? AND completed_at IS NOT NULL ORDER BY completed_at DESC LIMIT 1",
+      )
+      .get(0);
+    expect(lastNonDryRun).toBeNull();
+  });
+
+  test("cursor: second run only sees delta since first run completed", async () => {
+    const ep1 = makeEpisode("first episode before cursor");
+    const gen = makeMockGenerator({
+      discoverProposals: [
+        {
+          kind: "entity_summary",
+          anchor: null,
+          inputs: [{ type: "episode", id: ep1.id }],
+          rationale: "first run proposal",
+        },
+      ],
+    });
+
+    // First non-dry-run discover
+    const firstResult = await reconcile(graph, gen, { phases: ["discover"] });
+    expect(firstResult.discovered).toBe(1);
+    expect(firstResult.status).toBe("completed");
+
+    // Second run — generator returns empty proposals
+    // The delta since first run completed should be empty (no new substrate)
+    let capturedDelta: SubstrateDelta | null = null;
+    const gen2 = makeMockGenerator({ discoverProposals: [] });
+    // Monkey-patch discover to capture the delta
+    const originalDiscover = gen2.discover.bind(gen2);
+    gen2.discover = async (ctx) => {
+      capturedDelta = ctx.delta;
+      return originalDiscover(ctx);
+    };
+
+    const secondResult = await reconcile(graph, gen2, { phases: ["discover"] });
+    expect(secondResult.discovered).toBe(0);
+
+    // Delta should have a non-null `since` (the first run's completed_at)
+    expect(capturedDelta).not.toBeNull();
+    expect((capturedDelta as SubstrateDelta | null)?.since).not.toBeNull();
+    // ep1 should NOT be in the delta (it was ingested before the cursor)
+    const deltaEpisodeIds =
+      (capturedDelta as SubstrateDelta | null)?.episodes.map((e) => e.id) ?? [];
+    expect(deltaEpisodeIds).not.toContain(ep1.id);
+  });
+});
+
+// ─── reconcile() — discover phase — malformed proposals ─────────────────────
+
+describe("reconcile() — discover phase — malformed proposal rejection", () => {
+  test("rejects proposal with unknown kind", async () => {
+    const ep = makeEpisode("content");
+    const gen = makeMockGenerator({
+      discoverProposals: [
+        {
+          kind: "nonexistent_kind",
+          anchor: null,
+          inputs: [{ type: "episode", id: ep.id }],
+          rationale: "invalid kind",
+        },
+      ],
+    });
+
+    const result = await reconcile(graph, gen, { phases: ["discover"] });
+
+    // Proposal should be skipped — no projection authored
+    expect(result.discovered).toBe(0);
+    const projections = listActiveProjections(graph, {});
+    expect(projections.length).toBe(0);
+  });
+
+  test("rejects proposal with empty inputs array", async () => {
+    const gen = makeMockGenerator({
+      discoverProposals: [
+        {
+          kind: "entity_summary",
+          anchor: null,
+          inputs: [],
+          rationale: "no inputs",
+        },
+      ],
+    });
+
+    const result = await reconcile(graph, gen, { phases: ["discover"] });
+
+    expect(result.discovered).toBe(0);
+  });
+
+  test("rejects proposal with invalid input type", async () => {
+    const ep = makeEpisode("content");
+    const gen = makeMockGenerator({
+      discoverProposals: [
+        {
+          kind: "entity_summary",
+          anchor: null,
+          inputs: [
+            {
+              type: "invalid_type" as "episode",
+              id: ep.id,
+            },
+          ],
+          rationale: "bad input type",
+        },
+      ],
+    });
+
+    const result = await reconcile(graph, gen, { phases: ["discover"] });
+
+    expect(result.discovered).toBe(0);
+  });
+
+  test("rejects proposal with invalid anchor type", async () => {
+    const ep = makeEpisode("content");
+    const gen = makeMockGenerator({
+      discoverProposals: [
+        {
+          kind: "entity_summary",
+          anchor: { type: "bad_anchor_type", id: "some-id" },
+          inputs: [{ type: "episode", id: ep.id }],
+          rationale: "bad anchor type",
+        },
+      ],
+    });
+
+    const result = await reconcile(graph, gen, { phases: ["discover"] });
+
+    expect(result.discovered).toBe(0);
+  });
+
+  test("valid proposal passes validation and is authored", async () => {
+    const ep = makeEpisode("valid content for projection");
+    const gen = makeMockGenerator({
+      discoverProposals: [
+        {
+          kind: "entity_summary",
+          anchor: null,
+          inputs: [{ type: "episode", id: ep.id }],
+          rationale: "valid proposal",
+        },
+      ],
+    });
+
+    const result = await reconcile(graph, gen, { phases: ["discover"] });
+
+    expect(result.discovered).toBe(1);
+    const projections = listActiveProjections(graph, {});
+    expect(projections.length).toBe(1);
+  });
+});
+
+// ─── reconcile() — discover phase — budget exhaustion ────────────────────────
+
+describe("reconcile() — discover phase — budget exhaustion", () => {
+  test("budget exhaustion during discover sets status=partial with error reason", async () => {
+    const ep1 = makeEpisode("episode one");
+    const ep2 = makeEpisode("episode two");
+
+    // Two proposals — budget of 1 means only the first project() call succeeds
+    const gen = makeMockGenerator({
+      discoverProposals: [
+        {
+          kind: "entity_summary",
+          anchor: null,
+          inputs: [{ type: "episode", id: ep1.id }],
+          rationale: "first",
+        },
+        {
+          kind: "entity_summary",
+          anchor: null,
+          inputs: [{ type: "episode", id: ep2.id }],
+          rationale: "second",
+        },
+      ],
+    });
+
+    // Budget of 2: 1 for discover() call + 1 for first project() call → exhausted before second
+    const result = await reconcile(graph, gen, {
+      phases: ["discover"],
+      maxCost: 2,
+    });
+
+    expect(result.status).toBe("partial");
+    expect(result.error).toBeDefined();
+    expect(result.discovered).toBeGreaterThan(0);
+
+    const runRow = graph.db
+      .query<{ status: string; error: string | null }, [string]>(
+        "SELECT status, error FROM reconciliation_runs WHERE id = ?",
+      )
+      .get(result.run_id);
+    expect(runRow?.status).toBe("partial");
+    expect(runRow?.error).not.toBeNull();
+  });
+});
+
+// ─── reconcile() — discover phase — substrate delta content ──────────────────
+
+describe("reconcile() — discover phase — substrate delta", () => {
+  test("delta includes episodes, entities, and edges", async () => {
+    // Seed entities and edges
+    const ep = makeEpisode("entity evidence");
+    const ep2 = addEpisode(graph, {
+      source_type: "manual",
+      content: "other entity evidence",
+      timestamp: new Date().toISOString(),
+    });
+    const ep3 = addEpisode(graph, {
+      source_type: "manual",
+      content: "edge evidence",
+      timestamp: new Date().toISOString(),
+    });
+    const entity = addEntity(
+      graph,
+      { canonical_name: "TestEntity", entity_type: "module" },
+      [{ episode_id: ep.id, extractor: "manual" }],
+    );
+    const entity2 = addEntity(
+      graph,
+      { canonical_name: "OtherEntity", entity_type: "module" },
+      [{ episode_id: ep2.id, extractor: "manual" }],
+    );
+    addEdge(
+      graph,
+      {
+        source_id: entity.id,
+        target_id: entity2.id,
+        relation_type: "depends_on",
+        edge_kind: "observed",
+        fact: "TestEntity depends on OtherEntity",
+      },
+      [{ episode_id: ep3.id, extractor: "manual" }],
+    );
+
+    let capturedDelta: SubstrateDelta | null = null;
+    const gen = makeMockGenerator({ discoverProposals: [] });
+    gen.discover = async (ctx) => {
+      capturedDelta = ctx.delta;
+      return [];
+    };
+
+    await reconcile(graph, gen, { phases: ["discover"] });
+
+    expect(capturedDelta).not.toBeNull();
+    const delta = capturedDelta as SubstrateDelta;
+    expect(delta.episodes.length).toBeGreaterThan(0);
+    expect(delta.entities.length).toBeGreaterThan(0);
+    expect(delta.edges.length).toBeGreaterThan(0);
+    // Verify episode is in delta
+    expect(delta.episodes.map((e) => e.id)).toContain(ep.id);
+    // Verify entity is in delta
+    expect(delta.entities.map((e) => e.id)).toContain(entity.id);
+  });
+
+  test("delta passed to discover includes catalog of active projections", async () => {
+    const ep = makeEpisode("pre-existing projection episode");
+    const preGen = makeMockGenerator();
+    // Author a projection first
+    await project(graph, {
+      kind: "entity_summary",
+      anchor: { type: "none" },
+      inputs: [{ type: "episode", id: ep.id }],
+      generator: preGen,
+    });
+
+    let capturedCatalog: ActiveProjectionSummary[] | null = null;
+    const gen = makeMockGenerator({ discoverProposals: [] });
+    gen.discover = async (ctx) => {
+      capturedCatalog = ctx.catalog;
+      return [];
+    };
+
+    await reconcile(graph, gen, { phases: ["discover"] });
+
+    expect(capturedCatalog).not.toBeNull();
+    const catalog = capturedCatalog as ActiveProjectionSummary[];
+    expect(catalog.length).toBe(1);
+    expect(catalog[0].kind).toBe("entity_summary");
   });
 });
