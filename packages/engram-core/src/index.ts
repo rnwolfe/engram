@@ -4,6 +4,7 @@
  * Public API surface. All consumer-facing types and functions are re-exported from here.
  */
 
+export { Budget } from "./ai/budget.js";
 export type { AIConfig, AIProvider, EntityHint } from "./ai/index.js";
 export {
   createProvider,
@@ -65,6 +66,8 @@ export type {
   ProjectionInput,
   ProjectionInputType,
   ProjectionOpts,
+  ReconcileOpts,
+  ReconciliationRunResult,
   SimilarResult,
   StoredEmbedding,
 } from "./graph/index.js";
@@ -75,6 +78,7 @@ export {
   addEpisode,
   computeBatchedStaleness,
   cosineSimilarity,
+  currentInputState,
   EdgeNotFoundError,
   EntityNotFoundError,
   EvidenceRequiredError,
@@ -92,8 +96,10 @@ export {
   ProjectionFrontmatterError,
   ProjectionInputMissingError,
   project,
+  reconcile,
   resolveEntity,
   searchProjections,
+  softRefresh,
   storeEmbedding,
   supersedeProjection,
 } from "./graph/index.js";
