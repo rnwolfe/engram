@@ -34,6 +34,15 @@ import {
  *  8. UPDATE metadata schema_version to '0.2.0'
  */
 export function migrate_0_1_0_to_0_2_0(db: Database): void {
+  const current = db
+    .query<{ value: string }, []>(
+      "SELECT value FROM metadata WHERE key = 'format_version'",
+    )
+    .get();
+  if (current?.value === "0.2.0") {
+    return; // already at target version, no-op
+  }
+
   const steps = [
     CREATE_PROJECTIONS,
     CREATE_PROJECTIONS_INDEXES,
