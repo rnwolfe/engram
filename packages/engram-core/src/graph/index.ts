@@ -46,3 +46,9 @@ export {
   project,
   supersedeProjection,
 } from "./projections.js";
+export type { ListProjectionsOpts } from "./projections-list.js";
+export {
+  computeBatchedStaleness,
+  listActiveProjections,
+  searchProjections,
+} from "./projections-list.js";

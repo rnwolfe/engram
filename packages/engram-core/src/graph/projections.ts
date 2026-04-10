@@ -10,10 +10,7 @@
 
 import { createHash } from "node:crypto";
 import { ulid } from "ulid";
-import type {
-  ProjectionGenerator,
-  ResolvedInput,
-} from "../ai/projection-generator.js";
+import type { ResolvedInput } from "../ai/projection-generator.js";
 import type { EngramGraph } from "../format/index.js";
 import type {
   AnchorType,

@@ -117,6 +117,24 @@ The `.engram` file is a SQLite database with this entity model:
 - `invalidated_at` is the transactional timestamp when the system learned a fact was superseded
 - Supersession is atomic: `supersedeEdge()` invalidates old + creates new in one transaction
 
+### Read-Time Staleness (Projection Invariant)
+
+Every read of a projection recomputes its current input fingerprint and carries a
+`stale: boolean` and optional `stale_reason` in the result. This is an invariant —
+no read path (`getProjection`, `listActiveProjections`, `searchProjections`) may return
+a projection without computing the freshness flag.
+
+- `stale: false` — stored `input_fingerprint` matches current substrate content.
+- `stale: true, stale_reason: 'input_content_changed'` — an input's content has drifted.
+- `stale: true, stale_reason: 'input_deleted'` — an input was redacted or invalidated.
+
+Coverage drift ("new substrate rows that were never in the evidence set") is **not** a
+read-time signal — that is the `reconcile` discover phase's responsibility. Conflating
+the two would require O(substrate) read-time queries instead of O(inputs).
+
+The stale flag is read-only. It never modifies `invalidated_at` or any projection column.
+Resolving stale projections requires `engram reconcile`.
+
 ### Edge Kinds
 
 Every edge has an `edge_kind` that separates observed fact from inference from human assertion:
