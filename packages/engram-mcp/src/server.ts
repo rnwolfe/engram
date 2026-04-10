@@ -46,6 +46,23 @@ import {
   OWNERSHIP_TOOL,
   type OwnershipInput,
 } from "./tools/ownership.js";
+import {
+  GET_PROJECTION_TOOL,
+  type GetProjectionInput,
+  handleGetProjection,
+  handleListProjections,
+  handleProject,
+  handleReconcile,
+  handleSearchProjections,
+  LIST_PROJECTIONS_TOOL,
+  type ListProjectionsInput,
+  PROJECT_TOOL,
+  type ProjectInput,
+  RECONCILE_TOOL,
+  type ReconcileInput,
+  SEARCH_PROJECTIONS_TOOL,
+  type SearchProjectionsInput,
+} from "./tools/projections.js";
 import { handleSearch, SEARCH_TOOL, type SearchInput } from "./tools/search.js";
 import {
   FIND_EDGES_TOOL,
@@ -69,27 +86,51 @@ import {
 
 export const MCP_SERVER_NAME = "engram";
 
-const ALL_TOOLS = [
-  SEARCH_TOOL,
-  GET_ENTITY_TOOL,
-  GET_CONTEXT_TOOL,
-  GET_DECAY_TOOL,
-  GET_HISTORY_TOOL,
-  OWNERSHIP_TOOL,
-  GET_NEIGHBORS_TOOL,
-  FIND_EDGES_TOOL,
-  GET_PATH_TOOL,
-  ADD_EPISODE_TOOL,
-  ADD_ENTITY_TOOL,
-  ADD_EDGE_TOOL,
-];
+export interface ServerConfig {
+  /**
+   * Enable authoring tools (engram_project, engram_reconcile).
+   * These tools call the LLM and consume token budget.
+   * Default: false.
+   */
+  enableProjectionAuthoring?: boolean;
+}
+
+export function buildAllTools(config: ServerConfig) {
+  const tools = [
+    SEARCH_TOOL,
+    GET_ENTITY_TOOL,
+    GET_CONTEXT_TOOL,
+    GET_DECAY_TOOL,
+    GET_HISTORY_TOOL,
+    OWNERSHIP_TOOL,
+    GET_NEIGHBORS_TOOL,
+    FIND_EDGES_TOOL,
+    GET_PATH_TOOL,
+    ADD_EPISODE_TOOL,
+    ADD_ENTITY_TOOL,
+    ADD_EDGE_TOOL,
+    // Projection read tools — always enabled
+    GET_PROJECTION_TOOL,
+    SEARCH_PROJECTIONS_TOOL,
+    LIST_PROJECTIONS_TOOL,
+  ];
+
+  // Projection authoring tools — gated by config
+  if (config.enableProjectionAuthoring === true) {
+    tools.push(PROJECT_TOOL, RECONCILE_TOOL);
+  }
+
+  return tools;
+}
 
 /**
  * Creates and configures the engram MCP server.
  * Does not connect to transport — call server.connect(transport) to start.
  */
-export function createServer(dbPath: string) {
+export function createServer(dbPath: string, config: ServerConfig = {}) {
   const graph = openGraph(dbPath);
+  const enableProjectionAuthoring = config.enableProjectionAuthoring ?? false;
+  const allTools = buildAllTools(config);
 
   const server = new Server(
     { name: MCP_SERVER_NAME, version: "0.1.0" },
@@ -101,7 +142,7 @@ export function createServer(dbPath: string) {
   // ---------------------------------------------------------------------------
 
   server.setRequestHandler(ListToolsRequestSchema, () => ({
-    tools: ALL_TOOLS,
+    tools: allTools,
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -147,6 +188,32 @@ export function createServer(dbPath: string) {
           break;
         case "engram_get_path":
           result = handleGetPath(graph, input as GetPathInput);
+          break;
+        case "engram_get_projection":
+          result = handleGetProjection(graph, input as GetProjectionInput);
+          break;
+        case "engram_search_projections":
+          result = handleSearchProjections(
+            graph,
+            input as SearchProjectionsInput,
+          );
+          break;
+        case "engram_list_projections":
+          result = handleListProjections(graph, input as ListProjectionsInput);
+          break;
+        case "engram_project":
+          result = await handleProject(
+            graph,
+            input as ProjectInput,
+            enableProjectionAuthoring,
+          );
+          break;
+        case "engram_reconcile":
+          result = await handleReconcile(
+            graph,
+            input as ReconcileInput,
+            enableProjectionAuthoring,
+          );
           break;
         default:
           return {
