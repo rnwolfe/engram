@@ -4,7 +4,7 @@
 **Status**: Specified
 **Proposed**: 2026-04-10
 **Vision fit**: Establishes the benchmark category unique to Engram — stale-knowledge detection over substrate evolution. Static-snapshot tools structurally cannot compete on this axis. ADR-002 names it explicitly as a moat: "author projections at commit X, advance the substrate to commit Y, measure how well `reconcile` identifies what changed."
-**Companion specs**: [`projections.md`](projections.md) — full projection-layer design. [`format-v0.2.md`](format-v0.2.md) — DDL contract. [`engramark-ai-benchmarking.md`](engramark-ai-benchmarking.md) — follow this doc's structure.
+**Companion specs**: [`projections.md`](../projections.md) — full projection-layer design. [`format-v0.2.md`](../format-v0.2.md) — DDL contract. [`engramark-ai-benchmarking.md`](engramark-ai-benchmarking.md) — follow this doc's structure.
 
 > This spec is scoped to the benchmark design only. No code changes accompany it.
 > Implementation is tracked separately in issue #76.
@@ -81,13 +81,21 @@ export interface StaleKnowledgeScenario {
    */
   should_be_stale: boolean;
   /**
-   * For should_be_stale=true: the expected stale_reason the system should surface.
+   * For should_be_stale=true: the expected stale_reason the system should surface
+   * from getProjection(). Matches the two-value union emitted by the read path.
    * 'input_content_changed' — a recorded input's content hash drifted.
    * 'input_deleted'         — a recorded input was redacted or invalidated.
-   * 'superseded'            — reconcile should author a new version.
    * null for should_be_stale=false scenarios.
    */
-  expected_stale_reason: 'input_content_changed' | 'input_deleted' | 'superseded' | null;
+  expected_stale_reason: 'input_content_changed' | 'input_deleted' | null;
+  /**
+   * For assess-tier scenarios: the expected outcome when reconcile() runs.
+   * 'flag_only'    — reconcile assesses the change as cosmetic; no re-authoring.
+   * 'soft_refresh' — reconcile soft-refreshes the projection body.
+   * 'supersede'    — reconcile should author a new version and supersede the old one.
+   * null for read_time-tier and discover-tier scenarios, or fresh scenarios.
+   */
+  expected_reconcile_outcome: 'flag_only' | 'soft_refresh' | 'supersede' | null;
   /**
    * The concrete substrate change that drives staleness. Implementer uses this
    * to verify the scenario is correctly set up.
@@ -115,23 +123,23 @@ The following 10 scenarios constitute the initial Fastify stale-knowledge datase
 
 #### Stale Scenarios (7)
 
-| ID | Label | Kind | Anchor description | Driving change | Detection tier |
-|----|-------|------|--------------------|----------------|----------------|
-| `sk-001` | `entity_summary/lib-hooks.js` | `entity_summary` | Entity for `lib/hooks.js` | Multiple commits in the X→Y window refactor the hooks lifecycle, adding `onRequestAbort` hook and reorganizing the execution order. The entity summary authored at X does not mention `onRequestAbort`. | `read_time` |
-| `sk-002` | `entity_summary/lib-pluginUtils.js` | `entity_summary` | Entity for `lib/pluginUtils.js` | Plugin timeout and encapsulation handling changed; several co-change relationships with `fastify.js` were added. Summary authored at X describes the pre-refactor API surface. | `read_time` |
-| `sk-003` | `ownership_report/lib-validation.js` | `ownership_report` | Entity for `lib/validation.js` | Primary contributor shifts: `behemoth89@gmail.com` (Manuel Spigolon) acquires significantly more commits in the validation layer in the X→Y window, changing the ownership distribution authored at X. | `read_time` |
-| `sk-004` | `entity_summary/fastify.js` | `entity_summary` | Entity for `fastify.js` (the main entry point) | Core file receives the largest number of cross-cutting changes in the window; summary authored at X describes the pre-refactor lifecycle initialization. At Y, plugin boot sequencing and `addHook` contract differs. | `read_time` |
-| `sk-005` | `entity_summary/lib-reply.js` | `entity_summary` | Entity for `lib/reply.js` | Reply serialization changes in the window; `hey@gurgun.day`'s ownership footprint grows significantly. Summary's description of the serialization path is outdated by Y. | `read_time` |
-| `sk-006` | `decision_page/hooks-execution-order` | `decision_page` | `decision_page` projection anchored on `lib/hooks.js` with subject "hooks execution order" | Commits in the window directly reverse the ordering of `onError` relative to `onSend` in the lifecycle. A decision page authored at X that describes the ordering is contradicted at Y. | `assess` |
-| `sk-007` | `topic_cluster/plugin-system` | `topic_cluster` | `topic_cluster` projection covering the plugin subsystem (`lib/pluginUtils.js`, `fastify-plugin` interactions, encapsulation) | The cluster's coverage at X is missing `onLoad` hook interactions that become central by Y. The projection should be superseded, not just soft-refreshed. | `assess` |
+| ID | Label | Kind | Anchor description | Driving change | Detection tier | `expected_stale_reason` |
+|----|-------|------|--------------------|----------------|----------------|------------------------|
+| `sk-001` | `entity_summary/lib-hooks.js` | `entity_summary` | Entity for `lib/hooks.js` | Multiple commits in the X→Y window refactor the hooks lifecycle, adding `onRequestAbort` hook and reorganizing the execution order. The entity summary authored at X does not mention `onRequestAbort`. | `read_time` | `input_content_changed` |
+| `sk-002` | `entity_summary/lib-pluginUtils.js` | `entity_summary` | Entity for `lib/pluginUtils.js` | Plugin timeout and encapsulation handling changed; several co-change relationships with `fastify.js` were added. Summary authored at X describes the pre-refactor API surface. | `read_time` | `input_content_changed` |
+| `sk-003` | `ownership_report/lib-validation.js` | `ownership_report` | Entity for `lib/validation.js` | Primary contributor shifts: `behemoth89@gmail.com` (Manuel Spigolon) acquires significantly more commits in the validation layer in the X→Y window, changing the ownership distribution authored at X. | `read_time` | `input_content_changed` |
+| `sk-004` | `entity_summary/fastify.js` | `entity_summary` | Entity for `fastify.js` (the main entry point) | Core file receives the largest number of cross-cutting changes in the window; summary authored at X describes the pre-refactor lifecycle initialization. At Y, plugin boot sequencing and `addHook` contract differs. | `read_time` | `input_content_changed` |
+| `sk-005` | `entity_summary/lib-reply.js` | `entity_summary` | Entity for `lib/reply.js` | Reply serialization changes in the window; `hey@gurgun.day`'s ownership footprint grows significantly. Summary's description of the serialization path is outdated by Y. | `read_time` | `input_content_changed` |
+| `sk-006` | `decision_page/hooks-execution-order` | `decision_page` | `decision_page` projection anchored on `lib/hooks.js` with subject "hooks execution order" | Commits in the window directly reverse the ordering of `onError` relative to `onSend` in the lifecycle. A decision page authored at X that describes the ordering is contradicted at Y. | `assess` | `input_content_changed` |
+| `sk-007` | `topic_cluster/plugin-system` | `topic_cluster` | `topic_cluster` projection covering the plugin subsystem (`lib/pluginUtils.js`, `fastify-plugin` interactions, encapsulation) | The cluster's coverage at X is missing `onLoad` hook interactions that become central by Y. The projection should be superseded, not just soft-refreshed. | `assess` | `input_content_changed` |
 
 #### Fresh Scenarios (3)
 
-| ID | Label | Kind | Anchor description | Why fresh | Detection tier |
-|----|-------|------|--------------------|-----------|----------------|
-| `sk-008` | `entity_summary/lib-logger.js` | `entity_summary` | Entity for `lib/logger.js` | The logger module is stable across the X→Y window. No commits in the window touch `lib/logger.js` content. A projection authored at X should remain accurate. | `read_time` |
-| `sk-009` | `ownership_report/test-types.test-d.ts` | `ownership_report` | Entity for `test/types/index.test-d.ts` | Type-test file has a single stable owner across the window; ownership projection authored at X remains accurate. | `read_time` |
-| `sk-010` | `entity_summary/lib-wrapThenable.js` | `entity_summary` | Entity for `lib/wrapThenable.js` | Small utility with no changes in the X→Y window. Fingerprint at Y matches fingerprint at X. | `read_time` |
+| ID | Label | Kind | Anchor description | Why fresh | Detection tier | `expected_stale_reason` |
+|----|-------|------|--------------------|-----------|----------------|------------------------|
+| `sk-008` | `entity_summary/lib-logger.js` | `entity_summary` | Entity for `lib/logger.js` | The logger module is stable across the X→Y window. No commits in the window touch `lib/logger.js` content. A projection authored at X should remain accurate. | `read_time` | `null` |
+| `sk-009` | `ownership_report/test-types.test-d.ts` | `ownership_report` | Entity for `test/types/index.test-d.ts` | Type-test file has a single stable owner across the window; ownership projection authored at X remains accurate. | `read_time` | `null` |
+| `sk-010` | `entity_summary/lib-wrapThenable.js` | `entity_summary` | Entity for `lib/wrapThenable.js` | Small utility with no changes in the X→Y window. Fingerprint at Y matches fingerprint at X. | `read_time` | `null` |
 
 ### Loader Contract
 
@@ -144,6 +152,26 @@ The dataset loader (`packages/engramark/src/datasets/fastify/stale-knowledge-loa
 5. Return an array of `PreparedScenario` objects, one per scenario, containing the authored projection ID plus the ground-truth `should_be_stale` and `expected_stale_reason`.
 
 The loader is deterministic given the same commit refs and model. If `SKIP_AI_BENCHMARK=1`, the loader substitutes a mock projection generator that produces fixed bodies — this allows CI to run the scoring harness without Ollama or Anthropic API access.
+
+### PreparedScenario Shape
+
+The loader returns one `PreparedScenario` per scenario. It extends `StaleKnowledgeScenario` with fields added during loading:
+
+```typescript
+/** A scenario after the loader has resolved anchors and authored projections. */
+export interface PreparedScenario extends StaleKnowledgeScenario {
+  /** ULID of the projection authored in dbX for this scenario. */
+  projection_id: string;
+  /** ULID of the resolved anchor entity in dbX. */
+  anchor_id: string;
+  /**
+   * Whether the substrate has been advanced to Y.
+   * true  — dbY is populated and fingerprint checks are live.
+   * false — substrate has not yet been advanced (pre-advance state, for debugging).
+   */
+  substrate_advanced: boolean;
+}
+```
 
 ## Scoring Metrics
 
@@ -190,7 +218,7 @@ reconcile_accuracy = |correct_supersessions| / |supersession_attempts|
 ```
 
 A supersession is "correct" if:
-1. The new projection body correctly reflects the state at Y (assessed by the LLM grader, see Ground-Truth Construction).
+1. The new projection body correctly reflects the state at Y (assessed by the LLM grader — see [LLM Grader for Reconcile Accuracy](#llm-grader-for-reconcile-accuracy) in the Ground-Truth Construction section below).
 2. The new projection's `valid_from` is within the ingest window of Y.
 3. The old projection's `valid_until` equals the new projection's `valid_from` (half-open window invariant, same check as `verifyGraph()`).
 
@@ -294,12 +322,34 @@ The `reconcile_accuracy` metric requires assessing whether a newly generated pro
 - Input: the original projection at X (body text), the new projection at Y (body text), and the top-5 episodes added between X and Y for the anchor entity.
 - Prompt: "Given the new evidence, does the revised projection accurately reflect the current state? Answer YES or NO with a one-sentence rationale."
 - Grade: YES → `supersession_correct=true`, NO → `supersession_correct=false`.
-- The grader model is configurable (default: `anthropic:claude-opus-4-6`). The grader prompt hash is recorded alongside the `ScenarioResult` so grader-prompt changes are detectable in the audit trail.
+- The grader model is configurable via `ENGRAM_BENCHMARK_GRADER_MODEL` env var (default: `anthropic:claude-opus-4-6`), separate from `ENGRAM_BENCHMARK_MODEL` used for projection authoring. The grader prompt hash is recorded alongside the `ScenarioResult` so grader-prompt changes are detectable in the audit trail.
 - The grader is mocked when `SKIP_AI_BENCHMARK=1`.
 
 ## Comparator Strategy
 
 Four comparators are defined. Each implements the `StaleKnowledgeBenchmarkRunner` interface and must produce a `ScenarioResult[]` for the same `PreparedScenario[]` input.
+
+### StaleKnowledgeBenchmarkRunner Interface
+
+```typescript
+/** Every comparator must implement this interface. */
+export interface StaleKnowledgeBenchmarkRunner {
+  /** Unique stable identifier for this comparator (used in report keys). */
+  readonly name: string;
+
+  /**
+   * Run the comparator against the prepared scenarios and return one
+   * ScenarioResult per scenario, in the same order as the input array.
+   */
+  run(dataset: PreparedScenario[]): Promise<ScenarioResult[]>;
+
+  /**
+   * Optional teardown called after run() completes (close DB handles, etc.).
+   * Implementations that do not need teardown may omit this method.
+   */
+  teardown?(): Promise<void>;
+}
+```
 
 ### Comparator 1: Engram with Full Reconcile (Headline)
 
@@ -358,7 +408,7 @@ Four comparators are defined. Each implements the `StaleKnowledgeBenchmarkRunner
 
 **Why optional**: Requires a working graphify integration and incurs high LLM cost. Excluded from CI. Run manually for comparison blog posts or competitive analyses.
 
-**Expected performance**: High stale_recall (rebuilds everything so nothing is stale by construction), zero stale_precision by the same logic (it doesn't track what it used to believe — it just overwrites), and very high `cost_per_staleness_resolved`.
+**Expected performance**: High stale_recall (rebuilds everything, so stale scenarios are detected) and moderate stale_precision (it flags all scenarios, so precision ≈ 7/10 = 0.70 on the initial dataset — lower than targeted reconcile but non-zero). The differentiator is cost: `cost_per_staleness_resolved` will be very high because every entity is re-authored regardless of whether it was stale.
 
 ## Dataset Versioning and Stability
 
@@ -420,6 +470,6 @@ Four comparators are defined. Each implements the `StaleKnowledgeBenchmarkRunner
 ## References
 
 - [`docs/internal/DECISIONS.md`](../DECISIONS.md) — ADR-002: AI-authored projection layer with temporal versioning
-- [`docs/internal/specs/projections.md`](projections.md) — § What this sketch buys us; stale-knowledge detection as EngRAMark moat
-- [`docs/internal/specs/format-v0.2.md`](format-v0.2.md) — DDL contract for the projection layer
+- [`docs/internal/specs/projections.md`](../projections.md) — § What this sketch buys us; stale-knowledge detection as EngRAMark moat
+- [`docs/internal/specs/format-v0.2.md`](../format-v0.2.md) — DDL contract for the projection layer
 - [`docs/internal/specs/engramark-ai-benchmarking.md`](engramark-ai-benchmarking.md) — benchmark infrastructure this spec builds on
