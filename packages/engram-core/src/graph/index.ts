@@ -52,3 +52,12 @@ export {
   listActiveProjections,
   searchProjections,
 } from "./projections-list.js";
+export type {
+  ReconcileOpts,
+  ReconciliationRunResult,
+} from "./reconcile.js";
+export {
+  currentInputState,
+  reconcile,
+  softRefresh,
+} from "./reconcile.js";
