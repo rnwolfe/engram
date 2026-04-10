@@ -227,6 +227,127 @@ function checkEmbeddingTargets(graph: EngramGraph): Violation[] {
   return violations;
 }
 
+/**
+ * Returns true if the projections table exists in this database.
+ * Used to skip projection checks on v0.1 files that lack projection tables.
+ */
+function hasProjectionsTable(graph: EngramGraph): boolean {
+  const row = graph.db
+    .query<{ cnt: number }, []>(
+      `SELECT COUNT(*) AS cnt FROM sqlite_master
+       WHERE type='table' AND name='projections'`,
+    )
+    .get();
+  return (row?.cnt ?? 0) > 0;
+}
+
+function checkProjectionEvidence(graph: EngramGraph): Violation[] {
+  if (!hasProjectionsTable(graph)) return [];
+
+  const rows = graph.db
+    .query<{ id: string }, []>(
+      `SELECT p.id FROM projections p
+       LEFT JOIN projection_evidence pe
+         ON p.id = pe.projection_id AND pe.role = 'input'
+       WHERE pe.projection_id IS NULL`,
+    )
+    .all();
+
+  return rows.map((row) => ({
+    check: "checkProjectionEvidence",
+    entity_or_edge_id: row.id,
+    message: `Projection '${row.id}' has no evidence rows with role='input'`,
+    severity: "error" as ViolationSeverity,
+  }));
+}
+
+function checkProjectionSupersessionCycles(graph: EngramGraph): Violation[] {
+  if (!hasProjectionsTable(graph)) return [];
+
+  // Use a recursive CTE with a depth guard to detect cycles in superseded_by chains.
+  // A cycle is detected when we visit a projection_id we have already seen in the chain
+  // (path contains it), or the depth exceeds the guard.
+  const rows = graph.db
+    .query<{ start_id: string; cycle_path: string }, []>(
+      `WITH RECURSIVE chain(start_id, current_id, path, depth, cycle) AS (
+         SELECT id, superseded_by, id, 1, 0
+         FROM projections
+         WHERE superseded_by IS NOT NULL
+         UNION ALL
+         SELECT c.start_id, p.superseded_by,
+                c.path || ',' || p.id,
+                c.depth + 1,
+                CASE WHEN instr(',' || c.path || ',', ',' || p.id || ',') > 0 THEN 1 ELSE 0 END
+         FROM chain c
+         JOIN projections p ON p.id = c.current_id
+         WHERE c.current_id IS NOT NULL
+           AND c.cycle = 0
+           AND c.depth < 10000
+       )
+       SELECT start_id, path AS cycle_path
+       FROM chain
+       WHERE cycle = 1`,
+    )
+    .all();
+
+  return rows.map((row) => ({
+    check: "checkProjectionSupersessionCycles",
+    entity_or_edge_id: row.start_id,
+    message: `Projection supersession cycle detected starting from '${row.start_id}': ${row.cycle_path}`,
+    severity: "error" as ViolationSeverity,
+  }));
+}
+
+function checkProjectionDependencyCycles(graph: EngramGraph): Violation[] {
+  if (!hasProjectionsTable(graph)) return [];
+
+  // Walk the projection→projection dependency graph (via projection_evidence where
+  // target_type='projection') using a recursive CTE. Detect cycles.
+  const rows = graph.db
+    .query<{ start_id: string; cycle_path: string }, []>(
+      `WITH RECURSIVE dep(start_id, current_id, path, depth, cycle) AS (
+         SELECT DISTINCT pe.projection_id, pe.target_id,
+                pe.projection_id || ',' || pe.target_id,
+                1, 0
+         FROM projection_evidence pe
+         WHERE pe.target_type = 'projection'
+         UNION ALL
+         SELECT d.start_id, pe.target_id,
+                d.path || ',' || pe.target_id,
+                d.depth + 1,
+                CASE WHEN instr(',' || d.path || ',', ',' || pe.target_id || ',') > 0 THEN 1 ELSE 0 END
+         FROM dep d
+         JOIN projection_evidence pe ON pe.projection_id = d.current_id
+         WHERE pe.target_type = 'projection'
+           AND d.cycle = 0
+           AND d.depth < 10000
+       )
+       SELECT start_id, path AS cycle_path
+       FROM dep
+       WHERE cycle = 1`,
+    )
+    .all();
+
+  // Deduplicate: a single cycle may be reported from multiple starting nodes.
+  const seen = new Set<string>();
+  const violations: Violation[] = [];
+  for (const row of rows) {
+    // Normalise the cycle path to the smallest rotation for dedup
+    const parts = row.cycle_path.split(",");
+    // Dedup on sorted unique node set — a cycle A→B→A and B→A→B are the same cycle
+    const key = [...new Set(parts)].sort().join(",");
+    if (!seen.has(key)) {
+      seen.add(key);
+      violations.push({
+        check: "checkProjectionDependencyCycles",
+        message: `Projection dependency cycle detected: ${row.cycle_path}`,
+        severity: "error" as ViolationSeverity,
+      });
+    }
+  }
+  return violations;
+}
+
 function checkActiveEdgeOverlaps(graph: EngramGraph): Violation[] {
   // Find pairs of active edges (no invalidated_at) sharing the same
   // (source_id, target_id, relation_type, edge_kind) with overlapping validity windows.
@@ -274,6 +395,9 @@ export function verifyGraph(graph: EngramGraph): VerifyResult {
   violations.push(...checkEvidenceEpisodeRefs(graph));
   violations.push(...checkEmbeddingTargets(graph));
   violations.push(...checkActiveEdgeOverlaps(graph));
+  violations.push(...checkProjectionEvidence(graph));
+  violations.push(...checkProjectionSupersessionCycles(graph));
+  violations.push(...checkProjectionDependencyCycles(graph));
 
   const valid = !violations.some((v) => v.severity === "error");
   return { valid, violations };
