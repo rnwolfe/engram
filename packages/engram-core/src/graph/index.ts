@@ -29,3 +29,20 @@ export {
 } from "./errors.js";
 export type { EvidenceLink } from "./evidence.js";
 export { getEvidenceForEdge, getEvidenceForEntity } from "./evidence.js";
+export type {
+  AnchorType,
+  GetProjectionResult,
+  Projection,
+  ProjectionEvidenceRow,
+  ProjectionInput,
+  ProjectionInputType,
+  ProjectionOpts,
+} from "./projections.js";
+export {
+  getProjection,
+  ProjectionCycleError,
+  ProjectionFrontmatterError,
+  ProjectionInputMissingError,
+  project,
+  supersedeProjection,
+} from "./projections.js";
