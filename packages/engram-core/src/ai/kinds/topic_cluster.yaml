@@ -1,0 +1,29 @@
+name: topic_cluster
+description: >
+  A named cluster of entities, edges, and episodes that share a common theme
+  identified by the LLM as coherent, even when no single hub entity represents
+  the theme.
+when_to_use: |
+  Propose a topic_cluster when:
+  - 4 or more entities and/or episodes in the substrate delta share a common
+    theme (e.g. "authentication", "database migrations", "CI/CD pipeline") that
+    is not captured by any existing entity, entity_summary, or topic_cluster.
+  - A cross-cutting concern touches many unrelated parts of the codebase and a
+    topic_cluster would serve as the index page linking them (think: Obsidian
+    map-of-content page).
+  - The substrate contains a coherent "storyline" across multiple PRs and
+    commits (e.g. a multi-week refactor) that lacks a single anchor entity.
+  - An existing topic_cluster is stale because new episodes significantly
+    expand or contract the theme.
+  Do NOT propose a topic_cluster that duplicates an entity_summary — if a
+  single named entity adequately represents the cluster, use entity_summary
+  instead. Topic clusters are for emergent themes, not for named components.
+  Anchor type is always 'none' — the cluster itself is the organizing artifact.
+anchor_types:
+  - none
+expected_inputs:
+  - Entities thematically linked by the cluster topic
+  - Edges connecting cluster members to each other
+  - Episodes (commits, PRs) that reference the theme across multiple entities
+  - Existing projections (entity_summaries, decision_pages) for cluster members
+example_title_pattern: "Topic: {theme_name}"

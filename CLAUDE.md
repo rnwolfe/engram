@@ -273,6 +273,8 @@ When creating a PR that implements a GitHub issue:
 | `packages/engram-core/src/graph/` | Entity, edge, alias, evidence CRUD |
 | `packages/engram-core/src/temporal/` | Temporal logic (validity, supersession, snapshots) |
 | `packages/engram-core/src/ai/` | AI provider layer (NullProvider, OllamaProvider, GeminiProvider) |
+| `packages/engram-core/src/ai/kinds/` | Built-in projection kind catalog files (YAML). User overrides via `$XDG_CONFIG_HOME/engram/kinds/` (fallback `~/.config/engram/kinds/`). |
+| `packages/engram-core/src/ai/kinds.ts` | Kind catalog loader — `loadKindCatalog()`, `KindEntry`, `KindCatalog` |
 | `packages/engram-core/src/ingest/git.ts` | Git VCS ingestion (the "money command" engine) |
 | `packages/engram-core/src/ingest/adapter.ts` | EnrichmentAdapter interface |
 
