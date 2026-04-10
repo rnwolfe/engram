@@ -10,6 +10,7 @@
  */
 
 import type { Projection } from "../graph/projections.js";
+import type { KindCatalog } from "./kinds.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,73 @@ export interface ResolvedInput {
   content: string | null;
   /** SHA-256 hash of the content at resolution time. */
   content_hash: string | null;
+}
+
+/**
+ * A summary of one active projection used as input to the discover phase.
+ * Contains identity and recency metadata — not the projection body.
+ */
+export interface ActiveProjectionSummary {
+  id: string;
+  kind: string;
+  title: string;
+  anchor_type: string;
+  anchor_id: string | null;
+  last_assessed_at: string | null;
+}
+
+/**
+ * A single substrate element (episode, entity, or edge) included in the
+ * substrate delta passed to ProjectionGenerator.discover().
+ */
+export interface SubstrateDeltaItem {
+  type: "episode" | "entity" | "edge";
+  id: string;
+  /** Short summary of the item's content (not the full content). */
+  summary: string;
+  /** ISO8601 UTC timestamp when this item was added or last modified. */
+  changed_at: string;
+}
+
+/**
+ * The substrate delta since the last non-dry-run reconcile for the same scope.
+ * Passed to ProjectionGenerator.discover() as context for new proposals.
+ */
+export interface SubstrateDelta {
+  since: string | null;
+  episodes: SubstrateDeltaItem[];
+  entities: SubstrateDeltaItem[];
+  edges: SubstrateDeltaItem[];
+}
+
+/**
+ * A proposal from ProjectionGenerator.discover() for a new projection to author.
+ *
+ * Each proposal contains the kind, optional anchor, list of input IDs, and a
+ * rationale explaining why the generator believes this projection is worth
+ * authoring. The authoring loop calls project() for each accepted proposal.
+ */
+export interface ProjectionProposal {
+  /** Projection kind identifier (must match a KindEntry.name from the catalog). */
+  kind: string;
+  /**
+   * Optional anchor entity/edge/episode for the projection.
+   *
+   * `null` means graph-wide (no specific anchor). When null, the projection will
+   * be stored with anchor_type='none' and anchor_id=null.
+   *
+   * NOTE: Do NOT use `{ type: 'none', id: '...' }` in proposals — `type: 'none'`
+   * is an internal database storage value only and is not valid as proposal input.
+   * Use `anchor: null` for graph-wide projections.
+   */
+  anchor: { type: string; id: string } | null;
+  /**
+   * List of substrate inputs the projection should summarise.
+   * Each entry must be a resolvable {type, id} pair from the substrate.
+   */
+  inputs: Array<{ type: string; id: string }>;
+  /** Short explanation of why this projection is worth authoring now. */
+  rationale: string;
 }
 
 /**
@@ -79,6 +147,29 @@ export interface ProjectionGenerator {
     projection: Projection,
     currentInputs: ResolvedInput[],
   ): Promise<{ body: string; confidence: number }>;
+
+  /**
+   * Discover new projections to author from the substrate delta.
+   *
+   * Called during the reconcile() discover phase. The generator is given:
+   * - `delta`: substrate items added or changed since the last non-dry-run
+   *   reconcile for the same scope (episodes, entities, edges).
+   * - `catalog`: active projection summaries — what projections already exist,
+   *   used to avoid proposing duplicates and to identify coverage gaps.
+   * - `kinds`: the full KindCatalog, so the generator knows which kinds are
+   *   available, when to use each, and what inputs are expected.
+   *
+   * Returns an ordered array of ProjectionProposal objects. The authoring loop
+   * calls project() for each proposal that passes validation. Returning [] is
+   * valid (the generator believes no new projections are warranted).
+   *
+   * Must never throw. On internal error, return [].
+   */
+  discover(ctx: {
+    delta: SubstrateDelta;
+    catalog: ActiveProjectionSummary[];
+    kinds: KindCatalog;
+  }): Promise<ProjectionProposal[]>;
 }
 
 // ─── NullGenerator ───────────────────────────────────────────────────────────
@@ -88,6 +179,7 @@ export interface ProjectionGenerator {
  *
  * generate() always throws — projections require an AI generator.
  * assess() and regenerate() also throw for consistency.
+ * discover() returns [] — no proposals without an AI provider.
  */
 export class NullGenerator implements ProjectionGenerator {
   async generate(
@@ -115,6 +207,17 @@ export class NullGenerator implements ProjectionGenerator {
     throw new Error(
       "NullGenerator: no AI provider configured — cannot regenerate projections.",
     );
+  }
+
+  /**
+   * NullGenerator.discover() always returns [] — no AI provider means no proposals.
+   */
+  async discover(_ctx: {
+    delta: SubstrateDelta;
+    catalog: ActiveProjectionSummary[];
+    kinds: KindCatalog;
+  }): Promise<ProjectionProposal[]> {
+    return [];
   }
 }
 
@@ -196,5 +299,22 @@ export class AnthropicGenerator implements ProjectionGenerator {
     // Production would call Anthropic with the old body as context.
     void projection;
     return this.generate(inputs);
+  }
+
+  /**
+   * AnthropicGenerator.discover() stub — returns [] in this placeholder.
+   *
+   * Production implementation would call the Anthropic API with a structured
+   * prompt built from the substrate delta, coverage catalog, and kind catalog,
+   * then parse the response into ProjectionProposal[].
+   */
+  async discover(_ctx: {
+    delta: SubstrateDelta;
+    catalog: ActiveProjectionSummary[];
+    kinds: KindCatalog;
+  }): Promise<ProjectionProposal[]> {
+    // Stub: in production this would issue a structured LLM call to propose
+    // new projections. For now return [] so the pipeline works end-to-end.
+    return [];
   }
 }
