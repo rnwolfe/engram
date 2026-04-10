@@ -102,10 +102,7 @@ const KIND_NAME_RE = /^[a-z][a-z0-9_]*$/;
  *
  * Does NOT support: anchors, aliases, inline objects/arrays, complex types.
  */
-function parseKindYaml(
-  text: string,
-  filePath: string,
-): Record<string, unknown> {
+function parseKindYaml(text: string): Record<string, unknown> {
   const lines = text.split("\n");
   const result: Record<string, unknown> = {};
   let i = 0;
@@ -168,9 +165,33 @@ function parseKindYaml(
       while (bodyLines.length > 0 && bodyLines[bodyLines.length - 1] === "") {
         bodyLines.pop();
       }
-      result[key] = fold
-        ? bodyLines.join(" ").replace(/\s+/g, " ").trim()
-        : bodyLines.join("\n");
+      if (fold) {
+        // Folded scalar (`>`): blank lines become paragraph breaks (\n\n),
+        // non-blank lines within a paragraph are joined with a space.
+        // Per YAML spec, a blank line in the body is preserved as a newline.
+        const paragraphs: string[] = [];
+        let current: string[] = [];
+        for (const bl of bodyLines) {
+          if (bl === "") {
+            if (current.length > 0) {
+              paragraphs.push(current.join(" "));
+              current = [];
+            }
+            paragraphs.push("");
+          } else {
+            current.push(bl.trim());
+          }
+        }
+        if (current.length > 0) {
+          paragraphs.push(current.join(" "));
+        }
+        result[key] = paragraphs
+          .join("\n")
+          .replace(/\n{3,}/g, "\n\n")
+          .trim();
+      } else {
+        result[key] = bodyLines.join("\n");
+      }
       continue;
     }
 
@@ -179,8 +200,6 @@ function parseKindYaml(
     i++;
   }
 
-  // Unused — kept for context
-  void filePath;
   return result;
 }
 
@@ -291,8 +310,15 @@ function loadKindsFromDir(dir: string): KindEntry[] {
 
   for (const file of files) {
     const filePath = join(dir, file);
-    const text = readFileSync(filePath, "utf-8");
-    const raw = parseKindYaml(text, filePath);
+    let text: string;
+    try {
+      text = readFileSync(filePath, "utf-8");
+    } catch (err) {
+      throw new Error(
+        `Failed to read kind file ${filePath}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+    const raw = parseKindYaml(text);
     const entry = validateEntry(raw, filePath);
     entries.push(entry);
   }
