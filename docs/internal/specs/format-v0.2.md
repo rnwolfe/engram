@@ -93,7 +93,7 @@ CREATE TABLE projection_evidence (
 CREATE INDEX idx_projection_evidence_target ON projection_evidence(target_type, target_id);
 ```
 
-**Polymorphic by intent.** Unlike `entity_evidence` and `edge_evidence`, this table does not enforce the FK on `(target_type, target_id)`. The polymorphic shape matches the existing `embeddings` table precedent and accommodates the four target kinds (including projections themselves) without three separate tables. The verify pass (see below) checks evidence integrity.
+**Polymorphic by intent.** Unlike `entity_evidence` and `edge_evidence`, this table does not enforce the FK on `(target_type, target_id)`. The polymorphic shape matches the existing `embeddings` table precedent and accommodates the four target kinds (including projections themselves) without three separate tables. The verify pass (see below) validates the documented v0.2 evidence-row invariants (presence of at least one `role='input'` row per projection, supersession chain termination, projection-dependency DAG), but does not by itself imply referential integrity checks for every `(target_type, target_id)` target.
 
 **Roles.** `role='input'` marks an element the LLM read to produce the projection. `role='anchor'` marks an additional anchor when a projection is *about* multiple things (the primary anchor lives on the row itself). The two roles share the same primary key namespace so an element can appear in both — useful when an entity is both anchor and input.
 
@@ -161,7 +161,7 @@ The migration appends these statements after the existing v0.1 DDL list in `pack
 
 ## Migration semantics
 
-**v0.1 → v0.2 is purely additive.** No `ALTER TABLE`, no data backfill, no break in any v0.1 query path. A v0.1 reader on a v0.2 file sees the new tables as foreign and ignores them; existing reads, writes, and verify checks continue to function. (But: a v0.1 reader will refuse to open a v0.2 file unless it advertises forward compatibility — see "Compatibility window" below.)
+**v0.1 → v0.2 is purely additive.** No `ALTER TABLE`, no data backfill, no break in any v0.1 query path. The new tables sit alongside existing ones; a v0.1 reader pointed at v0.2 SQL would see them as foreign and irrelevant, and nothing in the v0.1 read/write/verify paths is changed. In practice, however, the version gate prevents this from happening at all — see "Compatibility window" below. v0.1 tooling cannot open v0.2 files without upgrading `engram-core`.
 
 **v0.2 reader on v0.1 file.** Opens cleanly. Projection-layer queries return empty result sets. `engram reconcile` is a no-op. `engram project` works (it bootstraps the projection layer on first author).
 
@@ -186,14 +186,15 @@ A new helper, `getProjection(db, id)`, is the canonical read path. Its return sh
   projection: Projection;
   stale: boolean;                  // current_input_fingerprint !== projection.input_fingerprint
   stale_reason?:                   // populated when stale=true
-    | 'inputs_added'               // a new substrate row matches the discover delta but isn't in projection_evidence
     | 'input_content_changed'      // an existing input's content_hash changed
     | 'input_deleted';             // an input is no longer in the substrate (or status='redacted')
   last_assessed_at: string | null; // ISO8601
 }
 ```
 
-The fingerprint recomputation runs on every projection read. It is O(inputs) with indexed lookups — measured in microseconds for typical projections. **The stale flag is an invariant of the read path** — no API surface returns a projection without computing it. Hybrid search results that include projections carry the same flag per row. Ranking and filtering on staleness is consumer policy.
+The fingerprint recomputation runs over the projection's recorded `projection_evidence` rows on every projection read. It is O(inputs) with indexed lookups — measured in microseconds for typical projections. **The stale flag is an invariant of the read path** — no API surface returns a projection without computing it. Hybrid search results that include projections carry the same flag per row. Ranking and filtering on staleness is consumer policy.
+
+**Coverage drift is not a read-time concern.** Detecting "the substrate has new rows that should have been inputs" requires enumerating candidates outside the recorded evidence set — a whole-substrate question, not an O(inputs) one. That belongs to the reconcile discover phase, not to `getProjection()`. The read-time API deliberately scopes `stale_reason` to what is cheaply and correctly derivable from the recorded inputs.
 
 ## Out of scope for v0.2
 

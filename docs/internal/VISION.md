@@ -18,7 +18,7 @@
 
 3. **Temporal by default.** Every fact has a validity window. Knowledge isn't static — people change jobs, APIs break, decisions get reversed. The graph remembers what was true and when.
 
-4. **Evidence-first.** Episodes are immutable raw evidence. Entities and edges are derived projections supported by evidence chains. Every claim in the graph traces back to source material.
+4. **Evidence-first.** Episodes are immutable raw evidence. Entities and edges are derived artifacts supported by evidence chains. Every claim in the graph traces back to source material.
 
 5. **Deterministic substrate, AI-authored projections — both versioned in time.** The substrate (episodes, entities, edges, evidence chains, validity windows) is deterministic and acts as an audit ledger. On top of it sits a projection layer: AI-authored syntheses (entity summaries, decision pages, contradiction reports) that are first-class artifacts, versioned by the same temporal model as edges. The substrate is correct without AI. The projection layer is where the LLM compounds value between queries — and because every projection traces back to the substrate, *what we believed and when* becomes a first-class query. With no AI configured you still have the substrate; with AI you get a temporally-versioned wiki that re-reconciles itself as new evidence arrives.
 

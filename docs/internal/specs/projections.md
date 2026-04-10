@@ -1,13 +1,14 @@
-# Projections — Sketch
+# Projections — Design
 
-**Phase**: 2 (proposal)
-**Status**: Draft for review
+**Phase**: 2
+**Status**: Accepted (ADR-002)
 **Proposed**: 2026-04-09
 **Vision fit**: Reframes principle 5 ("structurally sound without AI, queryable with AI") by adding an AI-authored, evidence-backed, temporally-versioned synthesis layer on top of the deterministic substrate. Engram becomes the temporal version of Karpathy's LLM wiki — compounding *and* revisitable.
+**Companion specs**: [`format-v0.2.md`](format-v0.2.md) — migration and DDL contract. [`../DECISIONS.md`](../DECISIONS.md#adr-002----ai-authored-projection-layer-with-temporal-versioning) — ADR-002.
 
-> This is a **schema sketch**, not an implementation plan. The goal is to make
-> the architectural shift concrete enough to poke holes in. Once the model is
-> agreed, we promote it to ADR-002 + a `VISION.md` edit + a format-spec migration.
+> This is the **full design rationale**. The migration and DDL contract lives in
+> [`format-v0.2.md`](format-v0.2.md); the architectural decision lives in ADR-002
+> ([`../DECISIONS.md`](../DECISIONS.md)); the vision reframe is in [`../VISION.md`](../VISION.md).
 
 ## Strategic Rationale
 
@@ -89,7 +90,7 @@ CREATE TABLE projections (
   anchor_type        TEXT NOT NULL,                   -- 'entity' | 'edge' | 'episode' | 'projection' | 'none'
   anchor_id          TEXT,                            -- NULL when anchor_type='none'
   title              TEXT NOT NULL,                   -- short label, used in listings and FTS
-  body               TEXT NOT NULL,                   -- markdown
+  body               TEXT NOT NULL,                   -- markdown with mandatory YAML frontmatter
   body_format        TEXT NOT NULL DEFAULT 'markdown',-- forward-compat: 'markdown' | 'json' | ...
   model              TEXT NOT NULL,                   -- 'anthropic:claude-opus-4-6' | 'human' | 'ollama:llama3.1' | ...
   prompt_template_id TEXT,                            -- name of the prompt used; NULL for human
@@ -192,8 +193,8 @@ Generators MUST emit the frontmatter; `project()` validates and normalizes it at
 
 The cost of `reconcile` (see resolved decisions below) means some users will defer it for budget reasons. The system MUST NOT pretend a projection is fresh just because reconcile hasn't run yet. Two-tier check:
 
-- **Cheap (read-time, always on).** Every read of a projection recomputes `current_input_fingerprint` from the substrate and compares it to the stored `input_fingerprint`. This is O(inputs) with indexed lookups — microseconds. If they differ, the read result carries `stale: true` and a `stale_reason` (`inputs_added` | `input_content_changed` | `input_deleted`). MCP and CLI surface this visibly; agents see it in tool results.
-- **Expensive (reconcile, opt-in cadence).** The full LLM assessment that decides refresh-vs-supersede. Transitions a projection from "known stale" to "resolved."
+- **Cheap (read-time, always on).** Every read of a projection recomputes `current_input_fingerprint` over the projection's recorded `projection_evidence` rows (using each target's *current* content hash) and compares it to the stored `input_fingerprint`. This is O(inputs) with indexed lookups — microseconds. If they differ, the read result carries `stale: true` and a `stale_reason` (`input_content_changed` | `input_deleted`). MCP and CLI surface this visibly; agents see it in tool results.
+- **Expensive (reconcile, opt-in cadence).** The full LLM assessment that decides refresh-vs-supersede. Transitions a projection from "known stale" to "resolved." Only the discover phase can detect "new substrate rows that should have been inputs but weren't" — that is a coverage question, not a staleness question, and belongs to reconcile.
 
 Read-time helper:
 
@@ -201,10 +202,12 @@ Read-time helper:
 getProjection(db, id): {
   projection: Projection;
   stale: boolean;
-  stale_reason?: 'inputs_added' | 'input_content_changed' | 'input_deleted';
+  stale_reason?: 'input_content_changed' | 'input_deleted';
   last_assessed_at: string | null;
 }
 ```
+
+**Why `inputs_added` is not a read-time reason.** The read path only sees the projection's recorded evidence rows, so it can detect when those inputs change or disappear but cannot discover newly relevant substrate rows that were never in the evidence set. That kind of "coverage drift" is exactly what the reconcile discover phase is for. Conflating the two would either require read-time queries over the whole substrate (violating the O(inputs) invariant) or promise something the fingerprint mechanism cannot deliver.
 
 Ranking/filtering stale projections in hybrid search is policy (tune per use case), but **the flag is an invariant** — no read path returns a projection without computing it. This converts cost deferral from a correctness problem into a UX problem: "you have 7 stale projections, run `engram reconcile` to resolve."
 
