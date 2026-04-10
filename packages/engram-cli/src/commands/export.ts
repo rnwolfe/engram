@@ -36,15 +36,32 @@ interface EpisodeRow {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /**
- * Sanitize a string to be filesystem-safe.
- * Replaces non-alphanumeric chars with '-', truncates to 64 chars.
+ * Sanitize an anchor string to be filesystem-safe.
+ * Replaces non-alphanumeric chars (except underscores) with '-', truncates to 64 chars.
  */
 function toSlug(value: string): string {
   return value
-    .replace(/[^a-zA-Z0-9]/g, "-")
+    .replace(/[^a-zA-Z0-9_]/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 64);
+}
+
+/**
+ * Sanitize a kind string for use as a directory path component.
+ * Strips path-traversal chars (../, slashes, null) while preserving underscores
+ * so that kind names like "entity_summary" remain readable.
+ */
+function toKindPath(kind: string): string {
+  return (
+    kind
+      .replace(/[/\\]/g, "-")
+      .replace(/\.\./g, "-")
+      .replace(/\0/g, "")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 64) || "unknown"
+  );
 }
 
 /**
@@ -59,11 +76,11 @@ function shortId(id: string): string {
  * Pattern: <kind>/<anchor-slug>__<short-id>.md
  */
 function projectionFilename(projection: Projection): string {
+  // Sanitize kind as a path component — prevents directory traversal
+  // if a malicious DB row contains kind = "../evil".
+  const kindSlug = toKindPath(projection.kind);
   const anchorSlug = toSlug(projection.anchor_id ?? projection.anchor_type);
-  return path.join(
-    projection.kind,
-    `${anchorSlug}__${shortId(projection.id)}.md`,
-  );
+  return path.join(kindSlug, `${anchorSlug}__${shortId(projection.id)}.md`);
 }
 
 // ─── Wiki subcommand ──────────────────────────────────────────────────────────
@@ -131,7 +148,7 @@ function registerWiki(exportCmd: Command): void {
         for (const projection of projections) {
           const relPath = projectionFilename(projection);
           const absPath = path.join(outDir, relPath);
-          const kindDir = path.join(outDir, projection.kind);
+          const kindDir = path.join(outDir, toKindPath(projection.kind));
 
           fs.mkdirSync(kindDir, { recursive: true });
 
