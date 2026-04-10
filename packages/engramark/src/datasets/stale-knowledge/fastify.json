@@ -1,0 +1,88 @@
+{
+  "version": "1.0",
+  "description": "Stale-knowledge detection benchmark scenarios for the Fastify repository.",
+  "commit_x": "v4.26.2",
+  "commit_y": "v4.28.1",
+  "scenarios": [
+    {
+      "id": "sk-001",
+      "description": "Projection: summary of fastify.js maintainers authored at v4.26.2. Maintainer list changes between v4.26.2 and v4.28.1 due to new commits by contributors.",
+      "anchor_description": "fastify.js",
+      "projection_kind": "entity_summary",
+      "expected_stale": true,
+      "expected_reconcile_outcome": "needs_update"
+    },
+    {
+      "id": "sk-002",
+      "description": "Projection: bus-factor report for lib/reply.js authored at v4.26.2. New commits change contributor distribution between X and Y.",
+      "anchor_description": "lib/reply.js",
+      "projection_kind": "bus_factor_report",
+      "expected_stale": true,
+      "expected_reconcile_outcome": "needs_update"
+    },
+    {
+      "id": "sk-003",
+      "description": "Projection: ownership summary for lib/hooks.js authored at v4.26.2. Commit history shifts primary owner between X and Y.",
+      "anchor_description": "lib/hooks.js",
+      "projection_kind": "ownership_summary",
+      "expected_stale": true,
+      "expected_reconcile_outcome": "needs_update"
+    },
+    {
+      "id": "sk-004",
+      "description": "Projection: co-change analysis for lib/validation.js authored at v4.26.2. Co-change partners gain or lose weight between X and Y.",
+      "anchor_description": "lib/validation.js",
+      "projection_kind": "co_change_report",
+      "expected_stale": true,
+      "expected_reconcile_outcome": "needs_update"
+    },
+    {
+      "id": "sk-005",
+      "description": "Projection: contributor summary for lib/contentTypeParser.js authored at v4.26.2. New contributor activity between X and Y.",
+      "anchor_description": "lib/contentTypeParser.js",
+      "projection_kind": "entity_summary",
+      "expected_stale": true,
+      "expected_reconcile_outcome": "needs_update"
+    },
+    {
+      "id": "sk-006",
+      "description": "Projection: entity summary for lib/errors.js authored at v4.26.2. Error handling module sees changes between X and Y.",
+      "anchor_description": "lib/errors.js",
+      "projection_kind": "entity_summary",
+      "expected_stale": true,
+      "expected_reconcile_outcome": "needs_update"
+    },
+    {
+      "id": "sk-007",
+      "description": "Projection: contributor summary for lib/pluginUtils.js authored at v4.26.2. Plugin utilities module sees activity between X and Y.",
+      "anchor_description": "lib/pluginUtils.js",
+      "projection_kind": "entity_summary",
+      "expected_stale": true,
+      "expected_reconcile_outcome": "needs_update"
+    },
+    {
+      "id": "sk-008",
+      "description": "Projection: ownership summary for package.json authored at v4.26.2. The package.json file has a stable owner across both tags — projection should remain fresh.",
+      "anchor_description": "package.json",
+      "projection_kind": "ownership_summary",
+      "expected_stale": false,
+      "expected_reconcile_outcome": "still_accurate"
+    },
+    {
+      "id": "sk-009",
+      "description": "Projection: bus-factor report for lib/logger.js authored at v4.26.2. Logger module has a single dominant contributor that does not change between X and Y.",
+      "anchor_description": "lib/logger.js",
+      "projection_kind": "bus_factor_report",
+      "expected_stale": false,
+      "expected_reconcile_outcome": "still_accurate"
+    },
+    {
+      "id": "sk-010",
+      "description": "Projection: entity summary for test/types/index.test-d.ts authored at v4.26.2. Type test file sees minimal churn — projection stays accurate between X and Y.",
+      "anchor_description": "test/types/index.test-d.ts",
+      "projection_kind": "entity_summary",
+      "expected_stale": false,
+      "expected_reconcile_outcome": "still_accurate"
+    }
+  ]
+}
