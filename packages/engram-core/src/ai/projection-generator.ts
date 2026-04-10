@@ -75,7 +75,13 @@ export interface ProjectionProposal {
   kind: string;
   /**
    * Optional anchor entity/edge/episode for the projection.
-   * Null means anchor_type='none' (graph-wide projections).
+   *
+   * `null` means graph-wide (no specific anchor). When null, the projection will
+   * be stored with anchor_type='none' and anchor_id=null.
+   *
+   * NOTE: Do NOT use `{ type: 'none', id: '...' }` in proposals — `type: 'none'`
+   * is an internal database storage value only and is not valid as proposal input.
+   * Use `anchor: null` for graph-wide projections.
    */
   anchor: { type: string; id: string } | null;
   /**
