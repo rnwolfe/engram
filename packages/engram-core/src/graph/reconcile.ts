@@ -16,7 +16,8 @@
  * Partial runs (budget exhausted) record what was authored and advance the cursor.
  *
  * Cursor semantics:
- * - Dry runs do NOT advance the cursor (projections_discovered stays 0 for dry runs).
+ * - Dry runs count proposals (discovered > 0 is possible) but do NOT author them
+ *   and do NOT advance the cursor.
  * - Partial runs advance the cursor to what was successfully authored.
  * - The cursor is the `completed_at` timestamp of the last non-dry-run
  *   reconciliation_runs row with the same scope.
@@ -517,7 +518,7 @@ function validateProposal(
       return `proposal.inputs entry missing id`;
     }
   }
-  if (proposal.anchor !== null) {
+  if (proposal.anchor != null) {
     const validAnchorTypes = new Set([
       "entity",
       "edge",
