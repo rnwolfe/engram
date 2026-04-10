@@ -18,9 +18,13 @@ export {
   loadKindCatalog,
 } from "./ai/kinds.js";
 export type {
+  ActiveProjectionSummary,
   AssessVerdict,
   ProjectionGenerator,
+  ProjectionProposal,
   ResolvedInput,
+  SubstrateDelta,
+  SubstrateDeltaItem,
 } from "./ai/projection-generator.js";
 export {
   AnthropicGenerator,
