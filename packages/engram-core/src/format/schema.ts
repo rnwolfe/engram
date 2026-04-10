@@ -1,6 +1,6 @@
 /**
  * DDL SQL constants for the .engram file format (SQLite schema).
- * Schema version: 0.1.0
+ * Schema version: 0.2.0
  */
 
 export const CREATE_METADATA = `
@@ -209,6 +209,95 @@ CREATE TRIGGER episodes_au AFTER UPDATE ON episodes BEGIN
 END;
 `;
 
+// ─── v0.2 additions: projection layer ────────────────────────────────────────
+
+export const CREATE_PROJECTIONS = `
+CREATE TABLE projections (
+  _rowid             INTEGER PRIMARY KEY,
+  id                 TEXT NOT NULL UNIQUE,
+  kind               TEXT NOT NULL,
+  anchor_type        TEXT NOT NULL,
+  anchor_id          TEXT,
+  title              TEXT NOT NULL,
+  body               TEXT NOT NULL,
+  body_format        TEXT NOT NULL DEFAULT 'markdown',
+  model              TEXT NOT NULL,
+  prompt_template_id TEXT,
+  prompt_hash        TEXT,
+  input_fingerprint  TEXT NOT NULL,
+  confidence         REAL NOT NULL DEFAULT 1.0,
+  valid_from         TEXT NOT NULL,
+  valid_until        TEXT,
+  last_assessed_at   TEXT,
+  invalidated_at     TEXT,
+  superseded_by      TEXT REFERENCES projections(id),
+  created_at         TEXT NOT NULL,
+  owner_id           TEXT
+);
+`;
+
+export const CREATE_PROJECTIONS_INDEXES = `
+CREATE INDEX idx_projections_anchor ON projections(anchor_type, anchor_id);
+CREATE INDEX idx_projections_kind   ON projections(kind);
+CREATE INDEX idx_projections_valid  ON projections(valid_from, valid_until);
+CREATE INDEX idx_projections_active ON projections(invalidated_at) WHERE invalidated_at IS NULL;
+CREATE UNIQUE INDEX idx_projections_active_unique
+  ON projections(anchor_type, anchor_id, kind)
+  WHERE invalidated_at IS NULL;
+`;
+
+export const CREATE_PROJECTION_EVIDENCE = `
+CREATE TABLE projection_evidence (
+  projection_id TEXT NOT NULL REFERENCES projections(id),
+  target_type   TEXT NOT NULL,
+  target_id     TEXT NOT NULL,
+  role          TEXT NOT NULL DEFAULT 'input',
+  content_hash  TEXT,
+  PRIMARY KEY (projection_id, target_type, target_id, role)
+);
+`;
+
+export const CREATE_PROJECTION_EVIDENCE_INDEXES = `
+CREATE INDEX idx_projection_evidence_target ON projection_evidence(target_type, target_id);
+`;
+
+export const CREATE_RECONCILIATION_RUNS = `
+CREATE TABLE reconciliation_runs (
+  id                     TEXT PRIMARY KEY,
+  started_at             TEXT NOT NULL,
+  completed_at           TEXT,
+  scope                  TEXT,
+  phases                 TEXT NOT NULL DEFAULT 'assess,discover',
+  projections_checked    INTEGER DEFAULT 0,
+  projections_refreshed  INTEGER DEFAULT 0,
+  projections_superseded INTEGER DEFAULT 0,
+  projections_discovered INTEGER DEFAULT 0,
+  dry_run                INTEGER NOT NULL DEFAULT 0,
+  status                 TEXT NOT NULL DEFAULT 'running',
+  error                  TEXT
+);
+`;
+
+export const CREATE_PROJECTIONS_FTS = `
+CREATE VIRTUAL TABLE projections_fts USING fts5(
+  title, body,
+  content=projections, content_rowid=_rowid
+);
+`;
+
+export const CREATE_PROJECTIONS_FTS_TRIGGERS = `
+CREATE TRIGGER projections_ai AFTER INSERT ON projections BEGIN
+  INSERT INTO projections_fts(rowid, title, body) VALUES (new._rowid, new.title, new.body);
+END;
+CREATE TRIGGER projections_ad AFTER DELETE ON projections BEGIN
+  INSERT INTO projections_fts(projections_fts, rowid, title, body) VALUES ('delete', old._rowid, old.title, old.body);
+END;
+CREATE TRIGGER projections_au AFTER UPDATE ON projections BEGIN
+  INSERT INTO projections_fts(projections_fts, rowid, title, body) VALUES ('delete', old._rowid, old.title, old.body);
+  INSERT INTO projections_fts(rowid, title, body) VALUES (new._rowid, new.title, new.body);
+END;
+`;
+
 /**
  * All DDL statements in the order they must be applied.
  * Tables with foreign key dependencies come after their referenced tables.
@@ -232,4 +321,12 @@ export const SCHEMA_DDL: string[] = [
   CREATE_INGESTION_RUNS_INDEXES,
   CREATE_FTS_TABLES,
   CREATE_FTS_TRIGGERS,
+  // v0.2: projection layer
+  CREATE_PROJECTIONS,
+  CREATE_PROJECTIONS_INDEXES,
+  CREATE_PROJECTION_EVIDENCE,
+  CREATE_PROJECTION_EVIDENCE_INDEXES,
+  CREATE_RECONCILIATION_RUNS,
+  CREATE_PROJECTIONS_FTS,
+  CREATE_PROJECTIONS_FTS_TRIGGERS,
 ];
