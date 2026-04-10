@@ -409,6 +409,47 @@ describe("reconcile --max-cost 0", () => {
     }
   });
 
+  it("--max-cost 0 with seeded stale projection exits 0 and outputs partial/Budget exhausted", async () => {
+    // Seed a real graph: create an episode + projection, then make it stale
+    const ep = addEpisode(graph, {
+      source_type: "manual",
+      content: "initial content",
+      timestamp: new Date().toISOString(),
+    });
+
+    const generator = makeRecordingGenerator();
+    await project(graph, {
+      kind: "entity_summary",
+      anchor: { type: "none" },
+      inputs: [{ type: "episode", id: ep.id }],
+      generator,
+    });
+
+    // Make the projection stale by changing the episode content
+    graph.db
+      .prepare(
+        "UPDATE episodes SET content = 'changed content', content_hash = 'differenthash' WHERE id = ?",
+      )
+      .run(ep.id);
+
+    closeGraph(graph);
+
+    const { exitCode, output } = await runCommand([
+      "reconcile",
+      "--phase",
+      "assess",
+      "--max-cost",
+      "0",
+      "--dry-run",
+      "--db",
+      dbPath,
+    ]);
+
+    expect(exitCode).toBe(0);
+    // Budget=0 with stale projection → partial run
+    expect(output.toLowerCase()).toMatch(/partial|budget exhausted/);
+  });
+
   it("budget=0 with stale projection records partial run via core reconcile()", async () => {
     // Test core behavior directly to verify budget=0 gives partial status
     const { reconcile: coreReconcile } = await import("engram-core");
@@ -522,6 +563,22 @@ describe("reconcile --scope", () => {
     ]);
     expect(exitCode).toBe(0);
     expect(output).toContain("Scope: anchor:entity");
+    expect(output).toContain("Reconciliation complete");
+  });
+
+  it("accepts anchor:type:id scope (colon in value) and does not truncate value", async () => {
+    // This tests the fix for split(':') truncating 'anchor:entity:01HX...' to 'entity'
+    closeGraph(graph);
+    const { exitCode, output } = await runCommand([
+      "reconcile",
+      "--scope",
+      "anchor:entity:01HXABC123",
+      "--dry-run",
+      "--db",
+      dbPath,
+    ]);
+    expect(exitCode).toBe(0);
+    expect(output).toContain("Scope: anchor:entity:01HXABC123");
     expect(output).toContain("Reconciliation complete");
   });
 });

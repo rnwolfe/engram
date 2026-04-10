@@ -307,7 +307,10 @@ function parseScopeToOpts(scope?: string): {
   anchor_type?: string;
 } {
   if (!scope) return {};
-  const [key, value] = scope.split(":");
+  const colonIdx = scope.indexOf(":");
+  if (colonIdx === -1) return {};
+  const key = scope.slice(0, colonIdx);
+  const value = scope.slice(colonIdx + 1);
   if (key === "kind" && value) return { kind: value };
   if (key === "anchor" && value) return { anchor_type: value };
   return {};
