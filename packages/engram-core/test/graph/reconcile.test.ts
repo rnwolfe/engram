@@ -21,6 +21,7 @@ import {
   createGraph,
   currentInputState,
   listActiveProjections,
+  NullGenerator,
   project,
   reconcile,
   softRefresh,
@@ -1057,5 +1058,71 @@ describe("reconcile() — discover phase — substrate delta", () => {
     const catalog = capturedCatalog as ActiveProjectionSummary[];
     expect(catalog.length).toBe(1);
     expect(catalog[0].kind).toBe("entity_summary");
+  });
+});
+
+// ─── NullGenerator.discover() ────────────────────────────────────────────────
+
+describe("NullGenerator", () => {
+  test("discover() returns [] without throwing", async () => {
+    const nullGen = new NullGenerator();
+    const ep = makeEpisode("some episode");
+    const delta: SubstrateDelta = {
+      since: null,
+      episodes: [
+        {
+          type: "episode",
+          id: ep.id,
+          summary: "some episode",
+          changed_at: new Date().toISOString(),
+        },
+      ],
+      entities: [],
+      edges: [],
+    };
+    const result = await nullGen.discover({ delta, catalog: [], kinds: [] });
+    expect(result).toEqual([]);
+  });
+});
+
+// ─── reconcile() — budget exhausted before any authoring ─────────────────────
+
+describe("reconcile() — discover phase — budget exhausted before any authoring", () => {
+  test("status=partial with discovered=0 when budget is gone after discover() call", async () => {
+    const ep = makeEpisode("episode for budget test");
+
+    const gen = makeMockGenerator({
+      discoverProposals: [
+        {
+          kind: "entity_summary",
+          anchor: null,
+          inputs: [{ type: "episode", id: ep.id }],
+          rationale: "should not be authored — budget gone",
+        },
+      ],
+    });
+
+    // Budget of 1: the discover() call itself consumes 1 unit (budget.consume(1)),
+    // leaving nothing for any project() calls. discovered stays 0.
+    const result = await reconcile(graph, gen, {
+      phases: ["discover"],
+      maxCost: 1,
+    });
+
+    expect(result.status).toBe("partial");
+    expect(result.discovered).toBe(0);
+
+    // Verify no projection was authored
+    const projections = listActiveProjections(graph, {});
+    expect(projections.length).toBe(0);
+
+    // reconciliation_runs row should reflect partial
+    const runRow = graph.db
+      .query<{ status: string; projections_discovered: number }, [string]>(
+        "SELECT status, projections_discovered FROM reconciliation_runs WHERE id = ?",
+      )
+      .get(result.run_id);
+    expect(runRow?.status).toBe("partial");
+    expect(runRow?.projections_discovered).toBe(0);
   });
 });
