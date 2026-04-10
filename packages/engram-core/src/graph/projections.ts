@@ -4,6 +4,8 @@
  * Implements the explicit projection authoring primitive described in
  * docs/internal/specs/projections.md. A projection is an AI-authored synthesis
  * of substrate elements (episodes, entities, edges, or other projections).
+ *
+ * Types and error classes live in projections-types.ts.
  */
 
 import { createHash } from "node:crypto";
@@ -13,87 +15,34 @@ import type {
   ResolvedInput,
 } from "../ai/projection-generator.js";
 import type { EngramGraph } from "../format/index.js";
+import type {
+  AnchorType,
+  GetProjectionResult,
+  Projection,
+  ProjectionEvidenceRow,
+  ProjectionInput,
+  ProjectionOpts,
+} from "./projections-types.js";
+import {
+  ProjectionCycleError,
+  ProjectionFrontmatterError,
+  ProjectionInputMissingError,
+} from "./projections-types.js";
 
-// ─── Types ──────────────────────────────────────────────────────────────────
-
-export type AnchorType = "entity" | "edge" | "episode" | "projection" | "none";
-
-export type ProjectionInputType = "episode" | "entity" | "edge" | "projection";
-
-export interface ProjectionInput {
-  type: ProjectionInputType;
-  id: string;
-}
-
-export interface Projection {
-  id: string;
-  kind: string;
-  anchor_type: AnchorType;
-  anchor_id: string | null;
-  title: string;
-  body: string;
-  body_format: string;
-  model: string;
-  prompt_template_id: string | null;
-  prompt_hash: string | null;
-  input_fingerprint: string;
-  confidence: number;
-  valid_from: string;
-  valid_until: string | null;
-  last_assessed_at: string | null;
-  invalidated_at: string | null;
-  superseded_by: string | null;
-  created_at: string;
-  owner_id: string | null;
-}
-
-export interface ProjectionEvidenceRow {
-  projection_id: string;
-  target_type: string;
-  target_id: string;
-  role: string;
-  content_hash: string | null;
-}
-
-export interface ProjectionOpts {
-  kind: string;
-  anchor: { type: AnchorType; id?: string };
-  inputs: ProjectionInput[];
-  generator: ProjectionGenerator;
-  owner_id?: string;
-}
-
-export interface GetProjectionResult {
-  projection: Projection;
-  stale: boolean;
-  stale_reason?: "input_content_changed" | "input_deleted";
-  last_assessed_at: string | null;
-}
-
-// ─── Errors ─────────────────────────────────────────────────────────────────
-
-export class ProjectionCycleError extends Error {
-  constructor(inputId: string) {
-    super(
-      `project(): cycle detected — projection input ${inputId} would create a circular dependency`,
-    );
-    this.name = "ProjectionCycleError";
-  }
-}
-
-export class ProjectionInputMissingError extends Error {
-  constructor(type: string, id: string) {
-    super(`project(): input ${type}:${id} not found or is redacted`);
-    this.name = "ProjectionInputMissingError";
-  }
-}
-
-export class ProjectionFrontmatterError extends Error {
-  constructor(message: string) {
-    super(`project(): invalid frontmatter — ${message}`);
-    this.name = "ProjectionFrontmatterError";
-  }
-}
+export type {
+  AnchorType,
+  GetProjectionResult,
+  Projection,
+  ProjectionEvidenceRow,
+  ProjectionInput,
+  ProjectionInputType,
+  ProjectionOpts,
+} from "./projections-types.js";
+export {
+  ProjectionCycleError,
+  ProjectionFrontmatterError,
+  ProjectionInputMissingError,
+} from "./projections-types.js";
 
 // ─── Required frontmatter keys ───────────────────────────────────────────────
 
@@ -108,12 +57,8 @@ const REQUIRED_FRONTMATTER_KEYS = [
   "inputs",
 ] as const;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Internal helpers ─────────────────────────────────────────────────────────
 
-/**
- * Resolves input rows from the substrate. Returns ResolvedInput[] or throws
- * ProjectionInputMissingError if any input is missing or redacted.
- */
 function resolveInputs(
   graph: EngramGraph,
   inputs: ProjectionInput[],
@@ -174,7 +119,7 @@ function resolveInputs(
             [string]
           >("SELECT id, fact, invalidated_at FROM edges WHERE id = ?")
           .get(input.id);
-        if (!row) {
+        if (!row || row.invalidated_at !== null) {
           throw new ProjectionInputMissingError(input.type, input.id);
         }
         content = row.fact;
@@ -206,9 +151,6 @@ function resolveInputs(
   return resolved;
 }
 
-/**
- * Computes the input_fingerprint as sha256 over sorted "type:id:content_hash" entries.
- */
 function computeFingerprint(resolved: ResolvedInput[]): string {
   const entries = resolved
     .map((r) => `${r.type}:${r.id}:${r.content_hash ?? ""}`)
@@ -216,10 +158,6 @@ function computeFingerprint(resolved: ResolvedInput[]): string {
   return createHash("sha256").update(entries.join("\n")).digest("hex");
 }
 
-/**
- * Recomputes the current fingerprint for an existing projection by reading
- * current content hashes from the substrate.
- */
 function recomputeFingerprint(
   graph: EngramGraph,
   projectionId: string,
@@ -252,8 +190,8 @@ function recomputeFingerprint(
           )
           .get(row.target_id);
         if (ent) {
-          const content = `${ent.canonical_name}${ent.summary ? `: ${ent.summary}` : ""}`;
-          currentHash = createHash("sha256").update(content).digest("hex");
+          const c = `${ent.canonical_name}${ent.summary ? `: ${ent.summary}` : ""}`;
+          currentHash = createHash("sha256").update(c).digest("hex");
         }
         break;
       }
@@ -263,9 +201,8 @@ function recomputeFingerprint(
             "SELECT fact FROM edges WHERE id = ?",
           )
           .get(row.target_id);
-        if (edge) {
+        if (edge)
           currentHash = createHash("sha256").update(edge.fact).digest("hex");
-        }
         break;
       }
       case "projection": {
@@ -288,18 +225,6 @@ function recomputeFingerprint(
   return createHash("sha256").update(entries.join("\n")).digest("hex");
 }
 
-/**
- * Detects if adding a dependency on any of `inputIds` would create a cycle in the
- * projection dependency graph.
- *
- * A cycle would occur if any projection in the transitive dependency set of the
- * candidate inputs is the same as `targetProjectionId` (the existing projection
- * that is about to be superseded, which the new projection would conceptually replace).
- *
- * Uses a recursive CTE to walk DOWNWARD from each projection input (following
- * their evidence targets where target_type='projection'), checking whether
- * `targetProjectionId` is reachable.
- */
 function detectProjectionCycle(
   graph: EngramGraph,
   targetProjectionId: string,
@@ -307,8 +232,6 @@ function detectProjectionCycle(
 ): string | null {
   if (inputIds.length === 0) return null;
 
-  // Walk the dependency tree downward from each projection input.
-  // If we reach targetProjectionId, adding this dependency would form a cycle.
   for (const inputId of inputIds) {
     const cycleRow = graph.db
       .query<{ id: string }, [string, string]>(
@@ -325,50 +248,46 @@ function detectProjectionCycle(
       )
       .get(inputId, targetProjectionId);
 
-    if (cycleRow) {
-      return inputId;
-    }
+    if (cycleRow) return inputId;
   }
 
   return null;
 }
 
-/**
- * Validates that the body frontmatter contains all required keys.
- * This is a simple YAML frontmatter check — not a full YAML parser.
- */
 function validateFrontmatter(body: string): void {
   if (!body.startsWith("---\n")) {
     throw new ProjectionFrontmatterError(
       "body must begin with YAML frontmatter block (---)",
     );
   }
-
   const endIdx = body.indexOf("\n---", 4);
   if (endIdx === -1) {
     throw new ProjectionFrontmatterError("frontmatter block is not closed");
   }
-
   const frontmatter = body.slice(4, endIdx);
-
   for (const key of REQUIRED_FRONTMATTER_KEYS) {
-    // Accept "key:" or "key: " patterns
     if (!frontmatter.includes(`${key}:`)) {
       throw new ProjectionFrontmatterError(`missing required key: ${key}`);
     }
   }
 }
 
+function extractFrontmatterValue(body: string, key: string): string | null {
+  const endIdx = body.indexOf("\n---", 4);
+  if (endIdx === -1) return null;
+  const frontmatter = body.slice(4, endIdx);
+  const safeKey = key.replace(/[^a-zA-Z0-9_]/g, "");
+  const regex = new RegExp(`^${safeKey}:\\s*["']?([^"'\\n]+?)["']?\\s*$`, "m");
+  const match = frontmatter.match(regex);
+  if (!match) return null;
+  return match[1].trim().replace(/^["']|["']$/g, "");
+}
+
 // ─── Core operations ─────────────────────────────────────────────────────────
 
 /**
  * Supersedes an existing projection with a new one atomically.
- *
- * In one transaction:
- * 1. UPDATE old projection: set invalidated_at, valid_until, superseded_by
- * 2. INSERT new projection row + evidence rows
- *
- * Returns the new projection.
+ * Invalidates the old row and inserts the new one in a single transaction.
  */
 export function supersedeProjection(
   graph: EngramGraph,
@@ -402,37 +321,22 @@ export function supersedeProjection(
         `supersedeProjection: projection ${oldProjectionId} not found`,
       );
     }
-
     if (oldRow.invalidated_at !== null) {
       throw new Error(
         `supersedeProjection: projection ${oldProjectionId} is already invalidated`,
       );
     }
 
-    // Invalidate old projection FIRST so the unique constraint clears before insert.
-    // The unique index is partial: WHERE invalidated_at IS NULL.
+    // Invalidate old FIRST so the partial unique index clears before INSERT.
     graph.db
       .prepare(
         `UPDATE projections
-           SET invalidated_at = ?,
-               valid_until    = ?
+           SET invalidated_at = ?, valid_until = ?
          WHERE id = ? AND invalidated_at IS NULL`,
       )
       .run(now, now, oldProjectionId);
 
-    const verifyRow = graph.db
-      .query<{ invalidated_at: string | null }, [string]>(
-        "SELECT invalidated_at FROM projections WHERE id = ?",
-      )
-      .get(oldProjectionId);
-
-    if (!verifyRow || verifyRow.invalidated_at === null) {
-      throw new Error(
-        `supersedeProjection: failed to invalidate projection ${oldProjectionId}`,
-      );
-    }
-
-    // Insert new projection (unique constraint is now clear)
+    // Insert new projection
     graph.db
       .prepare(
         `INSERT INTO projections
@@ -459,7 +363,7 @@ export function supersedeProjection(
         newData.owner_id,
       );
 
-    // Point old projection to new one
+    // Point old → new
     graph.db
       .prepare(`UPDATE projections SET superseded_by = ? WHERE id = ?`)
       .run(newId, oldProjectionId);
@@ -474,39 +378,18 @@ export function supersedeProjection(
       insertEvidence.run(newId, inp.type, inp.id, inp.content_hash);
     }
 
-    const newRow = graph.db
+    result.projection = graph.db
       .query<Projection, [string]>("SELECT * FROM projections WHERE id = ?")
       .get(newId);
-
-    if (!newRow) {
-      throw new Error(
-        `supersedeProjection: failed to retrieve new projection ${newId}`,
-      );
-    }
-
-    result.projection = newRow;
   })();
 
-  if (!result.projection) {
+  if (!result.projection)
     throw new Error("supersedeProjection: transaction produced no result");
-  }
-
   return result.projection;
 }
 
 /**
  * Authors a new projection (or returns an existing idempotent match).
- *
- * Steps:
- * 1. Resolve input set from substrate — reject if any missing or redacted.
- * 2. Compute input_fingerprint.
- * 3. Cycle check: if any input is type='projection', detect would-be cycles.
- * 4. Check whether active projection exists for (anchor, kind):
- *    - If yes and fingerprint matches → return existing (idempotent no-op).
- *    - If yes with different fingerprint → supersede after generation.
- * 5. Call generator.generate(inputs) → body with frontmatter.
- * 6. Validate frontmatter.
- * 7. Insert projections row + projection_evidence rows in a single transaction.
  */
 export async function project(
   graph: EngramGraph,
@@ -516,23 +399,15 @@ export async function project(
   const anchor_id = anchor.id ?? null;
   const anchor_type = anchor.type;
 
-  // Step 1: Resolve inputs
   const resolved = resolveInputs(graph, inputs);
-
-  // Step 2: Compute fingerprint
   const fingerprint = computeFingerprint(resolved);
 
-  // Step 3: Cycle check for projection inputs
+  // Cycle check for projection inputs
   const projectionInputIds = inputs
     .filter((i) => i.type === "projection")
     .map((i) => i.id);
 
   if (projectionInputIds.length > 0) {
-    // We need an ID for the would-be new projection to check cycles.
-    // Use a temporary placeholder for cycle detection — we check if any
-    // existing projection in the candidate input set can reach itself.
-    // Actually, since the new projection doesn't exist yet, we check if
-    // the anchor's existing active projection (if any) would be in the cycle.
     const existingActive = graph.db
       .query<{ id: string }, [string, string | null, string]>(
         `SELECT id FROM projections
@@ -548,13 +423,11 @@ export async function project(
         existingActive.id,
         projectionInputIds,
       );
-      if (cycleInputId) {
-        throw new ProjectionCycleError(cycleInputId);
-      }
+      if (cycleInputId) throw new ProjectionCycleError(cycleInputId);
     }
   }
 
-  // Step 4: Check for existing active projection
+  // Check for existing active projection
   const existingProjection = graph.db
     .query<Projection, [string, string | null, string]>(
       `SELECT * FROM projections
@@ -568,17 +441,12 @@ export async function project(
     existingProjection &&
     existingProjection.input_fingerprint === fingerprint
   ) {
-    // Idempotent no-op: same inputs, same projection
-    return existingProjection;
+    return existingProjection; // idempotent no-op
   }
 
-  // Step 5: Generate body
   const generated = await generator.generate(resolved);
-
-  // Step 6: Validate frontmatter
   validateFrontmatter(generated.body);
 
-  // Extract title and model from frontmatter (simple string extraction)
   const title = extractFrontmatterValue(generated.body, "title") ?? kind;
   const model = extractFrontmatterValue(generated.body, "model") ?? "unknown";
   const prompt_template_id =
@@ -600,18 +468,32 @@ export async function project(
     owner_id: owner_id ?? null,
   };
 
-  // Step 7: Insert or supersede
   if (existingProjection) {
-    // Fingerprint differs — supersede
     return supersedeProjection(graph, existingProjection.id, newData, resolved);
   }
 
-  // No existing projection — insert fresh
+  // Insert fresh projection
   const newId = ulid();
   const now = new Date().toISOString();
   const result: { projection: Projection | null } = { projection: null };
 
   graph.db.transaction(() => {
+    // Application-level uniqueness guard: SQLite's partial UNIQUE index does not
+    // enforce uniqueness when anchor_id IS NULL (each NULL is treated as distinct).
+    const duplicate = graph.db
+      .query<{ id: string }, [string, string | null, string]>(
+        `SELECT id FROM projections
+          WHERE anchor_type = ? AND anchor_id IS ? AND kind = ?
+            AND invalidated_at IS NULL
+          LIMIT 1`,
+      )
+      .get(anchor_type, anchor_id, kind);
+    if (duplicate) {
+      throw new Error(
+        `project: active projection already exists for (${anchor_type}, ${anchor_id ?? "null"}, ${kind})`,
+      );
+    }
+
     graph.db
       .prepare(
         `INSERT INTO projections
@@ -647,23 +529,13 @@ export async function project(
       insertEvidence.run(newId, inp.type, inp.id, inp.content_hash);
     }
 
-    const row = graph.db
+    result.projection = graph.db
       .query<Projection, [string]>("SELECT * FROM projections WHERE id = ?")
       .get(newId);
-
-    if (!row) {
-      throw new Error(
-        `project: failed to retrieve inserted projection ${newId}`,
-      );
-    }
-
-    result.projection = row;
   })();
 
-  if (!result.projection) {
+  if (!result.projection)
     throw new Error("project: transaction produced no result");
-  }
-
   return result.projection;
 }
 
@@ -680,13 +552,11 @@ export function getProjection(
 
   if (!projection) return null;
 
-  // Compute current fingerprint and compare
   const currentFingerprint = recomputeFingerprint(graph, id);
   const stale = currentFingerprint !== projection.input_fingerprint;
 
   let stale_reason: GetProjectionResult["stale_reason"];
   if (stale) {
-    // Check if any input is missing (deleted/redacted)
     const evidenceRows = graph.db
       .query<ProjectionEvidenceRow, [string]>(
         "SELECT * FROM projection_evidence WHERE projection_id = ? AND role = 'input'",
@@ -695,25 +565,20 @@ export function getProjection(
 
     let hasDeleted = false;
     for (const row of evidenceRows) {
-      switch (row.target_type) {
-        case "episode": {
-          const ep = graph.db
-            .query<{ status: string }, [string]>(
-              "SELECT status FROM episodes WHERE id = ?",
-            )
-            .get(row.target_id);
-          if (!ep || ep.status === "redacted") hasDeleted = true;
-          break;
-        }
-        case "projection": {
-          const proj = graph.db
-            .query<{ invalidated_at: string | null }, [string]>(
-              "SELECT invalidated_at FROM projections WHERE id = ?",
-            )
-            .get(row.target_id);
-          if (!proj || proj.invalidated_at !== null) hasDeleted = true;
-          break;
-        }
+      if (row.target_type === "episode") {
+        const ep = graph.db
+          .query<{ status: string }, [string]>(
+            "SELECT status FROM episodes WHERE id = ?",
+          )
+          .get(row.target_id);
+        if (!ep || ep.status === "redacted") hasDeleted = true;
+      } else if (row.target_type === "projection") {
+        const proj = graph.db
+          .query<{ invalidated_at: string | null }, [string]>(
+            "SELECT invalidated_at FROM projections WHERE id = ?",
+          )
+          .get(row.target_id);
+        if (!proj || proj.invalidated_at !== null) hasDeleted = true;
       }
     }
 
@@ -726,19 +591,4 @@ export function getProjection(
     stale_reason,
     last_assessed_at: projection.last_assessed_at,
   };
-}
-
-/**
- * Extracts a scalar value from a YAML frontmatter block.
- * Handles: key: value and key: "value" and key: 'value'
- */
-function extractFrontmatterValue(body: string, key: string): string | null {
-  const endIdx = body.indexOf("\n---", 4);
-  if (endIdx === -1) return null;
-  const frontmatter = body.slice(4, endIdx);
-
-  const regex = new RegExp(`^${key}:\\s*['"']?([^'"'\\n]+)['"']?\\s*$`, "m");
-  const match = frontmatter.match(regex);
-  if (!match) return null;
-  return match[1].trim().replace(/^["']|["']$/g, "");
 }
