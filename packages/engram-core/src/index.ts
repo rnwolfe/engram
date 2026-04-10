@@ -12,6 +12,15 @@ export {
   OllamaProvider,
 } from "./ai/index.js";
 export type {
+  AssessVerdict,
+  ProjectionGenerator,
+  ResolvedInput,
+} from "./ai/projection-generator.js";
+export {
+  AnthropicGenerator,
+  NullGenerator,
+} from "./ai/projection-generator.js";
+export type {
   CreateOpts,
   EngramGraph,
   VerifyResult,
@@ -36,6 +45,7 @@ export {
 export type {
   Alias,
   AliasInput,
+  AnchorType,
   Edge,
   EdgeInput,
   EmbeddingTargetType,
@@ -48,6 +58,12 @@ export type {
   FindEdgesQuery,
   FindEntitiesQuery,
   FindSimilarOpts,
+  GetProjectionResult,
+  Projection,
+  ProjectionEvidenceRow,
+  ProjectionInput,
+  ProjectionInputType,
+  ProjectionOpts,
   SimilarResult,
   StoredEmbedding,
 } from "./graph/index.js";
@@ -68,8 +84,14 @@ export {
   getEpisode,
   getEvidenceForEdge,
   getEvidenceForEntity,
+  getProjection,
+  ProjectionCycleError,
+  ProjectionFrontmatterError,
+  ProjectionInputMissingError,
+  project,
   resolveEntity,
   storeEmbedding,
+  supersedeProjection,
 } from "./graph/index.js";
 export type { EnrichmentAdapter, EnrichOpts } from "./ingest/adapter.js";
 export { GitHubAdapter } from "./ingest/adapters/github.js";
