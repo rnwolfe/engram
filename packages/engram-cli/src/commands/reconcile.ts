@@ -174,6 +174,9 @@ export function registerReconcile(program: Command): void {
           `Superseded:  ${result.superseded}`,
         );
       }
+      if (phases.includes("discover")) {
+        summaryLines.push(`Discovered:  ${result.discovered}`);
+      }
       summaryLines.push(`Run ID:   ${result.run_id}`);
       log.info(summaryLines.join("\n"));
 

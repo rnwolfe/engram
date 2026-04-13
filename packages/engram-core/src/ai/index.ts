@@ -86,6 +86,11 @@ export function createGenerator(opts?: {
 
   // Explicit provider selection via ENGRAM_AI_PROVIDER
   if (provider === "anthropic") {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      console.warn(
+        "[engram] ENGRAM_AI_PROVIDER=anthropic but ANTHROPIC_API_KEY is not set — generator will run in stub mode (no LLM calls).",
+      );
+    }
     return new AnthropicGenerator({
       model: opts?.model,
       promptTemplateId: opts?.promptTemplateId,
@@ -93,6 +98,11 @@ export function createGenerator(opts?: {
     });
   }
   if (provider === "gemini") {
+    if (!process.env.GEMINI_API_KEY) {
+      console.warn(
+        "[engram] ENGRAM_AI_PROVIDER=gemini but GEMINI_API_KEY is not set — generator will run in stub mode (no LLM calls).",
+      );
+    }
     return new GeminiGenerator({
       model: opts?.model,
       promptTemplateId: opts?.promptTemplateId,
@@ -100,6 +110,11 @@ export function createGenerator(opts?: {
     });
   }
   if (provider === "openai") {
+    if (!process.env.OPENAI_API_KEY) {
+      console.warn(
+        "[engram] ENGRAM_AI_PROVIDER=openai but OPENAI_API_KEY is not set — generator will run in stub mode (no LLM calls).",
+      );
+    }
     return new OpenAIGenerator({
       model: opts?.model,
       promptTemplateId: opts?.promptTemplateId,
