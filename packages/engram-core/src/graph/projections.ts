@@ -441,7 +441,7 @@ export async function project(
     return existingProjection; // idempotent no-op
   }
 
-  const generated = await generator.generate(resolved);
+  const generated = await generator.generate(resolved, kind);
   validateFrontmatter(generated.body);
 
   const title = extractFrontmatterValue(generated.body, "title") ?? kind;

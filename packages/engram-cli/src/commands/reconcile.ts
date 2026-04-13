@@ -13,7 +13,7 @@
 import * as path from "node:path";
 import type { Command } from "commander";
 import type { EngramGraph } from "engram-core";
-import { closeGraph, NullGenerator, openGraph, reconcile } from "engram-core";
+import { closeGraph, createGenerator, openGraph, reconcile } from "engram-core";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -156,14 +156,11 @@ export function registerReconcile(program: Command): void {
       }
 
       // ── Create generator ────────────────────────────────────────────────────
-      // We use NullGenerator here — the reconcile() core function calls
-      // generator.assess() and generator.regenerate(). When no AI is configured,
-      // NullGenerator will throw on the first LLM call, which reconcile() will
-      // propagate as an error. A real implementation would build an AI provider
-      // from environment config (ENGRAM_AI_PROVIDER, ENGRAM_AI_MODEL, etc.).
-      //
-      // For now, NullGenerator is correct: no AI = no projection ops.
-      const generator = new NullGenerator();
+      // createGenerator() resolves the provider from ENGRAM_AI_PROVIDER
+      // (anthropic | gemini | openai) or auto-detects from present API keys.
+      // Falls back to NullGenerator when nothing is configured, which will
+      // error on the first LLM call with a clear message.
+      const generator = createGenerator();
 
       // ── Run reconciliation ──────────────────────────────────────────────────
       let result: Awaited<ReturnType<typeof reconcile>>;
@@ -190,7 +187,7 @@ export function registerReconcile(program: Command): void {
           errMsg.includes("no AI provider configured")
         ) {
           console.error(
-            "\n  No AI provider configured. Set ENGRAM_AI_PROVIDER=anthropic and ANTHROPIC_API_KEY to enable projection authoring.",
+            "\n  No AI provider configured. Set ANTHROPIC_API_KEY, GEMINI_API_KEY, or OPENAI_API_KEY to enable projection authoring.",
           );
         }
         closeGraph(graph);

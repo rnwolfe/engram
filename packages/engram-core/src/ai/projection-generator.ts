@@ -1,35 +1,38 @@
 /**
- * projection-generator.ts — ProjectionGenerator interface and implementations.
+ * projection-generator.ts — ProjectionGenerator interface, NullGenerator,
+ * and AnthropicGenerator.
  *
- * A ProjectionGenerator wraps an AI provider and prompt template to produce
- * projection bodies. It is the AI boundary for the projection authoring layer.
- *
- * Implementations:
+ * Provider-specific generators:
  * - NullGenerator: throws on generate() — used when no AI is configured.
- * - AnthropicGenerator: stub that calls the Anthropic API with a placeholder prompt.
+ * - AnthropicGenerator: calls the Anthropic API (Claude).
+ * - GeminiGenerator: see gemini-generator.ts
+ * - OpenAIGenerator: see openai-generator.ts
+ *
+ * All generators share prompt logic from generator-prompts.ts.
  */
 
+import Anthropic from "@anthropic-ai/sdk";
 import type { Projection } from "../graph/projections.js";
+import {
+  buildAssessPrompt,
+  buildDiscoverPrompt,
+  buildGeneratePrompt,
+  buildRegeneratePrompt,
+  buildStubBody,
+  parseAssessVerdict,
+  parseDiscoverProposals,
+} from "./generator-prompts.js";
 import type { KindCatalog } from "./kinds.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-/**
- * A substrate element resolved from the database, ready to pass to an AI generator.
- */
 export interface ResolvedInput {
   type: "episode" | "entity" | "edge" | "projection";
   id: string;
-  /** The content of the substrate element at resolution time. */
   content: string | null;
-  /** SHA-256 hash of the content at resolution time. */
   content_hash: string | null;
 }
 
-/**
- * A summary of one active projection used as input to the discover phase.
- * Contains identity and recency metadata — not the projection body.
- */
 export interface ActiveProjectionSummary {
   id: string;
   kind: string;
@@ -39,23 +42,13 @@ export interface ActiveProjectionSummary {
   last_assessed_at: string | null;
 }
 
-/**
- * A single substrate element (episode, entity, or edge) included in the
- * substrate delta passed to ProjectionGenerator.discover().
- */
 export interface SubstrateDeltaItem {
   type: "episode" | "entity" | "edge";
   id: string;
-  /** Short summary of the item's content (not the full content). */
   summary: string;
-  /** ISO8601 UTC timestamp when this item was added or last modified. */
   changed_at: string;
 }
 
-/**
- * The substrate delta since the last non-dry-run reconcile for the same scope.
- * Passed to ProjectionGenerator.discover() as context for new proposals.
- */
 export interface SubstrateDelta {
   since: string | null;
   episodes: SubstrateDeltaItem[];
@@ -63,108 +56,40 @@ export interface SubstrateDelta {
   edges: SubstrateDeltaItem[];
 }
 
-/**
- * A proposal from ProjectionGenerator.discover() for a new projection to author.
- *
- * Each proposal contains the kind, optional anchor, list of input IDs, and a
- * rationale explaining why the generator believes this projection is worth
- * authoring. The authoring loop calls project() for each accepted proposal.
- */
 export interface ProjectionProposal {
-  /** Projection kind identifier (must match a KindEntry.name from the catalog). */
   kind: string;
-  /**
-   * Optional anchor entity/edge/episode for the projection.
-   *
-   * `null` means graph-wide (no specific anchor). When null, the projection will
-   * be stored with anchor_type='none' and anchor_id=null.
-   *
-   * NOTE: Do NOT use `{ type: 'none', id: '...' }` in proposals — `type: 'none'`
-   * is an internal database storage value only and is not valid as proposal input.
-   * Use `anchor: null` for graph-wide projections.
-   */
   anchor: { type: string; id: string } | null;
-  /**
-   * List of substrate inputs the projection should summarise.
-   * Each entry must be a resolvable {type, id} pair from the substrate.
-   */
   inputs: Array<{ type: string; id: string }>;
-  /** Short explanation of why this projection is worth authoring now. */
   rationale: string;
 }
 
-/**
- * The verdict returned by generator.assess() during a reconcile() run.
- */
 export type AssessVerdict =
   | { verdict: "still_accurate" }
   | { verdict: "needs_update"; reason: string }
   | { verdict: "contradicted"; reason: string };
 
-/**
- * Core interface for projection generation.
- *
- * Implementations wrap an AI provider plus a prompt template and handle:
- * - generate(): produce the initial markdown body from resolved inputs.
- * - assess(): determine whether an existing projection is still accurate
- *   given the current (possibly changed) input state.
- * - regenerate(): produce a revised body for an existing projection given
- *   updated inputs.
- */
 export interface ProjectionGenerator {
   /**
    * Generate a markdown body (with YAML frontmatter) from resolved inputs.
    *
-   * The returned body MUST include all required frontmatter keys:
-   * id, kind, anchor, title, model, input_fingerprint, valid_from, inputs.
-   *
-   * @throws Error if generation fails or is not supported.
+   * @param inputs - Resolved substrate elements to synthesize from.
+   * @param kind - The projection kind (e.g. "entity_summary").
    */
   generate(
     inputs: ResolvedInput[],
+    kind: string,
   ): Promise<{ body: string; confidence: number }>;
 
-  /**
-   * Assess whether an existing projection is still accurate given the
-   * current state of its inputs.
-   *
-   * Called during reconcile() assess phase for projections whose
-   * input_fingerprint has drifted.
-   */
   assess(
     projection: Projection,
     currentInputs: ResolvedInput[],
   ): Promise<AssessVerdict>;
 
-  /**
-   * Regenerate a projection body based on updated inputs.
-   *
-   * Called during reconcile() when assess() returns 'needs_update' or
-   * 'contradicted'. The old projection is passed for context (e.g. to
-   * carry over parts of the body that haven't changed).
-   */
   regenerate(
     projection: Projection,
     currentInputs: ResolvedInput[],
   ): Promise<{ body: string; confidence: number }>;
 
-  /**
-   * Discover new projections to author from the substrate delta.
-   *
-   * Called during the reconcile() discover phase. The generator is given:
-   * - `delta`: substrate items added or changed since the last non-dry-run
-   *   reconcile for the same scope (episodes, entities, edges).
-   * - `catalog`: active projection summaries — what projections already exist,
-   *   used to avoid proposing duplicates and to identify coverage gaps.
-   * - `kinds`: the full KindCatalog, so the generator knows which kinds are
-   *   available, when to use each, and what inputs are expected.
-   *
-   * Returns an ordered array of ProjectionProposal objects. The authoring loop
-   * calls project() for each proposal that passes validation. Returning [] is
-   * valid (the generator believes no new projections are warranted).
-   *
-   * Must never throw. On internal error, return [].
-   */
   discover(ctx: {
     delta: SubstrateDelta;
     catalog: ActiveProjectionSummary[];
@@ -174,20 +99,14 @@ export interface ProjectionGenerator {
 
 // ─── NullGenerator ───────────────────────────────────────────────────────────
 
-/**
- * NullGenerator: used when no AI provider is configured.
- *
- * generate() always throws — projections require an AI generator.
- * assess() and regenerate() also throw for consistency.
- * discover() returns [] — no proposals without an AI provider.
- */
 export class NullGenerator implements ProjectionGenerator {
   async generate(
     _inputs: ResolvedInput[],
+    _kind: string,
   ): Promise<{ body: string; confidence: number }> {
     throw new Error(
       "NullGenerator: no AI provider configured — cannot generate projections. " +
-        "Configure an AI provider (e.g. ENGRAM_AI_PROVIDER=anthropic) to use project().",
+        "Set ENGRAM_AI_PROVIDER and the corresponding API key to use project().",
     );
   }
 
@@ -209,9 +128,6 @@ export class NullGenerator implements ProjectionGenerator {
     );
   }
 
-  /**
-   * NullGenerator.discover() always returns [] — no AI provider means no proposals.
-   */
   async discover(_ctx: {
     delta: SubstrateDelta;
     catalog: ActiveProjectionSummary[];
@@ -224,14 +140,10 @@ export class NullGenerator implements ProjectionGenerator {
 // ─── AnthropicGenerator ──────────────────────────────────────────────────────
 
 /**
- * AnthropicGenerator: stub implementation backed by the Anthropic API.
+ * AnthropicGenerator: backed by the Anthropic API (Claude).
  *
- * This is a placeholder implementation. In production it would use the
- * @anthropic-ai/sdk to call Claude with a prompt template populated from
- * the resolved inputs.
- *
- * The stub returns a valid markdown body with frontmatter so the generate/
- * validate/insert pipeline can be exercised end-to-end in tests.
+ * Falls back to stub responses when apiKey is undefined so the pipeline
+ * can be exercised end-to-end in tests without network access.
  */
 export class AnthropicGenerator implements ProjectionGenerator {
   private readonly model: string;
@@ -243,78 +155,120 @@ export class AnthropicGenerator implements ProjectionGenerator {
     promptTemplateId?: string;
     apiKey?: string;
   }) {
-    this.model = opts?.model ?? "anthropic:claude-opus-4-6";
+    this.model = opts?.model ?? "claude-sonnet-4-6";
     this.promptTemplateId = opts?.promptTemplateId ?? "default.v1";
     this.apiKey = opts?.apiKey ?? process.env.ANTHROPIC_API_KEY;
   }
 
   async generate(
     inputs: ResolvedInput[],
+    kind: string,
   ): Promise<{ body: string; confidence: number }> {
-    // Stub: in production this would call the Anthropic API with a
-    // populated prompt template. For now, return a valid body so the
-    // pipeline works end-to-end.
-    const inputList = inputs.map((i) => `  - ${i.type}:${i.id}`).join("\n");
-    const now = new Date().toISOString();
-
+    if (!this.apiKey) {
+      return {
+        body: buildStubBody(inputs, kind, this.model, this.promptTemplateId),
+        confidence: 0.9,
+      };
+    }
+    const { system, user } = buildGeneratePrompt(
+      inputs,
+      kind,
+      this.model,
+      this.promptTemplateId,
+    );
+    const client = new Anthropic({ apiKey: this.apiKey });
+    const message = await client.messages.create({
+      model: this.model,
+      max_tokens: 2048,
+      system,
+      messages: [{ role: "user", content: user }],
+    });
     const body =
-      `---\n` +
-      `id: placeholder\n` +
-      `kind: generated\n` +
-      `anchor: none\n` +
-      `title: "Generated Projection"\n` +
-      `model: ${this.model}\n` +
-      `prompt_template_id: ${this.promptTemplateId}\n` +
-      `prompt_hash: stub\n` +
-      `input_fingerprint: stub\n` +
-      `valid_from: ${now}\n` +
-      `valid_until: null\n` +
-      `inputs:\n${inputList}\n` +
-      `---\n\n` +
-      `# Generated Projection\n\n` +
-      `This projection was generated from ${inputs.length} input(s) by ${this.model}.\n\n` +
-      `> Note: AnthropicGenerator is a stub. Configure a real implementation for production use.\n`;
-
-    return { body, confidence: 0.9 };
+      message.content[0].type === "text" ? message.content[0].text : "";
+    return { body, confidence: 0.85 };
   }
 
   async assess(
-    _projection: Projection,
-    _currentInputs: ResolvedInput[],
+    projection: Projection,
+    currentInputs: ResolvedInput[],
   ): Promise<AssessVerdict> {
-    // Stub: always returns needs_update in production this would call
-    // the Anthropic API with the existing body + current inputs.
-    return {
-      verdict: "needs_update",
-      reason:
-        "AnthropicGenerator.assess() is a stub — always returns needs_update",
-    };
+    if (!this.apiKey) {
+      return {
+        verdict: "needs_update",
+        reason:
+          "AnthropicGenerator running in stub mode (no ANTHROPIC_API_KEY)",
+      };
+    }
+    const { system, user } = buildAssessPrompt(projection, currentInputs);
+    const client = new Anthropic({ apiKey: this.apiKey });
+    const message = await client.messages.create({
+      model: this.model,
+      max_tokens: 256,
+      system,
+      messages: [{ role: "user", content: user }],
+    });
+    const text =
+      message.content[0].type === "text" ? message.content[0].text : "";
+    return parseAssessVerdict(text);
   }
 
   async regenerate(
     projection: Projection,
     inputs: ResolvedInput[],
   ): Promise<{ body: string; confidence: number }> {
-    // Stub: delegates to generate() in this placeholder implementation.
-    // Production would call Anthropic with the old body as context.
-    void projection;
-    return this.generate(inputs);
+    if (!this.apiKey) {
+      return {
+        body: buildStubBody(
+          inputs,
+          projection.kind,
+          this.model,
+          this.promptTemplateId,
+        ),
+        confidence: 0.9,
+      };
+    }
+    const { system, user } = buildRegeneratePrompt(
+      projection,
+      inputs,
+      this.model,
+      this.promptTemplateId,
+    );
+    const client = new Anthropic({ apiKey: this.apiKey });
+    const message = await client.messages.create({
+      model: this.model,
+      max_tokens: 2048,
+      system,
+      messages: [{ role: "user", content: user }],
+    });
+    const body =
+      message.content[0].type === "text" ? message.content[0].text : "";
+    return { body, confidence: 0.85 };
   }
 
-  /**
-   * AnthropicGenerator.discover() stub — returns [] in this placeholder.
-   *
-   * Production implementation would call the Anthropic API with a structured
-   * prompt built from the substrate delta, coverage catalog, and kind catalog,
-   * then parse the response into ProjectionProposal[].
-   */
-  async discover(_ctx: {
+  async discover(ctx: {
     delta: SubstrateDelta;
     catalog: ActiveProjectionSummary[];
     kinds: KindCatalog;
   }): Promise<ProjectionProposal[]> {
-    // Stub: in production this would issue a structured LLM call to propose
-    // new projections. For now return [] so the pipeline works end-to-end.
-    return [];
+    if (!this.apiKey) return [];
+    const { delta, catalog, kinds } = ctx;
+    if (
+      delta.episodes.length === 0 &&
+      delta.entities.length === 0 &&
+      delta.edges.length === 0
+    ) {
+      return [];
+    }
+    const { system, user } = buildDiscoverPrompt(delta, catalog, kinds);
+    const client = new Anthropic({ apiKey: this.apiKey });
+    const message = await client.messages.create({
+      model: this.model,
+      max_tokens: 1024,
+      system,
+      messages: [{ role: "user", content: user }],
+    });
+    const text =
+      message.content[0].type === "text" ? message.content[0].text : "[]";
+    return parseDiscoverProposals(text);
   }
 }

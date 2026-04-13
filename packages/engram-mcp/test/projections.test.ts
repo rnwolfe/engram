@@ -281,6 +281,7 @@ describe("engram MCP projection tool handlers", () => {
           inputs: [`episode:${episode.id}`],
         },
         true, // enableProjectionAuthoring = true
+        new AnthropicGenerator(), // stub generator (no API key)
       );
 
       expect(result).not.toHaveProperty("error");
@@ -359,6 +360,7 @@ describe("engram MCP projection tool handlers", () => {
           inputs: [`episode:${episode.id}`],
         },
         true,
+        new AnthropicGenerator(), // stub generator (no API key)
       );
 
       expect(result).not.toHaveProperty("error");
@@ -388,7 +390,12 @@ describe("engram MCP projection tool handlers", () => {
     test("returns run summary with run_id when authoring enabled", async () => {
       await seedProjection(graph);
 
-      const result = await handleReconcile(graph, { max_cost: 100 }, true);
+      const result = await handleReconcile(
+        graph,
+        { max_cost: 100 },
+        true,
+        new AnthropicGenerator(),
+      );
 
       expect(result).not.toHaveProperty("error");
       const r = result as Exclude<typeof result, { error: string }>;
@@ -408,6 +415,7 @@ describe("engram MCP projection tool handlers", () => {
         graph,
         { max_cost: 100, dry_run: true },
         true,
+        new AnthropicGenerator(),
       );
 
       expect(result).not.toHaveProperty("error");
@@ -422,6 +430,7 @@ describe("engram MCP projection tool handlers", () => {
         graph,
         { max_cost: 100, phase: "assess" },
         true,
+        new AnthropicGenerator(),
       );
 
       expect(result).not.toHaveProperty("error");
@@ -434,6 +443,7 @@ describe("engram MCP projection tool handlers", () => {
         graph,
         { max_cost: 0, phase: "assess" },
         true,
+        new AnthropicGenerator(),
       );
 
       expect(result).not.toHaveProperty("error");
