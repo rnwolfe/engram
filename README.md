@@ -186,7 +186,7 @@ Synthesizes projection bodies from the graph substrate. Supported providers are 
 | Provider | Auto-detected from | Explicit | Default model | Notes |
 |----------|--------------------|----------|---------------|-------|
 | Anthropic | `ANTHROPIC_API_KEY` | `ENGRAM_AI_PROVIDER=anthropic` | `claude-sonnet-4-6` | Detected first when multiple keys are set. |
-| Gemini | `GEMINI_API_KEY` | `ENGRAM_AI_PROVIDER=gemini` | `gemini-2.5-pro` | Detected second. `gemini-3.1-pro-preview` available as preview. |
+| Gemini | `GEMINI_API_KEY` | `ENGRAM_AI_PROVIDER=gemini` | `gemini-3.1-pro-preview` | Detected second. Use `gemini-3-flash-preview` for a faster, cheaper option. |
 | OpenAI | `OPENAI_API_KEY` | `ENGRAM_AI_PROVIDER=openai` | `gpt-5.4` | Detected third. `gpt-5.4-mini`/`gpt-5.4-nano` available for cost efficiency. |
 | Ollama | — | Not supported | — | Embeddings only. |
 

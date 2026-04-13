@@ -28,7 +28,7 @@ import type {
   SubstrateDelta,
 } from "./projection-generator.js";
 
-const DEFAULT_MODEL = "gemini-2.5-pro";
+const DEFAULT_MODEL = "gemini-3.1-pro-preview";
 
 export class GeminiGenerator implements ProjectionGenerator {
   private readonly model: string;
