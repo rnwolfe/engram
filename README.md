@@ -15,35 +15,43 @@ curl -fsSL https://raw.githubusercontent.com/rnwolfe/engram/main/install.sh | ba
 
 Installs the `engram` binary to `/usr/local/bin` (or `~/.local/bin` if not writable). Supports Linux and macOS on x64 and arm64.
 
-## What It Does
+## How It Works
 
-Engram extracts knowledge from where it already lives — git history, code review
-discussions, commit messages, documents — and encodes it as a temporal knowledge graph:
-entities, relationships, and facts that track how your understanding evolves over time.
+Engram runs a three-layer pipeline:
 
-Every claim in the graph traces back to evidence. Every fact has a validity window.
-The graph is structurally sound without AI, so when AI queries it, the answers are grounded.
+1. **Ingest** — pull knowledge from where it already lives: git history (free, no tokens), GitHub PRs and review comments (optional enrichment), markdown documents. Every piece of source material becomes an immutable episode in the graph.
+
+2. **Graph** — encode that evidence as a temporal knowledge graph: entities, relationships, and facts with validity windows. Every edge traces back to source material. Every claim knows when it was true.
+
+3. **Project** — synthesize AI-authored documents from the graph: entity summaries, decision pages, contradiction reports. They anchor to the graph substrate and reconcile themselves as new evidence lands.
+
+The result is a self-maintaining wiki grounded in evidence — not a snapshot, not a RAG index. A versioned synthesis that knows what changed, when, and why.
 
 ## Quick Start
 
 ```bash
-# Step 1 — build a knowledge graph from your git history (no API tokens needed)
+# Step 1 — build a knowledge graph from your git history (free, no tokens needed)
 cd your-repo
 engram init --from-git .
 
-# Step 2 — query it
-engram search "who owns the auth module"
-engram search "what changed in the last 30 days"
+# Step 2 — enrich with PR and issue context (optional, needs GITHUB_TOKEN)
+engram ingest enrich github --token $GITHUB_TOKEN
 
-# Step 3 — visualize it (opens http://127.0.0.1:7878)
-engram visualize
-
-# Step 4 — synthesize AI documents from the graph (optional, needs ANTHROPIC_API_KEY)
+# Step 3 — synthesize living documents from the graph (needs ANTHROPIC_API_KEY)
 ANTHROPIC_API_KEY=<key> engram reconcile --max-cost 50000
 engram export wiki --out ./wiki
+
+# Step 4 — query and explore
+engram search "who owns the auth module"
+engram search "what changed in the last 30 days"
+engram visualize   # opens http://127.0.0.1:7878
 ```
 
-`engram init --from-git` builds the graph with no cloud and no API tokens:
+## Ingestion
+
+### Git — free, no tokens
+
+`engram init --from-git .` builds the structural graph from git history alone:
 
 - **Entities**: authors, files, modules, issue references
 - **Observed edges**: git blame attribution, file change records
@@ -53,20 +61,29 @@ engram export wiki --out ./wiki
 
 The result is a single `.engram` file — a SQLite database you can copy, back up, and version alongside your repo.
 
-## Enrichment
+### Enrichment — decision context from code review
+
+Git tells you what changed. Enrichment adapters tell you why — PR discussions, review comments, linked issues, the rationale behind decisions.
+
+| Source | Status | What it adds |
+|--------|--------|-------------|
+| GitHub | **Supported** | PRs, issues, review comments, linked decisions |
+| GitLab | Planned | MRs, issues |
+| Gerrit | Planned | Code review discussions |
+| Jira | Planned | Issue tracker, sprint context |
+| Linear | Planned | Issue tracker, project context |
+| Slack | Desired | Decisions made outside code review |
+| Confluence | Desired | Internal docs, ADRs |
 
 ```bash
 engram ingest enrich github --token $GITHUB_TOKEN
 ```
 
-Pull PR discussions, linked issues, and review comments into the graph — adding decision
-context that commit messages alone don't capture.
-
 ## Projections
 
-Projections are AI-synthesized documents — summaries, reports, decision pages — anchored to specific entities, edges, or topics in the graph. They form a human-readable knowledge layer on top of the raw evidence.
+Projections are the output layer — AI-synthesized documents anchored to the graph substrate. Unlike a static wiki, they know when they're stale and re-reconcile themselves as new evidence arrives. Like every other fact in the graph, they carry validity windows and trace back to source material.
 
-Four built-in kinds ship out of the box:
+Four built-in kinds:
 
 | Kind | What it produces |
 |------|-----------------|
@@ -119,8 +136,7 @@ engram-mcp           MCP server (stdio). Read and authoring tool surface for AI 
 engramark            Benchmark suite (EngRAMark). Validated against Fastify and stale-knowledge scenarios.
 ```
 
-The `.engram` file format is the durable contract. The CLI and MCP server are reference
-implementations over that contract.
+The `.engram` file format is the durable contract. The CLI and MCP server are reference implementations over that contract.
 
 ## Design Principles
 
@@ -128,30 +144,26 @@ implementations over that contract.
 2. **Local-first, single-file portable** — one `.engram` file, no external databases
 3. **Temporal by default** — every fact has a validity window
 4. **Evidence-first** — every claim traces back to source material
-5. **Structurally sound without AI** — deterministic extraction, AI enhances queries
+5. **Deterministic substrate, AI-authored projections — both versioned in time** — the graph is correct without AI; projections are where the LLM compounds value between queries, and both layers share the same temporal model
 6. **Developer-native** — CLI interface, MCP integration surface, git-first ingestors
 7. **Format over features** — the `.engram` format is the contract
 8. **Personal today, tribal tomorrow** — provenance from day one, merge later
 
-## AI-Enhanced Mode
+## AI Providers
 
-Engram works without any AI configured. AI unlocks two distinct capabilities:
+Engram uses AI for two distinct purposes. Provider support differs between them.
 
-**Embeddings** — blends vector similarity into search scores during ingest.
+### Embeddings (hybrid search)
 
-| Provider | Configuration | Notes |
-|----------|---------------|-------|
-| `null` | (default) | No embeddings. FTS-only search. Always available. |
-| `ollama` | `ENGRAM_AI_PROVIDER=ollama` | Local Ollama. Default model: `nomic-embed-text`. |
-| `gemini` | `ENGRAM_AI_PROVIDER=gemini` + `GEMINI_API_KEY=<key>` | Google Gemini. Default model: `gemini-embedding-001`. |
+Blends vector similarity into search scores during ingest and retrieval. Falls back to FTS-only if no provider is configured. Embedding failures never corrupt the graph.
 
-**Projection authoring** — synthesizes entities/topics/decisions from the graph into readable documents. Requires Anthropic:
-
-```bash
-ANTHROPIC_API_KEY=<key> engram reconcile --max-cost 50000
-```
-
-### Embedding usage
+| Provider | Configuration | Default model | Notes |
+|----------|---------------|---------------|-------|
+| `null` | (default) | — | FTS-only. No setup required. |
+| `ollama` | `ENGRAM_AI_PROVIDER=ollama` | `nomic-embed-text` | Local. Requires Ollama running. |
+| `gemini` | `ENGRAM_AI_PROVIDER=gemini` + `GEMINI_API_KEY=<key>` | `gemini-embedding-001` | Google Gemini API. |
+| OpenAI | Not supported | — | — |
+| Anthropic | Not supported for embeddings | — | Use Anthropic for projection authoring. |
 
 ```bash
 # No AI — FTS-only (default)
@@ -161,13 +173,26 @@ engram search "who owns the auth module"
 ENGRAM_AI_PROVIDER=ollama engram search "who owns the auth module"
 
 # With Gemini
-ENGRAM_AI_PROVIDER=gemini GEMINI_API_KEY=<your-key> engram search "who owns the auth module"
+ENGRAM_AI_PROVIDER=gemini GEMINI_API_KEY=<key> engram search "who owns the auth module"
 
 # Ingest with embeddings
 ENGRAM_AI_PROVIDER=ollama engram ingest git .
 ```
 
-Engram degrades gracefully: if the embedding provider is offline or the key is missing, it logs a warning and falls back to FTS-only. Embedding failures never corrupt the graph.
+### Projection authoring (reconcile, project)
+
+Synthesizes projection bodies from the graph substrate. Requires Anthropic. Other providers are not currently supported for authoring.
+
+| Provider | Configuration | Notes |
+|----------|---------------|-------|
+| Anthropic | `ANTHROPIC_API_KEY=<key>` | **Required** for projection authoring. |
+| Ollama | Not supported | — |
+| Gemini | Not supported | — |
+| OpenAI | Not supported | — |
+
+```bash
+ANTHROPIC_API_KEY=<key> engram reconcile --max-cost 50000
+```
 
 ### Programmatic API
 
