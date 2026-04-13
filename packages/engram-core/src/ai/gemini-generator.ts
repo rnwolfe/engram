@@ -51,7 +51,7 @@ export class GeminiGenerator implements ProjectionGenerator {
     maxTokens: number,
   ): Promise<string> {
     const { GoogleGenAI } = await import("@google/genai");
-    const genai = new GoogleGenAI({ apiKey: this.apiKey! });
+    const genai = new GoogleGenAI({ apiKey: this.apiKey as string });
     const response = await genai.models.generateContent({
       model: this.model,
       config: {

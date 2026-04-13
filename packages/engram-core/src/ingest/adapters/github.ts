@@ -154,6 +154,21 @@ function getLastCursor(graph: EngramGraph, sourceScope: string): number {
 }
 
 // ---------------------------------------------------------------------------
+// Error types
+// ---------------------------------------------------------------------------
+
+/**
+ * Thrown when the GitHub API returns 401 or 403.
+ * Caught by the CLI to display a targeted help message.
+ */
+export class GitHubAuthError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "GitHubAuthError";
+  }
+}
+
+// ---------------------------------------------------------------------------
 // HTTP helpers
 // ---------------------------------------------------------------------------
 
@@ -163,20 +178,53 @@ async function apiGet<T>(
   fetchFn: FetchFn,
   endpoint: string,
   path: string,
-  token: string,
+  token: string | undefined,
 ): Promise<T> {
   const url = `${endpoint}${path}`;
-  const resp = await fetchFn(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-    },
-  });
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const resp = await fetchFn(url, { headers });
 
   if (!resp.ok) {
+    const body = await resp.text();
+
+    if (resp.status === 401) {
+      throw new GitHubAuthError(
+        token
+          ? "GitHub API returned 401 — your token may be invalid or expired. Check your GITHUB_TOKEN."
+          : "GitHub API returned 401 — this repository requires authentication. Provide a token with --token or GITHUB_TOKEN env var.",
+      );
+    }
+    if (resp.status === 403) {
+      throw new GitHubAuthError(
+        token
+          ? "GitHub API returned 403 — your token may lack the required scope. Private repos need the `repo` scope."
+          : "GitHub API returned 403 — access denied. This repository may be private. Provide a token with --token or GITHUB_TOKEN env var.",
+      );
+    }
+    if (resp.status === 404) {
+      throw new Error(
+        `GitHubAdapter: repository not found. Check the owner/repo format and ensure the repository exists. (${url})`,
+      );
+    }
+    if (resp.status === 429) {
+      const resetAt = resp.headers.get("x-ratelimit-reset");
+      const resetMsg = resetAt
+        ? ` Rate limit resets at ${new Date(Number(resetAt) * 1000).toISOString()}.`
+        : "";
+      throw new Error(
+        `GitHubAdapter: rate limit exceeded.${resetMsg}${!token ? " Provide a GITHUB_TOKEN to raise the limit from 60 to 5,000 requests/hour." : ""}`,
+      );
+    }
+
     throw new Error(
-      `GitHubAdapter: GET ${url} returned HTTP ${resp.status}: ${await resp.text()}`,
+      `GitHubAdapter: GET ${url} returned HTTP ${resp.status}: ${body}`,
     );
   }
 
@@ -187,7 +235,7 @@ async function fetchAllPages<T>(
   fetchFn: FetchFn,
   endpoint: string,
   basePath: string,
-  token: string,
+  token: string | undefined,
   since?: string,
 ): Promise<T[]> {
   const results: T[] = [];

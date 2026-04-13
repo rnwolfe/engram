@@ -18,14 +18,43 @@ import {
 } from "engram-core";
 import { registerProject } from "../../src/commands/project.js";
 
-// ─── Mock generator (recording mode) ─────────────────────────────────────────
-
 // ─── Test helpers ─────────────────────────────────────────────────────────────
 
 function tmpDb(): { tmpDir: string; dbPath: string } {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "engram-project-test-"));
   const dbPath = path.join(tmpDir, "test.engram");
   return { tmpDir, dbPath };
+}
+
+/**
+ * Captures all process.stdout.write calls during fn() and returns the
+ * concatenated output with ANSI escape codes stripped.
+ *
+ * Works with @clack/prompts which writes directly to process.stdout.
+ * Errors from fn() are swallowed — callers check exitCode via a side-effecting
+ * process.exit override instead of catching the thrown error here.
+ */
+async function captureOutput(fn: () => Promise<void>): Promise<string> {
+  const chunks: string[] = [];
+  const orig = process.stdout.write.bind(process.stdout);
+  // biome-ignore lint/suspicious/noExplicitAny: test shim
+  (process.stdout as any).write = (chunk: string | Uint8Array) => {
+    chunks.push(
+      typeof chunk === "string" ? chunk : Buffer.from(chunk).toString(),
+    );
+    return true;
+  };
+  try {
+    await fn();
+  } catch {
+    // process.exit() throws to stop execution — swallow so we can return output
+  } finally {
+    // biome-ignore lint/suspicious/noExplicitAny: test shim
+    (process.stdout as any).write = orig;
+  }
+  // Strip ANSI escape codes so assertions can match plain text
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: intentionally matching ANSI escape sequences
+  return chunks.join("").replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "");
 }
 
 // ─── Test infrastructure ───────────────────────────────────────────────────────
@@ -51,11 +80,6 @@ describe("engram project — unit: input/anchor parsing errors", () => {
   it("exits 2 on invalid --anchor format (no colon)", async () => {
     const program = new Command().exitOverride();
     registerProject(program);
-
-    const errs: string[] = [];
-    const origErr = console.error;
-    console.error = (...args: unknown[]) => errs.push(args.join(" "));
-
     let exitCode: number | null = null;
     const origExit = process.exit;
     // biome-ignore lint/suspicious/noExplicitAny: test override
@@ -63,9 +87,8 @@ describe("engram project — unit: input/anchor parsing errors", () => {
       exitCode = code;
       throw new Error(`process.exit(${code})`);
     };
-
-    try {
-      await program.parseAsync([
+    const output = await captureOutput(() =>
+      program.parseAsync([
         "node",
         "engram",
         "project",
@@ -75,27 +98,17 @@ describe("engram project — unit: input/anchor parsing errors", () => {
         "invalidanchor",
         "--db",
         dbPath,
-      ]);
-    } catch {
-      // expected
-    } finally {
-      console.error = origErr;
-      // biome-ignore lint/suspicious/noExplicitAny: test override
-      (process as any).exit = origExit;
-    }
-
+      ]),
+    );
+    // biome-ignore lint/suspicious/noExplicitAny: test override
+    (process as any).exit = origExit;
     expect(exitCode).toBe(2);
-    expect(errs.join(" ")).toContain("Invalid --anchor");
+    expect(output).toContain("Invalid --anchor");
   });
 
   it("exits 2 on invalid --anchor type", async () => {
     const program = new Command().exitOverride();
     registerProject(program);
-
-    const errs: string[] = [];
-    const origErr = console.error;
-    console.error = (...args: unknown[]) => errs.push(args.join(" "));
-
     let exitCode: number | null = null;
     const origExit = process.exit;
     // biome-ignore lint/suspicious/noExplicitAny: test override
@@ -103,9 +116,8 @@ describe("engram project — unit: input/anchor parsing errors", () => {
       exitCode = code;
       throw new Error(`process.exit(${code})`);
     };
-
-    try {
-      await program.parseAsync([
+    const output = await captureOutput(() =>
+      program.parseAsync([
         "node",
         "engram",
         "project",
@@ -115,27 +127,17 @@ describe("engram project — unit: input/anchor parsing errors", () => {
         "badtype:01HXABC123",
         "--db",
         dbPath,
-      ]);
-    } catch {
-      // expected
-    } finally {
-      console.error = origErr;
-      // biome-ignore lint/suspicious/noExplicitAny: test override
-      (process as any).exit = origExit;
-    }
-
+      ]),
+    );
+    // biome-ignore lint/suspicious/noExplicitAny: test override
+    (process as any).exit = origExit;
     expect(exitCode).toBe(2);
-    expect(errs.join(" ")).toContain("Invalid --anchor type");
+    expect(output).toContain("Invalid --anchor type");
   });
 
   it("exits 2 on invalid --input format (no colon)", async () => {
     const program = new Command().exitOverride();
     registerProject(program);
-
-    const errs: string[] = [];
-    const origErr = console.error;
-    console.error = (...args: unknown[]) => errs.push(args.join(" "));
-
     let exitCode: number | null = null;
     const origExit = process.exit;
     // biome-ignore lint/suspicious/noExplicitAny: test override
@@ -143,9 +145,8 @@ describe("engram project — unit: input/anchor parsing errors", () => {
       exitCode = code;
       throw new Error(`process.exit(${code})`);
     };
-
-    try {
-      await program.parseAsync([
+    const output = await captureOutput(() =>
+      program.parseAsync([
         "node",
         "engram",
         "project",
@@ -157,27 +158,17 @@ describe("engram project — unit: input/anchor parsing errors", () => {
         "badinput",
         "--db",
         dbPath,
-      ]);
-    } catch {
-      // expected
-    } finally {
-      console.error = origErr;
-      // biome-ignore lint/suspicious/noExplicitAny: test override
-      (process as any).exit = origExit;
-    }
-
+      ]),
+    );
+    // biome-ignore lint/suspicious/noExplicitAny: test override
+    (process as any).exit = origExit;
     expect(exitCode).toBe(2);
-    expect(errs.join(" ")).toContain("Invalid --input");
+    expect(output).toContain("Invalid --input");
   });
 
   it("exits 2 on invalid --input type", async () => {
     const program = new Command().exitOverride();
     registerProject(program);
-
-    const errs: string[] = [];
-    const origErr = console.error;
-    console.error = (...args: unknown[]) => errs.push(args.join(" "));
-
     let exitCode: number | null = null;
     const origExit = process.exit;
     // biome-ignore lint/suspicious/noExplicitAny: test override
@@ -185,9 +176,8 @@ describe("engram project — unit: input/anchor parsing errors", () => {
       exitCode = code;
       throw new Error(`process.exit(${code})`);
     };
-
-    try {
-      await program.parseAsync([
+    const output = await captureOutput(() =>
+      program.parseAsync([
         "node",
         "engram",
         "project",
@@ -199,17 +189,12 @@ describe("engram project — unit: input/anchor parsing errors", () => {
         "badtype:01HXABC123",
         "--db",
         dbPath,
-      ]);
-    } catch {
-      // expected
-    } finally {
-      console.error = origErr;
-      // biome-ignore lint/suspicious/noExplicitAny: test override
-      (process as any).exit = origExit;
-    }
-
+      ]),
+    );
+    // biome-ignore lint/suspicious/noExplicitAny: test override
+    (process as any).exit = origExit;
     expect(exitCode).toBe(2);
-    expect(errs.join(" ")).toContain("Invalid --input type");
+    expect(output).toContain("Invalid --input type");
   });
 });
 
@@ -237,10 +222,6 @@ describe("engram project — dry-run does not write", () => {
     const program = new Command().exitOverride();
     registerProject(program);
 
-    const logs: string[] = [];
-    const origLog = console.log;
-    console.log = (...args: unknown[]) => logs.push(args.join(" "));
-
     let exitCode: number | null = null;
     const origExit = process.exit;
     // biome-ignore lint/suspicious/noExplicitAny: test override
@@ -248,9 +229,8 @@ describe("engram project — dry-run does not write", () => {
       exitCode = code;
       throw new Error(`process.exit(${code})`);
     };
-
-    try {
-      await program.parseAsync([
+    const output = await captureOutput(() =>
+      program.parseAsync([
         "node",
         "engram",
         "project",
@@ -263,16 +243,11 @@ describe("engram project — dry-run does not write", () => {
         "--dry-run",
         "--db",
         dbPath,
-      ]);
-    } catch {
-      // process.exit throws
-    } finally {
-      console.log = origLog;
-      // biome-ignore lint/suspicious/noExplicitAny: test override
-      (process as any).exit = origExit;
-    }
+      ]),
+    );
+    // biome-ignore lint/suspicious/noExplicitAny: test override
+    (process as any).exit = origExit;
 
-    const output = logs.join("\n");
     expect(output).toContain("Dry run");
     expect(output).toContain("entity_summary");
     expect(output).toContain(episode.id);
@@ -303,16 +278,11 @@ describe("engram project — NullGenerator error", () => {
   });
 
   it("exits 1 with a friendly error when no AI provider is configured", async () => {
-    // Default env has no ENGRAM_AI_PROVIDER or it's 'null'
     const savedEnv = process.env.ENGRAM_AI_PROVIDER;
     delete process.env.ENGRAM_AI_PROVIDER;
 
     const program = new Command().exitOverride();
     registerProject(program);
-
-    const errs: string[] = [];
-    const origErr = console.error;
-    console.error = (...args: unknown[]) => errs.push(args.join(" "));
 
     let exitCode: number | null = null;
     const origExit = process.exit;
@@ -321,9 +291,8 @@ describe("engram project — NullGenerator error", () => {
       exitCode = code;
       throw new Error(`process.exit(${code})`);
     };
-
-    try {
-      await program.parseAsync([
+    const output = await captureOutput(() =>
+      program.parseAsync([
         "node",
         "engram",
         "project",
@@ -335,20 +304,16 @@ describe("engram project — NullGenerator error", () => {
         "episode:fakeid",
         "--db",
         dbPath,
-      ]);
-    } catch {
-      // expected
-    } finally {
-      console.error = origErr;
-      // biome-ignore lint/suspicious/noExplicitAny: test override
-      (process as any).exit = origExit;
-      if (savedEnv !== undefined) {
-        process.env.ENGRAM_AI_PROVIDER = savedEnv;
-      }
+      ]),
+    );
+    // biome-ignore lint/suspicious/noExplicitAny: test override
+    (process as any).exit = origExit;
+    if (savedEnv !== undefined) {
+      process.env.ENGRAM_AI_PROVIDER = savedEnv;
     }
 
     expect(exitCode).toBe(1);
-    expect(errs.join(" ")).toContain("no AI provider configured");
+    expect(output).toContain("No AI provider configured");
   });
 });
 
@@ -373,39 +338,35 @@ describe("engram project — happy path with AnthropicGenerator stub", () => {
     });
     closeGraph(graph);
 
-    // AnthropicGenerator is the stub that returns valid output
     process.env.ENGRAM_AI_PROVIDER = "anthropic";
 
     const program = new Command().exitOverride();
     registerProject(program);
 
-    const logs: string[] = [];
-    const origLog = console.log;
-    console.log = (...args: unknown[]) => logs.push(args.join(" "));
-
+    let output = "";
     try {
-      await program.parseAsync([
-        "node",
-        "engram",
-        "project",
-        "--kind",
-        "entity_summary",
-        "--anchor",
-        "none",
-        "--input",
-        `episode:${episode.id}`,
-        "--db",
-        dbPath,
-      ]);
+      output = await captureOutput(() =>
+        program.parseAsync([
+          "node",
+          "engram",
+          "project",
+          "--kind",
+          "entity_summary",
+          "--anchor",
+          "none",
+          "--input",
+          `episode:${episode.id}`,
+          "--db",
+          dbPath,
+        ]),
+      );
     } finally {
-      console.log = origLog;
       delete process.env.ENGRAM_AI_PROVIDER;
     }
 
-    const output = logs.join("\n");
     expect(output).toContain("authored");
     expect(output).toContain("entity_summary");
-    expect(output).toContain("id:");
+    expect(output).toContain("ID:");
 
     // Verify the projection was actually written
     const graph2 = openGraph(dbPath);
@@ -435,7 +396,6 @@ describe("engram project — happy path with AnthropicGenerator stub", () => {
       return program;
     };
 
-    const origLog = console.log;
     const args = [
       "node",
       "engram",
@@ -450,30 +410,17 @@ describe("engram project — happy path with AnthropicGenerator stub", () => {
       dbPath,
     ];
 
-    // First run
-    const logs1: string[] = [];
-    console.log = (...args: unknown[]) => logs1.push(args.join(" "));
-    try {
-      await makeCmd().parseAsync(args);
-    } finally {
-      console.log = origLog;
-    }
+    // First run — should report "authored"
+    const output1 = await captureOutput(() => makeCmd().parseAsync(args));
+    expect(output1).toContain("authored");
 
-    // The first run should report "authored"
-    expect(logs1.join("\n")).toContain("authored");
-
-    // Second run with same inputs (no sleep needed — idempotence is detected by ID comparison)
-    const logs2: string[] = [];
-    console.log = (...args: unknown[]) => logs2.push(args.join(" "));
+    // Second run with same inputs — should report idempotent
+    let output2 = "";
     try {
-      await makeCmd().parseAsync(args);
+      output2 = await captureOutput(() => makeCmd().parseAsync(args));
     } finally {
-      console.log = origLog;
       delete process.env.ENGRAM_AI_PROVIDER;
     }
-
-    // Second run should report idempotent
-    const output2 = logs2.join("\n");
     expect(output2).toContain("idempotent");
 
     // Only one active projection should exist (no supersession on identical inputs)
@@ -555,12 +502,15 @@ describe("engram project — default input resolution", () => {
     const program = new Command().exitOverride();
     registerProject(program);
 
-    const logs: string[] = [];
-    const origLog = console.log;
-    console.log = (...args: unknown[]) => logs.push(args.join(" "));
-
-    try {
-      await program.parseAsync([
+    let exitCode: number | null = null;
+    const origExit = process.exit;
+    // biome-ignore lint/suspicious/noExplicitAny: test override
+    (process as any).exit = (code: number) => {
+      exitCode = code;
+      throw new Error(`process.exit(${code})`);
+    };
+    const output = await captureOutput(() =>
+      program.parseAsync([
         "node",
         "engram",
         "project",
@@ -571,15 +521,13 @@ describe("engram project — default input resolution", () => {
         "--dry-run",
         "--db",
         dbPath,
-      ]);
-    } catch {
-      // process.exit(0) throws
-    } finally {
-      console.log = origLog;
-      delete process.env.ENGRAM_AI_PROVIDER;
-    }
+      ]),
+    );
+    // biome-ignore lint/suspicious/noExplicitAny: test override
+    (process as any).exit = origExit;
+    delete process.env.ENGRAM_AI_PROVIDER;
 
-    const output = logs.join("\n");
+    expect(exitCode).toBe(0);
 
     // The dry-run output should include the entity, the episode, and the edge
     expect(output).toContain(`entity:${entity.id}`);
@@ -587,12 +535,9 @@ describe("engram project — default input resolution", () => {
     expect(output).toContain(`edge:${edge.id}`);
 
     // Should have at least 3 inputs: entity + episode + edge
-    const inputsLine = logs.find((l) => l.includes("inputs:"));
-    expect(inputsLine).toBeDefined();
-    const count = Number.parseInt(
-      inputsLine?.split("inputs:")[1]?.trim() ?? "0",
-      10,
-    );
+    const inputsMatch = output.match(/Inputs:\s+(\d+)/);
+    expect(inputsMatch).toBeDefined();
+    const count = Number.parseInt(inputsMatch?.[1] ?? "0", 10);
     expect(count).toBeGreaterThanOrEqual(3);
   });
 
@@ -603,10 +548,6 @@ describe("engram project — default input resolution", () => {
     const program = new Command().exitOverride();
     registerProject(program);
 
-    const errs: string[] = [];
-    const origErr = console.error;
-    console.error = (...args: unknown[]) => errs.push(args.join(" "));
-
     let exitCode: number | null = null;
     const origExit = process.exit;
     // biome-ignore lint/suspicious/noExplicitAny: test override
@@ -614,9 +555,8 @@ describe("engram project — default input resolution", () => {
       exitCode = code;
       throw new Error(`process.exit(${code})`);
     };
-
-    try {
-      await program.parseAsync([
+    const output = await captureOutput(() =>
+      program.parseAsync([
         "node",
         "engram",
         "project",
@@ -626,17 +566,13 @@ describe("engram project — default input resolution", () => {
         "entity:nonexistent_id",
         "--db",
         dbPath,
-      ]);
-    } catch {
-      // expected
-    } finally {
-      console.error = origErr;
-      // biome-ignore lint/suspicious/noExplicitAny: test override
-      (process as any).exit = origExit;
-    }
+      ]),
+    );
+    // biome-ignore lint/suspicious/noExplicitAny: test override
+    (process as any).exit = origExit;
 
     expect(exitCode).toBe(1);
-    expect(errs.join(" ")).toContain("not found");
+    expect(output).toContain("not found");
   });
 });
 
@@ -656,11 +592,6 @@ describe("engram project — kind validation", () => {
   it("exits 2 on invalid --kind with uppercase letters", async () => {
     const program = new Command().exitOverride();
     registerProject(program);
-
-    const errs: string[] = [];
-    const origErr = console.error;
-    console.error = (...args: unknown[]) => errs.push(args.join(" "));
-
     let exitCode: number | null = null;
     const origExit = process.exit;
     // biome-ignore lint/suspicious/noExplicitAny: test override
@@ -668,9 +599,8 @@ describe("engram project — kind validation", () => {
       exitCode = code;
       throw new Error(`process.exit(${code})`);
     };
-
-    try {
-      await program.parseAsync([
+    const output = await captureOutput(() =>
+      program.parseAsync([
         "node",
         "engram",
         "project",
@@ -682,27 +612,17 @@ describe("engram project — kind validation", () => {
         "episode:fakeid",
         "--db",
         dbPath,
-      ]);
-    } catch {
-      // expected
-    } finally {
-      console.error = origErr;
-      // biome-ignore lint/suspicious/noExplicitAny: test override
-      (process as any).exit = origExit;
-    }
-
+      ]),
+    );
+    // biome-ignore lint/suspicious/noExplicitAny: test override
+    (process as any).exit = origExit;
     expect(exitCode).toBe(2);
-    expect(errs.join(" ")).toContain("invalid");
+    expect(output.toLowerCase()).toContain("invalid");
   });
 
   it("exits 2 on --kind with path traversal characters", async () => {
     const program = new Command().exitOverride();
     registerProject(program);
-
-    const errs: string[] = [];
-    const origErr = console.error;
-    console.error = (...args: unknown[]) => errs.push(args.join(" "));
-
     let exitCode: number | null = null;
     const origExit = process.exit;
     // biome-ignore lint/suspicious/noExplicitAny: test override
@@ -710,9 +630,8 @@ describe("engram project — kind validation", () => {
       exitCode = code;
       throw new Error(`process.exit(${code})`);
     };
-
-    try {
-      await program.parseAsync([
+    const output = await captureOutput(() =>
+      program.parseAsync([
         "node",
         "engram",
         "project",
@@ -724,17 +643,12 @@ describe("engram project — kind validation", () => {
         "episode:fakeid",
         "--db",
         dbPath,
-      ]);
-    } catch {
-      // expected
-    } finally {
-      console.error = origErr;
-      // biome-ignore lint/suspicious/noExplicitAny: test override
-      (process as any).exit = origExit;
-    }
-
+      ]),
+    );
+    // biome-ignore lint/suspicious/noExplicitAny: test override
+    (process as any).exit = origExit;
     expect(exitCode).toBe(2);
-    expect(errs.join(" ")).toContain("invalid");
+    expect(output.toLowerCase()).toContain("invalid");
   });
 });
 

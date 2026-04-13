@@ -13,8 +13,12 @@ import type { IngestResult } from "./git.js";
 // ---------------------------------------------------------------------------
 
 export interface EnrichOpts {
-  /** Auth token for the remote API. NEVER stored in the graph. */
-  token: string;
+  /**
+   * Auth token for the remote API. NEVER stored in the graph.
+   * Optional — omit for public repositories (unauthenticated, 60 req/hr).
+   * Required for private repositories.
+   */
+  token?: string;
   /** ISO8601 date — only fetch items updated after this date */
   since?: string;
   /** API endpoint base URL (default: 'https://api.github.com') */

@@ -34,8 +34,10 @@ The result is a self-maintaining wiki grounded in evidence — not a snapshot, n
 cd your-repo
 engram init --from-git .
 
-# Step 2 — enrich with PR and issue context (optional, needs GITHUB_TOKEN)
-engram ingest enrich github --token $GITHUB_TOKEN
+# Step 2 — enrich with PR and issue context (optional)
+# Public repos work without a token. Private repos require GITHUB_TOKEN.
+engram ingest enrich github --repo owner/repo
+engram ingest enrich github --repo owner/repo --token $GITHUB_TOKEN  # private repos
 
 # Step 3 — synthesize living documents from the graph (needs ANTHROPIC_API_KEY)
 ANTHROPIC_API_KEY=<key> engram reconcile --max-cost 50000
@@ -76,7 +78,12 @@ Git tells you what changed. Enrichment adapters tell you why — PR discussions,
 | Confluence | Desired | Internal docs, ADRs |
 
 ```bash
-engram ingest enrich github --token $GITHUB_TOKEN
+# Public repositories — no token needed
+engram ingest enrich github --repo owner/repo
+
+# Private repositories — token required (needs `repo` scope)
+engram ingest enrich github --repo owner/repo --token $GITHUB_TOKEN
+# or: export GITHUB_TOKEN=<token>
 ```
 
 ## Projections
