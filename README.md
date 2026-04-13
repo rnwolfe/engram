@@ -24,30 +24,34 @@ entities, relationships, and facts that track how your understanding evolves ove
 Every claim in the graph traces back to evidence. Every fact has a validity window.
 The graph is structurally sound without AI, so when AI queries it, the answers are grounded.
 
-## The Money Command
+## Quick Start
 
 ```bash
+# Step 1 — build a knowledge graph from your git history (no API tokens needed)
+cd your-repo
 engram init --from-git .
+
+# Step 2 — query it
+engram search "who owns the auth module"
+engram search "what changed in the last 30 days"
+
+# Step 3 — visualize it (opens http://127.0.0.1:7878)
+engram visualize
+
+# Step 4 — synthesize AI documents from the graph (optional, needs ANTHROPIC_API_KEY)
+ANTHROPIC_API_KEY=<key> engram reconcile --max-cost 50000
+engram export wiki --out ./wiki
 ```
 
-One command. No API tokens. No cloud. Walks your git history and builds a knowledge graph:
+`engram init --from-git` builds the graph with no cloud and no API tokens:
 
 - **Entities**: authors, files, modules, issue references
 - **Observed edges**: git blame attribution, file change records
 - **Inferred edges**: co-change patterns, likely ownership, bus factor signals
 - **Evidence chains**: every edge traces back to specific commits
-- **Temporal validity**: all relationships carry time windows
+- **Temporal validity**: every relationship carries a validity window
 
-The resulting `.engram` file is a single SQLite database you can copy, query, and back up.
-
-## Visualize your knowledge graph
-
-```bash
-engram visualize --db repo.engram
-# Opens http://127.0.0.1:7878
-```
-
-Interactive graph: pan, zoom, time slider, decay overlay, evidence drill-down.
+The result is a single `.engram` file — a SQLite database you can copy, back up, and version alongside your repo.
 
 ## Enrichment
 
