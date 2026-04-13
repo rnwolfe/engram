@@ -6,10 +6,14 @@
  *
  * Implementations:
  * - NullGenerator: throws on generate() — used when no AI is configured.
- * - AnthropicGenerator: stub that calls the Anthropic API with a placeholder prompt.
+ * - AnthropicGenerator: calls the Anthropic API (Claude) to synthesize projections.
+ *   Falls back to a stub body when ANTHROPIC_API_KEY is not set, so the pipeline
+ *   can be exercised end-to-end in tests without network access.
  */
 
+import Anthropic from "@anthropic-ai/sdk";
 import type { Projection } from "../graph/projections.js";
+import { loadKindCatalog } from "./kinds.js";
 import type { KindCatalog } from "./kinds.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -118,10 +122,15 @@ export interface ProjectionGenerator {
    * The returned body MUST include all required frontmatter keys:
    * id, kind, anchor, title, model, input_fingerprint, valid_from, inputs.
    *
+   * @param inputs - Resolved substrate elements to synthesize from.
+   * @param kind - The projection kind (e.g. "entity_summary"). Used to build
+   *   a kind-appropriate prompt.
+   *
    * @throws Error if generation fails or is not supported.
    */
   generate(
     inputs: ResolvedInput[],
+    kind: string,
   ): Promise<{ body: string; confidence: number }>;
 
   /**
@@ -184,10 +193,11 @@ export interface ProjectionGenerator {
 export class NullGenerator implements ProjectionGenerator {
   async generate(
     _inputs: ResolvedInput[],
+    _kind: string,
   ): Promise<{ body: string; confidence: number }> {
     throw new Error(
       "NullGenerator: no AI provider configured — cannot generate projections. " +
-        "Configure an AI provider (e.g. ENGRAM_AI_PROVIDER=anthropic) to use project().",
+        "Set ENGRAM_AI_PROVIDER=anthropic and ANTHROPIC_API_KEY to use project().",
     );
   }
 
@@ -209,9 +219,6 @@ export class NullGenerator implements ProjectionGenerator {
     );
   }
 
-  /**
-   * NullGenerator.discover() always returns [] — no AI provider means no proposals.
-   */
   async discover(_ctx: {
     delta: SubstrateDelta;
     catalog: ActiveProjectionSummary[];
@@ -224,14 +231,14 @@ export class NullGenerator implements ProjectionGenerator {
 // ─── AnthropicGenerator ──────────────────────────────────────────────────────
 
 /**
- * AnthropicGenerator: stub implementation backed by the Anthropic API.
+ * AnthropicGenerator: backed by the Anthropic API (Claude).
  *
- * This is a placeholder implementation. In production it would use the
- * @anthropic-ai/sdk to call Claude with a prompt template populated from
- * the resolved inputs.
+ * When ANTHROPIC_API_KEY is present, makes real API calls to synthesize
+ * projections, assess staleness, and discover new coverage gaps.
  *
- * The stub returns a valid markdown body with frontmatter so the generate/
- * validate/insert pipeline can be exercised end-to-end in tests.
+ * When apiKey is undefined (e.g. in tests), falls back to stub responses so
+ * the generate/validate/insert pipeline can be exercised end-to-end without
+ * network access.
  */
 export class AnthropicGenerator implements ProjectionGenerator {
   private readonly model: string;
@@ -243,26 +250,26 @@ export class AnthropicGenerator implements ProjectionGenerator {
     promptTemplateId?: string;
     apiKey?: string;
   }) {
-    this.model = opts?.model ?? "anthropic:claude-opus-4-6";
+    this.model = opts?.model ?? "claude-sonnet-4-6";
     this.promptTemplateId = opts?.promptTemplateId ?? "default.v1";
     this.apiKey = opts?.apiKey ?? process.env.ANTHROPIC_API_KEY;
   }
 
-  async generate(
+  // ── Stub helpers ─────────────────────────────────────────────────────────
+
+  private _stubGenerate(
     inputs: ResolvedInput[],
-  ): Promise<{ body: string; confidence: number }> {
-    // Stub: in production this would call the Anthropic API with a
-    // populated prompt template. For now, return a valid body so the
-    // pipeline works end-to-end.
+    kind: string,
+  ): { body: string; confidence: number } {
     const inputList = inputs.map((i) => `  - ${i.type}:${i.id}`).join("\n");
     const now = new Date().toISOString();
 
     const body =
       `---\n` +
       `id: placeholder\n` +
-      `kind: generated\n` +
+      `kind: ${kind}\n` +
       `anchor: none\n` +
-      `title: "Generated Projection"\n` +
+      `title: "Generated ${kind.replace(/_/g, " ")} (stub)"\n` +
       `model: ${this.model}\n` +
       `prompt_template_id: ${this.promptTemplateId}\n` +
       `prompt_hash: stub\n` +
@@ -271,50 +278,295 @@ export class AnthropicGenerator implements ProjectionGenerator {
       `valid_until: null\n` +
       `inputs:\n${inputList}\n` +
       `---\n\n` +
-      `# Generated Projection\n\n` +
-      `This projection was generated from ${inputs.length} input(s) by ${this.model}.\n\n` +
-      `> Note: AnthropicGenerator is a stub. Configure a real implementation for production use.\n`;
+      `# Generated ${kind.replace(/_/g, " ")}\n\n` +
+      `This projection was generated from ${inputs.length} input(s).\n\n` +
+      `> Note: AnthropicGenerator is running in stub mode (no ANTHROPIC_API_KEY).\n`;
 
     return { body, confidence: 0.9 };
   }
 
+  // ── generate() ───────────────────────────────────────────────────────────
+
+  async generate(
+    inputs: ResolvedInput[],
+    kind: string,
+  ): Promise<{ body: string; confidence: number }> {
+    if (!this.apiKey) {
+      return this._stubGenerate(inputs, kind);
+    }
+
+    const catalog = loadKindCatalog();
+    const kindEntry = catalog.find((k) => k.name === kind);
+    const kindDesc = kindEntry
+      ? `${kindEntry.description}\n\nExpected inputs: ${kindEntry.expected_inputs.join("; ")}`
+      : kind;
+
+    const now = new Date().toISOString();
+    const inputList = inputs.map((i) => `  - ${i.type}:${i.id}`).join("\n");
+    const inputContent = inputs
+      .map(
+        (i) =>
+          `[${i.type}:${i.id}]\n${i.content ?? "(content unavailable)"}`,
+      )
+      .join("\n\n---\n\n");
+
+    const systemPrompt =
+      `You are an expert technical knowledge synthesizer. You generate structured knowledge documents from software project evidence.\n\n` +
+      `Your output MUST be a single markdown document beginning with a YAML frontmatter block.\n\n` +
+      `Required frontmatter keys — ALL must be present, in this order:\n` +
+      `  id: placeholder\n` +
+      `  kind: ${kind}\n` +
+      `  anchor: none\n` +
+      `  title: <concise descriptive title>\n` +
+      `  model: ${this.model}\n` +
+      `  prompt_template_id: ${this.promptTemplateId}\n` +
+      `  prompt_hash: 1\n` +
+      `  input_fingerprint: computed\n` +
+      `  valid_from: ${now}\n` +
+      `  valid_until: null\n` +
+      `  inputs:\n` +
+      `${inputList}\n\n` +
+      `Start with --- on its own line, then the frontmatter keys above exactly, then --- on its own line, then the markdown body. Output nothing before the opening ---.`;
+
+    const userPrompt =
+      `Generate a "${kind}" projection.\n\n` +
+      `Kind: ${kindDesc}\n\n` +
+      `Substrate evidence (${inputs.length} items):\n\n` +
+      inputContent;
+
+    const client = new Anthropic({ apiKey: this.apiKey });
+    const message = await client.messages.create({
+      model: this.model,
+      max_tokens: 2048,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    });
+
+    const text =
+      message.content[0].type === "text" ? message.content[0].text : "";
+    return { body: text, confidence: 0.85 };
+  }
+
+  // ── assess() ─────────────────────────────────────────────────────────────
+
   async assess(
-    _projection: Projection,
-    _currentInputs: ResolvedInput[],
+    projection: Projection,
+    currentInputs: ResolvedInput[],
   ): Promise<AssessVerdict> {
-    // Stub: always returns needs_update in production this would call
-    // the Anthropic API with the existing body + current inputs.
+    if (!this.apiKey) {
+      return {
+        verdict: "needs_update",
+        reason: "AnthropicGenerator running in stub mode (no ANTHROPIC_API_KEY)",
+      };
+    }
+
+    const currentContent = currentInputs
+      .map(
+        (i) =>
+          `[${i.type}:${i.id}]\n${i.content ?? "(content unavailable)"}`,
+      )
+      .join("\n\n---\n\n");
+
+    const systemPrompt =
+      `You assess whether a knowledge projection document is still accurate given updated substrate evidence.\n\n` +
+      `Respond with exactly one of these formats on a single line:\n` +
+      `  still_accurate\n` +
+      `  needs_update: <brief reason>\n` +
+      `  contradicted: <brief reason>\n\n` +
+      `Output only the verdict line. Nothing else.`;
+
+    const userPrompt =
+      `Existing projection:\n${projection.body}\n\n` +
+      `Current substrate state (${currentInputs.length} inputs):\n\n` +
+      currentContent +
+      `\n\nIs this projection still accurate?`;
+
+    const client = new Anthropic({ apiKey: this.apiKey });
+    const message = await client.messages.create({
+      model: this.model,
+      max_tokens: 256,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    });
+
+    const text =
+      message.content[0].type === "text"
+        ? message.content[0].text.trim()
+        : "";
+
+    if (text.startsWith("still_accurate")) {
+      return { verdict: "still_accurate" };
+    }
+    if (text.startsWith("needs_update:")) {
+      return {
+        verdict: "needs_update",
+        reason: text.slice("needs_update:".length).trim(),
+      };
+    }
+    if (text.startsWith("contradicted:")) {
+      return {
+        verdict: "contradicted",
+        reason: text.slice("contradicted:".length).trim(),
+      };
+    }
+
+    // Default to needs_update when the response doesn't match the expected format
     return {
       verdict: "needs_update",
-      reason:
-        "AnthropicGenerator.assess() is a stub — always returns needs_update",
+      reason: `Unparseable assess response: ${text.slice(0, 100)}`,
     };
   }
+
+  // ── regenerate() ─────────────────────────────────────────────────────────
 
   async regenerate(
     projection: Projection,
     inputs: ResolvedInput[],
   ): Promise<{ body: string; confidence: number }> {
-    // Stub: delegates to generate() in this placeholder implementation.
-    // Production would call Anthropic with the old body as context.
-    void projection;
-    return this.generate(inputs);
+    if (!this.apiKey) {
+      return this._stubGenerate(inputs, projection.kind);
+    }
+
+    const catalog = loadKindCatalog();
+    const kindEntry = catalog.find((k) => k.name === projection.kind);
+    const kindDesc = kindEntry ? kindEntry.description : projection.kind;
+
+    const now = new Date().toISOString();
+    const inputList = inputs.map((i) => `  - ${i.type}:${i.id}`).join("\n");
+    const inputContent = inputs
+      .map(
+        (i) =>
+          `[${i.type}:${i.id}]\n${i.content ?? "(content unavailable)"}`,
+      )
+      .join("\n\n---\n\n");
+
+    const systemPrompt =
+      `You are an expert technical knowledge synthesizer. You update an existing knowledge document based on new evidence.\n\n` +
+      `Your output MUST be a single markdown document beginning with a YAML frontmatter block.\n\n` +
+      `Required frontmatter keys — ALL must be present:\n` +
+      `  id: placeholder\n` +
+      `  kind: ${projection.kind}\n` +
+      `  anchor: none\n` +
+      `  title: <concise descriptive title — may carry over or refine the existing title>\n` +
+      `  model: ${this.model}\n` +
+      `  prompt_template_id: ${this.promptTemplateId}\n` +
+      `  prompt_hash: 1\n` +
+      `  input_fingerprint: computed\n` +
+      `  valid_from: ${now}\n` +
+      `  valid_until: null\n` +
+      `  inputs:\n` +
+      `${inputList}\n\n` +
+      `Start with --- on its own line, then the frontmatter keys above exactly, then --- on its own line, then the markdown body.`;
+
+    const userPrompt =
+      `Update this "${projection.kind}" projection based on the current substrate state.\n\n` +
+      `Kind description: ${kindDesc}\n\n` +
+      `Existing projection (for context — update as needed):\n${projection.body}\n\n` +
+      `Current substrate state (${inputs.length} inputs):\n\n` +
+      inputContent;
+
+    const client = new Anthropic({ apiKey: this.apiKey });
+    const message = await client.messages.create({
+      model: this.model,
+      max_tokens: 2048,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    });
+
+    const text =
+      message.content[0].type === "text" ? message.content[0].text : "";
+    return { body: text, confidence: 0.85 };
   }
 
-  /**
-   * AnthropicGenerator.discover() stub — returns [] in this placeholder.
-   *
-   * Production implementation would call the Anthropic API with a structured
-   * prompt built from the substrate delta, coverage catalog, and kind catalog,
-   * then parse the response into ProjectionProposal[].
-   */
-  async discover(_ctx: {
+  // ── discover() ───────────────────────────────────────────────────────────
+
+  async discover(ctx: {
     delta: SubstrateDelta;
     catalog: ActiveProjectionSummary[];
     kinds: KindCatalog;
   }): Promise<ProjectionProposal[]> {
-    // Stub: in production this would issue a structured LLM call to propose
-    // new projections. For now return [] so the pipeline works end-to-end.
-    return [];
+    if (!this.apiKey) {
+      return [];
+    }
+
+    const { delta, catalog, kinds } = ctx;
+
+    if (
+      delta.episodes.length === 0 &&
+      delta.entities.length === 0 &&
+      delta.edges.length === 0
+    ) {
+      return [];
+    }
+
+    const kindsText = kinds
+      .map(
+        (k) =>
+          `### ${k.name}\n${k.description}\n\nWhen to use:\n${k.when_to_use}`,
+      )
+      .join("\n\n");
+
+    const deltaText =
+      [
+        delta.episodes.length > 0
+          ? `Episodes (${delta.episodes.length}):\n${delta.episodes.map((e) => `  [${e.id}] ${e.summary}`).join("\n")}`
+          : null,
+        delta.entities.length > 0
+          ? `Entities (${delta.entities.length}):\n${delta.entities.map((e) => `  [${e.id}] ${e.summary}`).join("\n")}`
+          : null,
+        delta.edges.length > 0
+          ? `Edges (${delta.edges.length}):\n${delta.edges.map((e) => `  [${e.id}] ${e.summary}`).join("\n")}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+
+    const catalogText =
+      catalog.length > 0
+        ? catalog
+            .map((p) => `  [${p.id}] ${p.kind}: ${p.title}`)
+            .join("\n")
+        : "  (none)";
+
+    const systemPrompt =
+      `You are a knowledge coverage analyst. Given a substrate delta and an existing projection catalog, propose new projections to fill coverage gaps.\n\n` +
+      `Respond with a JSON array of proposal objects. Each object must have:\n` +
+      `  kind: string (must match one of the available kinds)\n` +
+      `  anchor: { type: string, id: string } | null\n` +
+      `  inputs: Array<{ type: string, id: string }>\n` +
+      `  rationale: string\n\n` +
+      `Use only entity/edge/episode IDs that appear in the substrate delta.\n` +
+      `Anchor type must be one of: entity, edge, episode, projection. Use null anchor for graph-wide projections.\n` +
+      `Return [] if no new projections are warranted.\n` +
+      `Output only the JSON array — no prose, no markdown fences.`;
+
+    const userPrompt =
+      `Available projection kinds:\n\n${kindsText}\n\n` +
+      `Existing projections (do not duplicate):\n${catalogText}\n\n` +
+      `Substrate delta since ${delta.since ?? "beginning"}:\n\n${deltaText}\n\n` +
+      `Propose new projections to author. Return a JSON array.`;
+
+    const client = new Anthropic({ apiKey: this.apiKey });
+    const message = await client.messages.create({
+      model: this.model,
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    });
+
+    const text =
+      message.content[0].type === "text"
+        ? message.content[0].text.trim()
+        : "[]";
+
+    try {
+      // Strip markdown fences if the model wrapped the JSON despite instructions
+      const stripped = text.replace(/^```(?:json)?\n?/i, "").replace(/\n?```$/, "");
+      const proposals = JSON.parse(stripped);
+      if (!Array.isArray(proposals)) return [];
+      return proposals as ProjectionProposal[];
+    } catch {
+      return [];
+    }
   }
 }

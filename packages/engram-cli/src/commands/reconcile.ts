@@ -13,7 +13,13 @@
 import * as path from "node:path";
 import type { Command } from "commander";
 import type { EngramGraph } from "engram-core";
-import { closeGraph, NullGenerator, openGraph, reconcile } from "engram-core";
+import {
+  AnthropicGenerator,
+  closeGraph,
+  NullGenerator,
+  openGraph,
+  reconcile,
+} from "engram-core";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -156,14 +162,17 @@ export function registerReconcile(program: Command): void {
       }
 
       // ── Create generator ────────────────────────────────────────────────────
-      // We use NullGenerator here — the reconcile() core function calls
-      // generator.assess() and generator.regenerate(). When no AI is configured,
-      // NullGenerator will throw on the first LLM call, which reconcile() will
-      // propagate as an error. A real implementation would build an AI provider
-      // from environment config (ENGRAM_AI_PROVIDER, ENGRAM_AI_MODEL, etc.).
-      //
-      // For now, NullGenerator is correct: no AI = no projection ops.
-      const generator = new NullGenerator();
+      // Reconcile requires an AI provider. When ANTHROPIC_API_KEY is set,
+      // AnthropicGenerator makes real Claude API calls. Without a key it falls
+      // back to stub behaviour (useful for dry-run and CI scenarios where no
+      // authoring should occur). NullGenerator is kept as a guard: if no
+      // provider is configured at all, reconcile() will error on the first
+      // LLM call with a clear message.
+      const generator = process.env.ANTHROPIC_API_KEY
+        ? new AnthropicGenerator({
+            apiKey: process.env.ANTHROPIC_API_KEY,
+          })
+        : new NullGenerator();
 
       // ── Run reconciliation ──────────────────────────────────────────────────
       let result: Awaited<ReturnType<typeof reconcile>>;
