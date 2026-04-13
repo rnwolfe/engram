@@ -12,6 +12,11 @@ export {
   NullProvider,
   OllamaProvider,
 } from "./ai/index.js";
+export type { AnchorTypeName, KindCatalog, KindEntry } from "./ai/kinds.js";
+export {
+  KindValidationError,
+  loadKindCatalog,
+} from "./ai/kinds.js";
 export type {
   AssessVerdict,
   ProjectionGenerator,

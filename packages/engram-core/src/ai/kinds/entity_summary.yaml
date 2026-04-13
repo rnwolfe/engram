@@ -1,0 +1,25 @@
+name: entity_summary
+description: >
+  A synthesis of what a single entity is — what it does, who works on it, its
+  key relationships to neighboring entities, and how it has changed over time.
+when_to_use: |
+  Propose an entity_summary when:
+  - A new entity has appeared in the substrate with 3 or more distinct evidence
+    episodes and no active entity_summary projection yet.
+  - An existing entity_summary is stale because 5 or more new episodes have been
+    added since it was last generated.
+  - An entity's edges have been substantially superseded (≥2 active edges
+    replaced) and the existing entity_summary does not reflect the new structure.
+  - An entity is referenced by multiple other projections but lacks its own
+    entity_summary — it is a "hub node" in the coverage graph.
+  Do NOT propose a new entity_summary if the existing one is marked stale but
+  the stale_reason is only 'input_content_changed' for minor commits (e.g.
+  formatting-only changes). The assess phase handles those.
+anchor_types:
+  - entity
+expected_inputs:
+  - Episodes that cite the anchor entity (commits, PRs, manual notes)
+  - Active edges where the anchor entity is source or target
+  - Related entity rows (name, entity_type, description) for neighbors
+  - Any existing projections anchored to the same entity
+example_title_pattern: "{entity_name}"

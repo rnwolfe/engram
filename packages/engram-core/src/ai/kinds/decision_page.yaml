@@ -1,0 +1,31 @@
+name: decision_page
+description: >
+  A record of a technical or process decision: what was decided, why it was
+  made, who participated, and what alternatives were considered and rejected.
+when_to_use: |
+  Propose a decision_page when:
+  - A cluster of PR and issue episodes (2 or more) reference a named technical
+    decision or architectural choice and no decision_page projection exists for
+    it yet.
+  - An entity of type 'decision' or 'adr' appears in the substrate with
+    supporting episode evidence but no decision_page projection.
+  - Commit or PR bodies include explicit decision language ("we decided to",
+    "rejected because", "chosen over", "trade-off") and the decision is
+    significant enough to warrant its own page (affects ≥2 other entities or
+    spans ≥1 week of discussion).
+  - An existing decision_page's anchor entity has new edges superseding
+    previously recorded alternatives or rationale.
+  Anchor to the decision entity if one exists. Use anchor_type='none' only if
+  the decision is emergent from episodes (e.g. a migration choice spread across
+  multiple PRs with no single entity).
+anchor_types:
+  - entity
+  - none
+expected_inputs:
+  - PR episodes that describe or discuss the decision
+  - Issue episodes that document the problem motivating the decision
+  - Commit episodes that implement the decision
+  - Entities representing alternatives that were considered
+  - Edges encoding the rationale relationship ('decided_because', 'supersedes',
+    'rejected_in_favor_of')
+example_title_pattern: "Decision: {decision_name}"

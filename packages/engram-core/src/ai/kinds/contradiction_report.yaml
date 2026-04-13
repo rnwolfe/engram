@@ -1,0 +1,34 @@
+name: contradiction_report
+description: >
+  Identifies facts in the substrate or across projections that directly
+  contradict each other, explaining what each source claims and why the
+  claims are incompatible.
+when_to_use: |
+  Propose a contradiction_report when:
+  - Two or more active edges with the same source and target entities carry
+    conflicting relation_type or edge_kind values (e.g. both 'owns' and
+    'does_not_own' with overlapping validity windows, or two 'observed' edges
+    asserting opposite facts).
+  - Two active entity_summary projections make contradictory claims about the
+    same entity or the same fact (detectable when the discover prompt finds
+    body text that logically conflicts across projections).
+  - An episode explicitly documents a disagreement or reversal ("this
+    contradicts the earlier decision", "PR reverted because", "issue: conflicting
+    behavior") and no contradiction_report yet captures it.
+  - An edge was superseded with a 'contradicted' verdict in the most recent
+    reconcile assess phase — the supersession event is evidence of a conflict
+    worth documenting.
+  Use anchor_type='none' unless the contradiction is tightly scoped to a single
+  entity or projection (in which case anchor to that entity or projection).
+  Do not propose a contradiction_report for stale projections that merely have
+  different fingerprints — staleness is not contradiction.
+anchor_types:
+  - none
+  - projection
+expected_inputs:
+  - Pairs of edges with conflicting facts (same source/target, overlapping
+    validity, contradictory relation or content)
+  - Entity_summary projections whose bodies assert conflicting facts
+  - Episodes that document disagreements, reversals, or issue reports
+  - The superseded edge or projection rows that record the contradiction event
+example_title_pattern: "Contradiction: {subject}"
