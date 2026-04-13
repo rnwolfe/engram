@@ -3,11 +3,15 @@
  *
  * Creates a new .engram database at the given path.
  * Optionally runs git ingestion immediately after creation.
+ *
+ * Note: git ingestion uses execFileSync internally (blocking), so a spinner
+ * cannot animate during the operation. We print a clear "starting" line
+ * before the call and results after.
  */
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { intro, log, outro, spinner } from "@clack/prompts";
+import { intro, log, outro } from "@clack/prompts";
 import type { Command } from "commander";
 import type { EngramGraph } from "engram-core";
 import { closeGraph, createGraph, ingestGitRepo } from "engram-core";
@@ -46,21 +50,24 @@ export function registerInit(program: Command): void {
 
       if (opts.fromGit) {
         const repoPath = path.resolve(opts.fromGit);
-        const s = spinner();
-        s.start(`Ingesting git repository at ${repoPath}`);
+        // Git ingestion is synchronous (execFileSync + SQLite writes).
+        // A spinner cannot animate while the event loop is blocked, so we
+        // print a plain message before starting and results when done.
+        log.info(`Ingesting git repository at ${repoPath} — this may take a while...`);
         try {
           const result = await ingestGitRepo(graph, repoPath);
-          s.stop("Git ingestion complete");
-          log.info(
+          log.success(
             [
-              `Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
-              `Entities: ${result.entitiesCreated} created`,
-              `Edges:    ${result.edgesCreated} created`,
+              "Git ingestion complete",
+              `  Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
+              `  Entities: ${result.entitiesCreated} created`,
+              `  Edges:    ${result.edgesCreated} created`,
             ].join("\n"),
           );
         } catch (err) {
-          s.stop("Git ingestion failed");
-          log.error(err instanceof Error ? err.message : String(err));
+          log.error(
+            `Git ingestion failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
           closeGraph(graph);
           process.exit(1);
         }

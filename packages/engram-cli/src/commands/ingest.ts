@@ -9,6 +9,11 @@
 
 import * as path from "node:path";
 import { intro, log, outro, spinner } from "@clack/prompts";
+
+// git and markdown ingest use execFileSync / synchronous SQLite — the event
+// loop is blocked for the duration, so spinner intervals cannot fire.
+// For those commands we log a "starting" line and print results when done.
+// spinner() is only used for async operations (GitHub fetch, LLM calls).
 import type { Command } from "commander";
 import type { EngramGraph } from "engram-core";
 import {
@@ -68,24 +73,24 @@ export function registerIngest(program: Command): void {
         process.exit(1);
       }
 
-      const s = spinner();
-      s.start(`Ingesting git repo at ${resolvedRepo}`);
+      log.info(`Ingesting git repo at ${resolvedRepo} — this may take a while...`);
       try {
         const result = await ingestGitRepo(graph, resolvedRepo, {
           since: opts.since,
           branch: opts.branch,
         });
-        s.stop("Git ingestion complete");
-        log.info(
+        log.success(
           [
-            `Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
-            `Entities: ${result.entitiesCreated} created`,
-            `Edges:    ${result.edgesCreated} created, ${result.edgesSuperseded} superseded`,
+            "Git ingestion complete",
+            `  Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
+            `  Entities: ${result.entitiesCreated} created`,
+            `  Edges:    ${result.edgesCreated} created, ${result.edgesSuperseded} superseded`,
           ].join("\n"),
         );
       } catch (err) {
-        s.stop("Git ingestion failed");
-        log.error(err instanceof Error ? err.message : String(err));
+        log.error(
+          `Git ingestion failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
         closeGraph(graph);
         process.exit(1);
       }
@@ -114,17 +119,19 @@ export function registerIngest(program: Command): void {
         process.exit(1);
       }
 
-      const s = spinner();
-      s.start(`Ingesting markdown: ${glob}`);
+      log.info(`Ingesting markdown: ${glob}`);
       try {
         const result = await ingestMarkdown(graph, glob);
-        s.stop("Markdown ingestion complete");
-        log.info(
-          `Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
+        log.success(
+          [
+            "Markdown ingestion complete",
+            `  Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
+          ].join("\n"),
         );
       } catch (err) {
-        s.stop("Markdown ingestion failed");
-        log.error(err instanceof Error ? err.message : String(err));
+        log.error(
+          `Markdown ingestion failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
         closeGraph(graph);
         process.exit(1);
       }
