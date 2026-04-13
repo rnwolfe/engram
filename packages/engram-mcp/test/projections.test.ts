@@ -430,7 +430,11 @@ describe("engram MCP projection tool handlers", () => {
     });
 
     test("returns run ID in output", async () => {
-      const result = await handleReconcile(graph, { max_cost: 0 }, true);
+      const result = await handleReconcile(
+        graph,
+        { max_cost: 0, phase: "assess" },
+        true,
+      );
 
       expect(result).not.toHaveProperty("error");
       const r = result as Exclude<typeof result, { error: string }>;

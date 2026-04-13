@@ -791,7 +791,7 @@ export async function reconcile(
     discovered,
     started_at: startedAt,
     completed_at: completedAt,
-    error: partialReason,
+    ...(partialReason !== undefined ? { error: partialReason } : {}),
   };
 }
 
