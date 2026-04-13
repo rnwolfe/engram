@@ -303,7 +303,7 @@ function loadKindsFromDir(dir: string): KindEntry[] {
   let files: string[];
 
   try {
-    files = readdirSync(dir).filter((f) => f.endsWith(".yaml"));
+    files = readdirSync(dir).filter((f) => f.endsWith(".yaml")).sort();
   } catch {
     return [];
   }
