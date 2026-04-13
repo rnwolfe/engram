@@ -28,7 +28,7 @@ import type {
   SubstrateDelta,
 } from "./projection-generator.js";
 
-const DEFAULT_MODEL = "gpt-4o";
+const DEFAULT_MODEL = "gpt-5.4";
 
 export class OpenAIGenerator implements ProjectionGenerator {
   private readonly model: string;
