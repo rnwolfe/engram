@@ -29,9 +29,7 @@ export interface PromptPair {
  */
 function formatInputContent(inputs: ResolvedInput[]): string {
   return inputs
-    .map(
-      (i) => `[${i.type}:${i.id}]\n${i.content ?? "(content unavailable)"}`,
-    )
+    .map((i) => `[${i.type}:${i.id}]\n${i.content ?? "(content unavailable)"}`)
     .join("\n\n---\n\n");
 }
 

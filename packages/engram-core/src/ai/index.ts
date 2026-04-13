@@ -11,24 +11,21 @@ export { GeminiGenerator } from "./gemini-generator.js";
 export { NullProvider } from "./null.js";
 export { OllamaProvider } from "./ollama.js";
 export { OpenAIGenerator } from "./openai-generator.js";
-export type { AIConfig, AIProvider, EntityHint } from "./provider.js";
+export type { ProjectionGenerator } from "./projection-generator.js";
 export {
   AnthropicGenerator,
   NullGenerator,
 } from "./projection-generator.js";
-export type { ProjectionGenerator } from "./projection-generator.js";
+export type { AIConfig, AIProvider, EntityHint } from "./provider.js";
 
 import { GeminiProvider } from "./gemini.js";
 import { GeminiGenerator } from "./gemini-generator.js";
 import { NullProvider } from "./null.js";
 import { OllamaProvider } from "./ollama.js";
 import { OpenAIGenerator } from "./openai-generator.js";
-import type { AIConfig, AIProvider } from "./provider.js";
-import {
-  AnthropicGenerator,
-  NullGenerator,
-} from "./projection-generator.js";
 import type { ProjectionGenerator } from "./projection-generator.js";
+import { AnthropicGenerator, NullGenerator } from "./projection-generator.js";
+import type { AIConfig, AIProvider } from "./provider.js";
 
 // ─── createProvider ───────────────────────────────────────────────────────────
 

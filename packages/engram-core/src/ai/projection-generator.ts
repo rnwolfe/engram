@@ -195,7 +195,8 @@ export class AnthropicGenerator implements ProjectionGenerator {
     if (!this.apiKey) {
       return {
         verdict: "needs_update",
-        reason: "AnthropicGenerator running in stub mode (no ANTHROPIC_API_KEY)",
+        reason:
+          "AnthropicGenerator running in stub mode (no ANTHROPIC_API_KEY)",
       };
     }
     const { system, user } = buildAssessPrompt(projection, currentInputs);

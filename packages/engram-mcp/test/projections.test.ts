@@ -390,7 +390,12 @@ describe("engram MCP projection tool handlers", () => {
     test("returns run summary with run_id when authoring enabled", async () => {
       await seedProjection(graph);
 
-      const result = await handleReconcile(graph, { max_cost: 100 }, true, new AnthropicGenerator());
+      const result = await handleReconcile(
+        graph,
+        { max_cost: 100 },
+        true,
+        new AnthropicGenerator(),
+      );
 
       expect(result).not.toHaveProperty("error");
       const r = result as Exclude<typeof result, { error: string }>;

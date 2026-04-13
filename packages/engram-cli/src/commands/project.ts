@@ -321,7 +321,7 @@ export function registerProject(program: Command): void {
         console.error(
           "Error: no AI provider configured for projection authoring. " +
             "No AI provider configured for projection authoring. " +
-              "Set ANTHROPIC_API_KEY, GEMINI_API_KEY, or OPENAI_API_KEY (or set ENGRAM_AI_PROVIDER explicitly).",
+            "Set ANTHROPIC_API_KEY, GEMINI_API_KEY, or OPENAI_API_KEY (or set ENGRAM_AI_PROVIDER explicitly).",
         );
         closeGraph(graph);
         process.exit(1);

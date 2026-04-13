@@ -13,12 +13,7 @@
 import * as path from "node:path";
 import type { Command } from "commander";
 import type { EngramGraph } from "engram-core";
-import {
-  closeGraph,
-  createGenerator,
-  openGraph,
-  reconcile,
-} from "engram-core";
+import { closeGraph, createGenerator, openGraph, reconcile } from "engram-core";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
