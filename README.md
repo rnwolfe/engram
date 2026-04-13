@@ -58,13 +58,61 @@ engram ingest enrich github --token $GITHUB_TOKEN
 Pull PR discussions, linked issues, and review comments into the graph — adding decision
 context that commit messages alone don't capture.
 
+## Projections
+
+Projections are AI-synthesized documents — summaries, reports, decision pages — anchored to specific entities, edges, or topics in the graph. They form a human-readable knowledge layer on top of the raw evidence.
+
+Four built-in kinds ship out of the box:
+
+| Kind | What it produces |
+|------|-----------------|
+| `entity_summary` | What an entity is, who owns it, how it's changed |
+| `decision_page` | Key decisions, rationale, alternatives considered |
+| `contradiction_report` | Conflicting facts or ownership overlaps in the substrate |
+| `topic_cluster` | Synthesized view across a theme or system boundary |
+
+Projection authoring requires `ANTHROPIC_API_KEY`.
+
+### Reconcile — the main workflow
+
+```bash
+# Assess stale projections and discover candidates for new ones
+engram reconcile --max-cost 50000
+
+# Assess only (no discovery)
+engram reconcile --phase assess --max-cost 10000
+
+# Dry run — see what would change without writing
+engram reconcile --dry-run
+```
+
+`reconcile` runs in two phases:
+1. **Assess** — finds projections whose inputs have drifted and regenerates them
+2. **Discover** — surveys uncovered substrate and proposes new projections
+
+### Author a single projection
+
+```bash
+engram project --kind entity_summary \
+               --anchor entity:<ULID> \
+               --input episode:<ULID> \
+               --input episode:<ULID>
+```
+
+### Export as a wiki
+
+```bash
+engram export wiki --out ./wiki
+# Writes one markdown file per active projection
+```
+
 ## Architecture
 
 ```
-engram-core          Library (the product). Graph, temporal, retrieval, ingestion engines.
+engram-core          Library (the product). Graph, temporal, retrieval, ingestion, projection engines.
 engram-cli           CLI wrapper. commander + @clack/prompts.
-engram-mcp           MCP server (stdio). Read-heavy tool surface for AI agents.
-engramark            Benchmark suite (EngRAMark). Validated against Fastify.
+engram-mcp           MCP server (stdio). Read and authoring tool surface for AI agents.
+engramark            Benchmark suite (EngRAMark). Validated against Fastify and stale-knowledge scenarios.
 ```
 
 The `.engram` file format is the durable contract. The CLI and MCP server are reference
@@ -83,9 +131,9 @@ implementations over that contract.
 
 ## AI-Enhanced Mode
 
-Engram works without any AI configured. With an AI provider, it generates embeddings for episodes during ingest (entity embeddings deferred to a future release), and blends vector similarity into search scores.
+Engram works without any AI configured. AI unlocks two distinct capabilities:
 
-### Providers
+**Embeddings** — blends vector similarity into search scores during ingest.
 
 | Provider | Configuration | Notes |
 |----------|---------------|-------|
@@ -93,10 +141,16 @@ Engram works without any AI configured. With an AI provider, it generates embedd
 | `ollama` | `ENGRAM_AI_PROVIDER=ollama` | Local Ollama. Default model: `nomic-embed-text`. |
 | `gemini` | `ENGRAM_AI_PROVIDER=gemini` + `GEMINI_API_KEY=<key>` | Google Gemini. Default model: `gemini-embedding-001`. |
 
-### Usage
+**Projection authoring** — synthesizes entities/topics/decisions from the graph into readable documents. Requires Anthropic:
 
 ```bash
-# No AI — FTS-only (default behavior, unchanged)
+ANTHROPIC_API_KEY=<key> engram reconcile --max-cost 50000
+```
+
+### Embedding usage
+
+```bash
+# No AI — FTS-only (default)
 engram search "who owns the auth module"
 
 # With Ollama running locally
@@ -109,7 +163,7 @@ ENGRAM_AI_PROVIDER=gemini GEMINI_API_KEY=<your-key> engram search "who owns the 
 ENGRAM_AI_PROVIDER=ollama engram ingest git .
 ```
 
-Engram degrades gracefully: if the provider is offline or the key is missing, it logs a warning and falls back to null behavior. Embedding failures never corrupt the graph.
+Engram degrades gracefully: if the embedding provider is offline or the key is missing, it logs a warning and falls back to FTS-only. Embedding failures never corrupt the graph.
 
 ### Programmatic API
 
@@ -131,7 +185,7 @@ const similar = findSimilar(graph, queryEmbedding, { limit: 10, target_type: "en
 
 ## Status
 
-**v0.1 — in development.** Format is experimental. Breaking changes expected before 1.0.
+**v0.2 (schema) — in development.** The projection layer (schema v0.2) is live. Format is experimental. Breaking changes expected before 1.0.
 
 ## License
 
