@@ -21,6 +21,8 @@ export interface ListProjectionsOpts {
   kind?: string;
   anchor_type?: AnchorType;
   anchor_id?: string;
+  /** Include invalidated (superseded) projections. Default: false. */
+  include_superseded?: boolean;
 }
 
 // ─── Batched staleness helper ─────────────────────────────────────────────────
@@ -272,8 +274,12 @@ export function listActiveProjections(
   graph: EngramGraph,
   opts?: ListProjectionsOpts,
 ): GetProjectionResult[] {
-  const conditions: string[] = ["invalidated_at IS NULL"];
+  const conditions: string[] = [];
   const params: string[] = [];
+
+  if (!opts?.include_superseded) {
+    conditions.push("invalidated_at IS NULL");
+  }
 
   if (opts?.kind !== undefined) {
     conditions.push("kind = ?");
@@ -288,7 +294,7 @@ export function listActiveProjections(
     params.push(opts.anchor_id);
   }
 
-  const whereClause = conditions.join(" AND ");
+  const whereClause = conditions.length > 0 ? conditions.join(" AND ") : "1=1";
   const projections = graph.db
     .query<Projection, string[]>(
       `SELECT * FROM projections WHERE ${whereClause} ORDER BY created_at DESC`,
@@ -319,11 +325,12 @@ export function searchProjections(
   query: string,
   opts?: ListProjectionsOpts,
 ): GetProjectionResult[] {
-  const conditions: string[] = [
-    "p.invalidated_at IS NULL",
-    "projections_fts MATCH ?",
-  ];
+  const conditions: string[] = ["projections_fts MATCH ?"];
   const params: string[] = [query];
+
+  if (!opts?.include_superseded) {
+    conditions.push("p.invalidated_at IS NULL");
+  }
 
   if (opts?.kind !== undefined) {
     conditions.push("p.kind = ?");

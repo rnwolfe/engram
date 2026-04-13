@@ -3,6 +3,8 @@
  *
  * Measures retrieval quality and answer accuracy against ground-truth
  * Q&A datasets built from public repositories (Fastify for v0.1).
+ *
+ * Also includes stale-knowledge detection benchmark reporting.
  */
 
 export type {
@@ -26,6 +28,10 @@ export {
 export { BENCHMARK_VERSION } from "./version.js";
 
 import type { BenchmarkReport, BenchmarkResult } from "./metrics.js";
+import type {
+  ScenarioResult,
+  StaleKnowledgeMetrics,
+} from "./scoring/stale-knowledge.js";
 
 /**
  * Aggregates a list of BenchmarkResults into a full BenchmarkReport.
@@ -108,6 +114,122 @@ export function printReport(report: BenchmarkReport): void {
 
 function padRight(s: string, width: number): string {
   return s.length >= width ? `${s.slice(0, width - 1)} ` : s.padEnd(width);
+}
+
+// ─── Stale-knowledge benchmark reporting ──────────────────────────────────────
+
+export type {
+  ScenarioResult,
+  StaleKnowledgeMetrics,
+} from "./scoring/stale-knowledge.js";
+
+/** Per-runner result bundle for the stale-knowledge comparison table. */
+export interface StaleKnowledgeRunnerResult {
+  runner_name: string;
+  metrics: StaleKnowledgeMetrics;
+  results: ScenarioResult[];
+}
+
+/**
+ * Print a stale-knowledge benchmark report for a single runner.
+ *
+ * Shows per-scenario results and aggregate metrics.
+ */
+export function printStaleKnowledgeReport(
+  bundle: StaleKnowledgeRunnerResult,
+): void {
+  const { runner_name, metrics, results } = bundle;
+
+  console.log(`\nEngRAMark Stale-Knowledge — ${runner_name}`);
+  console.log("─".repeat(80));
+
+  // Header
+  console.log(
+    padRight("Scenario", 12) +
+      padRight("ExpStale", 10) +
+      padRight("Detected", 10) +
+      padRight("Correct", 9) +
+      "Details",
+  );
+  console.log("─".repeat(80));
+
+  for (const r of results) {
+    const correct = r.expected_stale === r.detected_stale ? "YES" : "NO";
+    console.log(
+      padRight(r.scenario_id, 12) +
+        padRight(r.expected_stale ? "true" : "false", 10) +
+        padRight(r.detected_stale ? "true" : "false", 10) +
+        padRight(correct, 9) +
+        (r.details ?? ""),
+    );
+  }
+
+  console.log("─".repeat(80));
+  console.log("Aggregate:");
+  console.log(`  Total scenarios        : ${metrics.total}`);
+  console.log(`  Truly stale            : ${metrics.total_stale}`);
+  console.log(`  Flagged stale          : ${metrics.flagged_stale}`);
+  console.log(`  True positives         : ${metrics.true_positives}`);
+  console.log(`  False positives        : ${metrics.false_positives}`);
+  console.log(`  False negatives        : ${metrics.false_negatives}`);
+  console.log(`  Recall                 : ${metrics.stale_recall.toFixed(4)}`);
+  console.log(
+    `  Precision              : ${metrics.stale_precision.toFixed(4)}`,
+  );
+  console.log(`  F1                     : ${metrics.stale_f1.toFixed(4)}`);
+  console.log(
+    `  Cost/staleness resolved: ${Number.isFinite(metrics.cost_per_staleness_resolved) ? `${metrics.cost_per_staleness_resolved.toFixed(2)}ms` : "∞ (no TPs)"}`,
+  );
+  console.log(
+    `  Reconcile accuracy     : ${metrics.reconcile_accuracy.toFixed(4)} (placeholder — LLM grader pending)`,
+  );
+  console.log("");
+}
+
+/**
+ * Print a comparison table of multiple stale-knowledge runner results.
+ *
+ * Shows recall, precision, F1, and cost-per-resolved side-by-side.
+ */
+export function compareStaleKnowledgeRunners(
+  bundles: StaleKnowledgeRunnerResult[],
+): void {
+  if (bundles.length === 0) {
+    console.log("\nNo stale-knowledge runners to compare.");
+    return;
+  }
+
+  console.log("\nEngRAMark Stale-Knowledge — Runner Comparison");
+  console.log("─".repeat(80));
+  console.log(
+    padRight("Runner", 26) +
+      padRight("Recall", 10) +
+      padRight("Precision", 12) +
+      padRight("F1", 10) +
+      "Cost/Resolved",
+  );
+  console.log("─".repeat(80));
+
+  for (const bundle of bundles) {
+    const { runner_name, metrics } = bundle;
+    const costStr = Number.isFinite(metrics.cost_per_staleness_resolved)
+      ? `${metrics.cost_per_staleness_resolved.toFixed(2)}ms`
+      : "∞";
+
+    console.log(
+      padRight(runner_name, 26) +
+        padRight(metrics.stale_recall.toFixed(4), 10) +
+        padRight(metrics.stale_precision.toFixed(4), 12) +
+        padRight(metrics.stale_f1.toFixed(4), 10) +
+        costStr,
+    );
+  }
+
+  console.log("─".repeat(80));
+  console.log(
+    "Recall = TP/(TP+FN)  |  Precision = TP/(TP+FP)  |  F1 = harmonic mean  |  Cost = avg ms per true-positive",
+  );
+  console.log("");
 }
 
 /**

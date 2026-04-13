@@ -1,8 +1,26 @@
 /**
- * reconcile.ts — reconcile() assess phase and softRefresh() helper.
+ * reconcile.ts — reconcile() assess + discover phases and softRefresh() helper.
  *
  * Implements Operation 2 from docs/internal/specs/projections.md.
- * The discover phase is stubbed as a no-op (out of scope for this issue).
+ *
+ * ## Assess phase
+ * Re-evaluates every stale active projection whose input_fingerprint has drifted.
+ * For each stale projection the generator verdict determines whether to
+ * softRefresh (still_accurate) or supersedeProjection (needs_update/contradicted).
+ *
+ * ## Discover phase
+ * Computes the substrate delta since the last non-dry-run reconcile run (same
+ * scope), loads the active-projection catalog and kind catalog, then calls
+ * generator.discover() to obtain ProjectionProposal[]. Each accepted proposal
+ * is authored via project(). Dry runs count proposals but skip authoring.
+ * Partial runs (budget exhausted) record what was authored and advance the cursor.
+ *
+ * Cursor semantics:
+ * - Dry runs count proposals (discovered > 0 is possible) but do NOT author them
+ *   and do NOT advance the cursor.
+ * - Partial runs advance the cursor to what was successfully authored.
+ * - The cursor is the `completed_at` timestamp of the last non-dry-run
+ *   reconciliation_runs row with the same scope.
  *
  * Exported: reconcile, softRefresh, currentInputState, ReconcileOpts, ReconciliationRunResult
  */
@@ -10,14 +28,20 @@
 import { createHash } from "node:crypto";
 import { ulid } from "ulid";
 import { Budget } from "../ai/budget.js";
+import { loadKindCatalog } from "../ai/kinds.js";
 import type {
+  ActiveProjectionSummary,
   ProjectionGenerator,
+  ProjectionProposal,
   ResolvedInput,
+  SubstrateDelta,
+  SubstrateDeltaItem,
 } from "../ai/projection-generator.js";
 import type { EngramGraph } from "../format/index.js";
-import { supersedeProjection } from "./projections.js";
+import { project, supersedeProjection } from "./projections.js";
 import { listActiveProjections } from "./projections-list.js";
 import type {
+  AnchorType,
   Projection,
   ProjectionEvidenceRow,
   ProjectionInputType,
@@ -42,8 +66,12 @@ export interface ReconciliationRunResult {
   assessed: number;
   superseded: number;
   soft_refreshed: number;
+  /** Number of new projections authored during the discover phase. */
+  discovered: number;
   started_at: string;
   completed_at: string;
+  /** Set when status='partial' to explain why the run did not complete. */
+  error?: string;
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
@@ -70,7 +98,7 @@ function startReconciliationRun(
 }
 
 /**
- * Updates the reconciliation_runs row with final counts and status.
+ * Updates the reconciliation_runs row with final counts, status, and optional error.
  */
 function finishReconciliationRun(
   graph: EngramGraph,
@@ -80,6 +108,8 @@ function finishReconciliationRun(
   assessed: number,
   refreshed: number,
   superseded: number,
+  discovered: number,
+  error?: string,
 ): void {
   graph.db
     .prepare(
@@ -88,10 +118,21 @@ function finishReconciliationRun(
               status = ?,
               projections_checked = ?,
               projections_refreshed = ?,
-              projections_superseded = ?
+              projections_superseded = ?,
+              projections_discovered = ?,
+              error = ?
         WHERE id = ?`,
     )
-    .run(completedAt, status, assessed, refreshed, superseded, runId);
+    .run(
+      completedAt,
+      status,
+      assessed,
+      refreshed,
+      superseded,
+      discovered,
+      error ?? null,
+      runId,
+    );
 }
 
 /**
@@ -293,6 +334,208 @@ export function softRefresh(
   })();
 }
 
+// ─── Discover phase helpers ───────────────────────────────────────────────────
+
+/**
+ * Returns the completed_at timestamp of the last non-dry-run reconciliation run
+ * for the given scope. Returns null if no such run exists (fresh database).
+ *
+ * This is the cursor for the discover phase: episodes/entities/edges added or
+ * changed after this timestamp are included in the substrate delta.
+ */
+function lastNonDryRunCompletedAt(
+  graph: EngramGraph,
+  scope?: string,
+): string | null {
+  const row = graph.db
+    .query<{ completed_at: string | null }, [number, string | null]>(
+      `SELECT completed_at FROM reconciliation_runs
+        WHERE dry_run = ? AND scope IS ? AND status != 'running'
+          AND completed_at IS NOT NULL
+        ORDER BY completed_at DESC
+        LIMIT 1`,
+    )
+    .get(0, scope ?? null);
+  return row?.completed_at ?? null;
+}
+
+/**
+ * Computes the substrate delta since the given cursor timestamp (or all rows if
+ * cursor is null). Returns a SubstrateDelta with short summaries for each item.
+ *
+ * Only includes non-redacted episodes, non-archived entities, and non-invalidated
+ * edges to avoid surfacing deleted substrate in discover proposals.
+ *
+ * Column mapping:
+ * - episodes: cursor column is `ingested_at` (episodes have no `created_at`)
+ * - entities: cursor column is `created_at`
+ * - edges: cursor column is `created_at`
+ */
+function computeSubstrateDelta(
+  graph: EngramGraph,
+  since: string | null,
+): SubstrateDelta {
+  // Episodes — use ingested_at as the timestamp column
+  const episodeRows = since
+    ? graph.db
+        .query<{ id: string; content: string; ingested_at: string }, [string]>(
+          `SELECT id, content, ingested_at FROM episodes
+            WHERE status != 'redacted' AND ingested_at > ?
+            ORDER BY ingested_at ASC`,
+        )
+        .all(since)
+    : graph.db
+        .query<{ id: string; content: string; ingested_at: string }, []>(
+          `SELECT id, content, ingested_at FROM episodes
+            WHERE status != 'redacted'
+            ORDER BY ingested_at ASC`,
+        )
+        .all();
+
+  const episodes: SubstrateDeltaItem[] = episodeRows.map((row) => ({
+    type: "episode" as const,
+    id: row.id,
+    summary: row.content.slice(0, 200),
+    changed_at: row.ingested_at,
+  }));
+
+  // Entities — use created_at
+  const entityRows = since
+    ? graph.db
+        .query<
+          {
+            id: string;
+            canonical_name: string;
+            summary: string | null;
+            created_at: string;
+          },
+          [string]
+        >(
+          `SELECT id, canonical_name, summary, created_at FROM entities
+            WHERE status != 'archived' AND created_at > ?
+            ORDER BY created_at ASC`,
+        )
+        .all(since)
+    : graph.db
+        .query<
+          {
+            id: string;
+            canonical_name: string;
+            summary: string | null;
+            created_at: string;
+          },
+          []
+        >(
+          `SELECT id, canonical_name, summary, created_at FROM entities
+            WHERE status != 'archived'
+            ORDER BY created_at ASC`,
+        )
+        .all();
+
+  const entities: SubstrateDeltaItem[] = entityRows.map((row) => ({
+    type: "entity" as const,
+    id: row.id,
+    summary: `${row.canonical_name}${row.summary ? `: ${row.summary}` : ""}`,
+    changed_at: row.created_at,
+  }));
+
+  // Edges — use created_at, non-invalidated only
+  const edgeRows = since
+    ? graph.db
+        .query<{ id: string; fact: string; created_at: string }, [string]>(
+          `SELECT id, fact, created_at FROM edges
+            WHERE invalidated_at IS NULL AND created_at > ?
+            ORDER BY created_at ASC`,
+        )
+        .all(since)
+    : graph.db
+        .query<{ id: string; fact: string; created_at: string }, []>(
+          `SELECT id, fact, created_at FROM edges
+            WHERE invalidated_at IS NULL
+            ORDER BY created_at ASC`,
+        )
+        .all();
+
+  const edges: SubstrateDeltaItem[] = edgeRows.map((row) => ({
+    type: "edge" as const,
+    id: row.id,
+    summary: row.fact.slice(0, 200),
+    changed_at: row.created_at,
+  }));
+
+  return { since, episodes, entities, edges };
+}
+
+/**
+ * Loads the active-projection catalog for the discover phase.
+ * Returns lightweight summaries — no projection bodies — to keep context small.
+ */
+function loadActiveProjectionCatalog(
+  graph: EngramGraph,
+  scope?: string,
+): ActiveProjectionSummary[] {
+  const scopeOpts = parseScopeToOpts(scope);
+  const results = listActiveProjections(graph, scopeOpts);
+  return results.map((r) => ({
+    id: r.projection.id,
+    kind: r.projection.kind,
+    title: r.projection.title,
+    anchor_type: r.projection.anchor_type,
+    anchor_id: r.projection.anchor_id,
+    last_assessed_at: r.projection.last_assessed_at,
+  }));
+}
+
+/**
+ * Validates a ProjectionProposal from the generator before calling project().
+ *
+ * Returns an error string if the proposal is malformed, or null if valid.
+ *
+ * Checks:
+ * - kind must be a non-empty string matching a known KindCatalog entry
+ * - inputs must be a non-empty array with valid type strings
+ * - anchor.type (if provided) must be a valid AnchorType
+ */
+function validateProposal(
+  proposal: ProjectionProposal,
+  knownKinds: Set<string>,
+): string | null {
+  if (!proposal.kind || typeof proposal.kind !== "string") {
+    return "proposal.kind must be a non-empty string";
+  }
+  if (!knownKinds.has(proposal.kind)) {
+    return `proposal.kind '${proposal.kind}' is not in the kind catalog`;
+  }
+  if (!Array.isArray(proposal.inputs) || proposal.inputs.length === 0) {
+    return "proposal.inputs must be a non-empty array";
+  }
+  const validInputTypes = new Set(["episode", "entity", "edge", "projection"]);
+  for (const inp of proposal.inputs) {
+    if (!inp.type || !validInputTypes.has(inp.type)) {
+      return `proposal.inputs entry has invalid type '${inp.type}'`;
+    }
+    if (!inp.id || typeof inp.id !== "string") {
+      return `proposal.inputs entry missing id`;
+    }
+  }
+  if (proposal.anchor != null) {
+    const validAnchorTypes = new Set([
+      "entity",
+      "edge",
+      "episode",
+      "projection",
+      "none",
+    ]);
+    if (!proposal.anchor.type || !validAnchorTypes.has(proposal.anchor.type)) {
+      return `proposal.anchor.type '${proposal.anchor.type}' is not a valid AnchorType`;
+    }
+    if (!proposal.anchor.id || typeof proposal.anchor.id !== "string") {
+      return `proposal.anchor.id must be a non-empty string when anchor is provided`;
+    }
+  }
+  return null;
+}
+
 // ─── Scope filter helper ──────────────────────────────────────────────────────
 
 /**
@@ -307,7 +550,10 @@ function parseScopeToOpts(scope?: string): {
   anchor_type?: string;
 } {
   if (!scope) return {};
-  const [key, value] = scope.split(":");
+  const colonIdx = scope.indexOf(":");
+  if (colonIdx === -1) return {};
+  const key = scope.slice(0, colonIdx);
+  const value = scope.slice(colonIdx + 1);
   if (key === "kind" && value) return { kind: value };
   if (key === "anchor" && value) return { anchor_type: value };
   return {};
@@ -316,14 +562,24 @@ function parseScopeToOpts(scope?: string): {
 // ─── reconcile() ─────────────────────────────────────────────────────────────
 
 /**
- * Reconciliation loop — assess phase (discover phase is a no-op stub).
+ * Reconciliation loop — assess phase and discover phase.
  *
+ * ## Assess phase
  * For each stale active projection whose input_fingerprint has drifted:
  * - Calls generator.assess() to determine the verdict.
  * - 'still_accurate': calls softRefresh() to update fingerprint + evidence hashes.
  * - 'needs_update' | 'contradicted': calls generator.regenerate() then supersedeProjection().
- * - If dryRun=true, tracks counts but skips writes.
- * - Stops early if the budget is exhausted (status='partial').
+ *
+ * ## Discover phase
+ * Computes the substrate delta since the last non-dry-run reconcile (same scope),
+ * loads the active-projection catalog and kind catalog, then calls
+ * generator.discover() to get ProjectionProposal[]. Each proposal is validated
+ * then authored via project(). Dry runs count proposals but skip authoring.
+ *
+ * Both phases:
+ * - If dryRun=true, track counts but skip all database writes.
+ * - Stop early if the budget is exhausted (status='partial').
+ * - Dry runs do NOT advance the discover cursor.
  *
  * Inserts a reconciliation_runs row at start and updates it at completion.
  */
@@ -343,7 +599,9 @@ export async function reconcile(
   let assessed = 0;
   let superseded = 0;
   let softRefreshed = 0;
+  let discovered = 0;
   let budgetHit = false;
+  let partialReason: string | undefined;
 
   // ── Phase 1: assess existing active projections ────────────────────────────
   if (phases.includes("assess")) {
@@ -356,6 +614,7 @@ export async function reconcile(
     for (const result of staleResults) {
       if (budget.exhausted()) {
         budgetHit = true;
+        partialReason = "budget exhausted during assess phase";
         break;
       }
 
@@ -393,6 +652,7 @@ export async function reconcile(
         case "contradicted": {
           if (budget.exhausted()) {
             budgetHit = true;
+            partialReason = "budget exhausted during assess phase (regenerate)";
             break;
           }
 
@@ -422,13 +682,90 @@ export async function reconcile(
 
       if (budget.exhausted()) {
         budgetHit = true;
+        partialReason = "budget exhausted during assess phase";
         break;
       }
     }
   }
 
-  // ── Phase 2: discover new projections (stub — out of scope) ───────────────
-  // The discover phase is not implemented in this issue. It is a no-op here.
+  // ── Phase 2: discover new projections from the substrate delta ─────────────
+  //
+  // Flow:
+  // 1. Resolve cursor: completed_at of last non-dry-run reconcile (same scope).
+  // 2. Compute substrate delta since cursor (episodes, entities, edges).
+  // 3. Load active-projection catalog (titles, kinds, anchors — not bodies).
+  // 4. Load kind catalog via loadKindCatalog().
+  // 5. Call generator.discover({ delta, catalog, kinds }) → ProjectionProposal[].
+  // 6. For each proposal: validate → project() → increment discovered.
+  // 7. Budget exhaustion mid-phase sets status='partial' and records reason.
+  //
+  // Dry runs count proposals but skip project() authoring and do not advance cursor.
+  if (phases.includes("discover") && !budgetHit) {
+    const kindCatalog = loadKindCatalog();
+    const knownKinds = new Set(kindCatalog.map((k) => k.name));
+
+    const cursor = lastNonDryRunCompletedAt(graph, opts?.scope);
+    const delta = computeSubstrateDelta(graph, cursor);
+    const catalog = loadActiveProjectionCatalog(graph, opts?.scope);
+
+    // Single structured LLM call to propose new projections
+    const proposals = await generator.discover({
+      delta,
+      catalog,
+      kinds: kindCatalog,
+    });
+    budget.consume(1); // one discover call counts as one budget unit
+
+    for (const proposal of proposals) {
+      if (budget.exhausted()) {
+        budgetHit = true;
+        partialReason = "budget exhausted during discover phase";
+        break;
+      }
+
+      // Validate proposal structure before attempting project()
+      const validationError = validateProposal(proposal, knownKinds);
+      if (validationError) {
+        // Skip malformed proposals — log-worthy but not fatal
+        // In production this would be a warn() call; for now just skip.
+        continue;
+      }
+
+      if (!dryRun) {
+        try {
+          await project(graph, {
+            kind: proposal.kind,
+            anchor: proposal.anchor
+              ? {
+                  type: proposal.anchor.type as AnchorType,
+                  id: proposal.anchor.id,
+                }
+              : { type: "none" as AnchorType },
+            inputs: proposal.inputs.map((i) => ({
+              type: i.type as "episode" | "entity" | "edge" | "projection",
+              id: i.id,
+            })),
+            generator,
+          });
+          discovered++;
+        } catch (_err) {
+          // project() throws on cycle detection, missing inputs, etc.
+          // Skip this proposal and continue — partial authoring is valid.
+          continue;
+        }
+      } else {
+        // Dry run: count the proposal but don't author it
+        discovered++;
+      }
+
+      budget.consume(1); // one project() call counts as one budget unit
+    }
+
+    if (budget.exhausted() && !budgetHit) {
+      budgetHit = true;
+      partialReason = "budget exhausted during discover phase";
+    }
+  }
 
   const completedAt = new Date().toISOString();
   const status: "completed" | "partial" = budgetHit ? "partial" : "completed";
@@ -441,6 +778,8 @@ export async function reconcile(
     assessed,
     softRefreshed,
     superseded,
+    discovered,
+    partialReason,
   );
 
   return {
@@ -449,8 +788,10 @@ export async function reconcile(
     assessed,
     superseded,
     soft_refreshed: softRefreshed,
+    discovered,
     started_at: startedAt,
     completed_at: completedAt,
+    ...(partialReason !== undefined ? { error: partialReason } : {}),
   };
 }
 

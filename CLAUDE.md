@@ -55,7 +55,7 @@ engram/
 │   │   └── test/
 │   ├── engram-cli/           # CLI application
 │   │   └── src/
-│   │       └── commands/     # init, add, search, show, decay, ingest, serve, export, project
+│   │       └── commands/     # init, add, search, show, decay, ingest, serve, export, project, reconcile
 │   ├── engram-mcp/           # MCP server (stdio transport)
 │   │   └── src/
 │   │       ├── tools/        # MCP tool implementations
@@ -67,9 +67,17 @@ engram/
 │   └── engramark/            # Benchmark suite
 │       └── src/
 │           ├── datasets/     # Ground-truth Q&A for test repos
-│           │   └── fastify/  # v0.1 benchmark target
+│           │   ├── fastify/  # v0.1 retrieval benchmark target
+│           │   └── stale-knowledge/  # Stale-knowledge detection scenarios
+│           │       ├── fastify.json  # 10 scenarios (sk-001..sk-010), 7 stale + 3 fresh
+│           │       └── loader.ts     # loadDataset(), prepareScenarios() with project()
 │           ├── runners/      # Benchmark execution
-│           └── report.ts     # Results formatting
+│           │   ├── stale-naive-rag.ts      # Baseline: always "not stale" (score 0.0)
+│           │   ├── stale-read-time.ts      # Read-time: getProjection() stale flag only
+│           │   └── stale-full-reconcile.ts # Full: reconcile() assess phase
+│           ├── scoring/
+│           │   └── stale-knowledge.ts  # computeStaleKnowledgeMetrics() — recall, precision, F1
+│           └── report.ts     # Results formatting (includes stale-knowledge tables)
 ├── docs/
 │   ├── internal/
 │   │   ├── VISION.md         # Product vision and design principles
