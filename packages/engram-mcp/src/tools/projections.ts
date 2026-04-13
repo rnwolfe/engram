@@ -12,7 +12,7 @@
  */
 
 import {
-  AnthropicGenerator,
+  createGenerator,
   type EngramGraph,
   type GetProjectionResult,
   getProjection,
@@ -262,6 +262,7 @@ export async function handleProject(
   graph: EngramGraph,
   input: ProjectInput,
   enableProjectionAuthoring: boolean,
+  generatorOverride?: import("engram-core").ProjectionGenerator,
 ) {
   if (!enableProjectionAuthoring) {
     return {
@@ -308,9 +309,9 @@ export async function handleProject(
     parsedInputs.push({ type, id });
   }
 
-  const generator = new AnthropicGenerator({
-    promptTemplateId: input.prompt_template_id,
-  });
+  const generator =
+    generatorOverride ??
+    createGenerator({ promptTemplateId: input.prompt_template_id });
 
   try {
     const projection = await project(graph, {
@@ -374,6 +375,7 @@ export async function handleReconcile(
   graph: EngramGraph,
   input: ReconcileInput,
   enableProjectionAuthoring: boolean,
+  generatorOverride?: import("engram-core").ProjectionGenerator,
 ): Promise<ReconciliationRunResult | { error: string }> {
   if (!enableProjectionAuthoring) {
     return {
@@ -390,7 +392,7 @@ export async function handleReconcile(
         ? ["assess"]
         : ["discover"];
 
-  const generator = new AnthropicGenerator();
+  const generator = generatorOverride ?? createGenerator();
 
   return reconcile(graph, generator, {
     phases,

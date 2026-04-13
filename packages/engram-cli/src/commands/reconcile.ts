@@ -14,9 +14,8 @@ import * as path from "node:path";
 import type { Command } from "commander";
 import type { EngramGraph } from "engram-core";
 import {
-  AnthropicGenerator,
   closeGraph,
-  NullGenerator,
+  createGenerator,
   openGraph,
   reconcile,
 } from "engram-core";
@@ -162,17 +161,11 @@ export function registerReconcile(program: Command): void {
       }
 
       // ── Create generator ────────────────────────────────────────────────────
-      // Reconcile requires an AI provider. When ANTHROPIC_API_KEY is set,
-      // AnthropicGenerator makes real Claude API calls. Without a key it falls
-      // back to stub behaviour (useful for dry-run and CI scenarios where no
-      // authoring should occur). NullGenerator is kept as a guard: if no
-      // provider is configured at all, reconcile() will error on the first
-      // LLM call with a clear message.
-      const generator = process.env.ANTHROPIC_API_KEY
-        ? new AnthropicGenerator({
-            apiKey: process.env.ANTHROPIC_API_KEY,
-          })
-        : new NullGenerator();
+      // createGenerator() resolves the provider from ENGRAM_AI_PROVIDER
+      // (anthropic | gemini | openai) or auto-detects from present API keys.
+      // Falls back to NullGenerator when nothing is configured, which will
+      // error on the first LLM call with a clear message.
+      const generator = createGenerator();
 
       // ── Run reconciliation ──────────────────────────────────────────────────
       let result: Awaited<ReturnType<typeof reconcile>>;
@@ -199,7 +192,7 @@ export function registerReconcile(program: Command): void {
           errMsg.includes("no AI provider configured")
         ) {
           console.error(
-            "\n  No AI provider configured. Set ENGRAM_AI_PROVIDER=anthropic and ANTHROPIC_API_KEY to enable projection authoring.",
+            "\n  No AI provider configured. Set ANTHROPIC_API_KEY, GEMINI_API_KEY, or OPENAI_API_KEY to enable projection authoring.",
           );
         }
         closeGraph(graph);

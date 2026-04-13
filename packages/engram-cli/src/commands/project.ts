@@ -16,8 +16,8 @@ import type {
   ProjectionInputType,
 } from "engram-core";
 import {
-  AnthropicGenerator,
   closeGraph,
+  createGenerator,
   findEdges,
   getEntity,
   listActiveProjections,
@@ -191,33 +191,9 @@ function resolveDefaultInputs(
 
 // ─── Generator resolution ────────────────────────────────────────────────────
 
-/**
- * Returns a ProjectionGenerator based on the ENGRAM_AI_PROVIDER env var.
- * Always returns a generator — NullGenerator throws at generate() time.
- *
- * Supported providers for projection authoring: anthropic.
- * Note: ollama and gemini are embedding/extraction providers; they do not
- * implement ProjectionGenerator. Use ENGRAM_AI_PROVIDER=anthropic for
- * projection authoring.
- */
-function createGenerator() {
-  const provider = process.env.ENGRAM_AI_PROVIDER ?? "null";
-
-  switch (provider) {
-    case "anthropic":
-      return new AnthropicGenerator({
-        apiKey: process.env.ANTHROPIC_API_KEY,
-      });
-    case "ollama":
-    case "gemini":
-      throw new UsageError(
-        `AI provider "${provider}" does not support projection authoring. ` +
-          `Use ENGRAM_AI_PROVIDER=anthropic for engram project.`,
-      );
-    default:
-      return new NullGenerator();
-  }
-}
+// createGenerator is imported from engram-core. It resolves the provider from
+// ENGRAM_AI_PROVIDER (anthropic | gemini | openai) or auto-detects from present
+// API keys. Falls back to NullGenerator when nothing is configured.
 
 // ─── Command registration ────────────────────────────────────────────────────
 
@@ -344,7 +320,8 @@ export function registerProject(program: Command): void {
       if (generator instanceof NullGenerator) {
         console.error(
           "Error: no AI provider configured for projection authoring. " +
-            "Set ENGRAM_AI_PROVIDER=anthropic (or another supported provider) to use engram project.",
+            "No AI provider configured for projection authoring. " +
+              "Set ANTHROPIC_API_KEY, GEMINI_API_KEY, or OPENAI_API_KEY (or set ENGRAM_AI_PROVIDER explicitly).",
         );
         closeGraph(graph);
         process.exit(1);

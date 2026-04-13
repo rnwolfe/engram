@@ -181,17 +181,27 @@ ENGRAM_AI_PROVIDER=ollama engram ingest git .
 
 ### Projection authoring (reconcile, project)
 
-Synthesizes projection bodies from the graph substrate. Requires Anthropic. Other providers are not currently supported for authoring.
+Synthesizes projection bodies from the graph substrate. Supported providers are auto-detected from present API keys — no `ENGRAM_AI_PROVIDER` required unless you want to be explicit.
 
-| Provider | Configuration | Notes |
-|----------|---------------|-------|
-| Anthropic | `ANTHROPIC_API_KEY=<key>` | **Required** for projection authoring. |
-| Ollama | Not supported | — |
-| Gemini | Not supported | — |
-| OpenAI | Not supported | — |
+| Provider | Auto-detected from | Explicit | Default model | Notes |
+|----------|--------------------|----------|---------------|-------|
+| Anthropic | `ANTHROPIC_API_KEY` | `ENGRAM_AI_PROVIDER=anthropic` | `claude-sonnet-4-6` | Detected first when multiple keys are set. |
+| Gemini | `GEMINI_API_KEY` | `ENGRAM_AI_PROVIDER=gemini` | `gemini-2.0-flash` | Detected second. |
+| OpenAI | `OPENAI_API_KEY` | `ENGRAM_AI_PROVIDER=openai` | `gpt-4o` | Detected third. |
+| Ollama | — | Not supported | — | Embeddings only. |
 
 ```bash
+# Anthropic
 ANTHROPIC_API_KEY=<key> engram reconcile --max-cost 50000
+
+# Gemini
+GEMINI_API_KEY=<key> engram reconcile --max-cost 50000
+
+# OpenAI
+OPENAI_API_KEY=<key> engram reconcile --max-cost 50000
+
+# Explicit selection when multiple keys are present
+ENGRAM_AI_PROVIDER=gemini GEMINI_API_KEY=<key> engram reconcile --max-cost 50000
 ```
 
 ### Programmatic API

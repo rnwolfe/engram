@@ -7,10 +7,13 @@
 export { Budget } from "./ai/budget.js";
 export type { AIConfig, AIProvider, EntityHint } from "./ai/index.js";
 export {
+  createGenerator,
   createProvider,
+  GeminiGenerator,
   GeminiProvider,
   NullProvider,
   OllamaProvider,
+  OpenAIGenerator,
 } from "./ai/index.js";
 export type { AnchorTypeName, KindCatalog, KindEntry } from "./ai/kinds.js";
 export {
