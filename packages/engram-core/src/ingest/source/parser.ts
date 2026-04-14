@@ -1,6 +1,8 @@
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { Parser, Language as TreeSitterLanguage } from "web-tree-sitter";
+import type { QueryCapture } from "web-tree-sitter";
+import { Parser, Query, Language as TreeSitterLanguage } from "web-tree-sitter";
 
 /** Languages supported by the source parser. */
 export type Language = "typescript" | "tsx";
@@ -31,6 +33,9 @@ export function languageForPath(relPath: string): Language | null {
   return null;
 }
 
+/** Re-export for consumers that only import from this module. */
+export type { QueryCapture };
+
 /**
  * Tree-sitter source parser for TypeScript and TSX.
  *
@@ -40,6 +45,8 @@ export function languageForPath(relPath: string): Language | null {
  */
 export class SourceParser {
   private parsers: Map<Language, Parser>;
+  /** Query cache — one Query per language, initialized lazily. */
+  private queryCache: Map<Language, Query> = new Map();
 
   private constructor(parsers: Map<Language, Parser>) {
     this.parsers = parsers;
@@ -89,10 +96,45 @@ export class SourceParser {
   }
 
   /**
-   * Release native resources held by the underlying parsers.
+   * Run the language-appropriate tree-sitter query against a parsed tree and
+   * return all captures in document order.
+   *
+   * Queries are compiled once per language and cached for the lifetime of this
+   * parser instance. The underlying WASM query objects are freed by `dispose()`.
+   */
+  runQuery(tree: Parser.Tree, lang: Language): QueryCapture[] {
+    if (!this.queryCache.has(lang)) {
+      const queryText = readFileSync(
+        path.join(import.meta.dir, "queries", "typescript.scm"),
+        "utf8",
+      );
+      const tsParser = this.parsers.get(lang);
+      if (!tsParser) {
+        throw new Error(`No parser loaded for language: ${lang}`);
+      }
+      const language = tsParser.language;
+      if (!language) {
+        throw new Error(`Parser has no language set for: ${lang}`);
+      }
+      const query = new Query(language, queryText);
+      this.queryCache.set(lang, query);
+    }
+    const query = this.queryCache.get(lang);
+    if (!query) {
+      throw new Error(`Query not found for language: ${lang}`);
+    }
+    return query.captures(tree.rootNode);
+  }
+
+  /**
+   * Release native resources held by the underlying parsers and query cache.
    * Do NOT call `.delete()` on trees — callers manage tree lifetime.
    */
   dispose(): void {
+    for (const query of this.queryCache.values()) {
+      query.delete();
+    }
+    this.queryCache.clear();
     for (const parser of this.parsers.values()) {
       parser.delete();
     }
