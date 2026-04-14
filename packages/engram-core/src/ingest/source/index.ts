@@ -48,7 +48,7 @@ export interface SourceIngestResult {
   episodesCreated: number;
   entitiesCreated: number;
   edgesCreated: number;
-  /** Always 0 in this chunk — sweep lands in a later issue. */
+  /** Number of episodes archived because their file was no longer found under the walk root. */
   deletedArchived: number;
   errors: Array<{ relPath: string; message: string }>;
 }
@@ -192,6 +192,10 @@ export async function ingestSource(
     errors: [],
   };
 
+  const absRoot = path.resolve(root);
+  // Track every relPath visited in this walk so the sweep pass can identify deletions.
+  const visitedRelPaths = new Set<string>();
+
   const parser = await SourceParser.create();
 
   // Per-file data for post-processing passes.
@@ -227,6 +231,7 @@ export async function ingestSource(
           .get(SOURCE_TYPE, sourceRef);
         if (existing) {
           result.filesSkipped++;
+          visitedRelPaths.add(relPath);
           // Still record the file entity id so the import resolution pass can use it.
           const fe = findEntities(graph, { canonical_name: relPath });
           if (fe.length > 0) fileEntityIds.set(relPath, fe[0].id);
@@ -293,6 +298,7 @@ export async function ingestSource(
           source_ref: sourceRef,
           content: body,
           timestamp: now,
+          metadata: { walk_root: absRoot },
         });
         episodeId = episode.id;
         result.episodesCreated++;
@@ -349,6 +355,7 @@ export async function ingestSource(
       }
 
       // Populate tracking maps for post-processing passes (both modes).
+      visitedRelPaths.add(relPath);
       fileEntityIds.set(relPath, fileEntityId);
       fileData.set(relPath, {
         episodeId,
@@ -513,6 +520,57 @@ export async function ingestSource(
           ev,
         );
         if (created) result.edgesCreated++;
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // SWEEP PASS — archive episodes for files no longer present under walk root.
+  // Queries only episodes whose metadata.walk_root matches this run's absRoot
+  // so that partial-ingest runs from different roots don't archive each other.
+  // Runs in both normal and dryRun mode (counts deletedArchived either way).
+  // ---------------------------------------------------------------------------
+
+  if (!dryRun) {
+    const sweepCandidates = graph.db
+      .query<{ id: string; source_ref: string }, [string]>(
+        `SELECT id, source_ref FROM episodes
+         WHERE source_type = 'source'
+           AND status = 'active'
+           AND json_extract(metadata, '$.walk_root') = ?`,
+      )
+      .all(absRoot);
+
+    for (const ep of sweepCandidates) {
+      if (!ep.source_ref) continue;
+      const atIdx = ep.source_ref.lastIndexOf("@");
+      if (atIdx < 0) continue; // malformed source_ref — skip rather than over-archive
+      const epRelPath = ep.source_ref.slice(0, atIdx);
+      if (!visitedRelPaths.has(epRelPath)) {
+        graph.db
+          .prepare(`UPDATE episodes SET status = 'archived' WHERE id = ?`)
+          .run(ep.id);
+        result.deletedArchived++;
+      }
+    }
+  } else {
+    // dryRun: count what would be archived without writing
+    const sweepCandidates = graph.db
+      .query<{ source_ref: string }, [string]>(
+        `SELECT source_ref FROM episodes
+         WHERE source_type = 'source'
+           AND status = 'active'
+           AND json_extract(metadata, '$.walk_root') = ?`,
+      )
+      .all(absRoot);
+
+    for (const ep of sweepCandidates) {
+      if (!ep.source_ref) continue;
+      const atIdx = ep.source_ref.lastIndexOf("@");
+      if (atIdx < 0) continue; // malformed source_ref — skip rather than over-archive
+      const epRelPath = ep.source_ref.slice(0, atIdx);
+      if (!visitedRelPaths.has(epRelPath)) {
+        result.deletedArchived++;
       }
     }
   }
