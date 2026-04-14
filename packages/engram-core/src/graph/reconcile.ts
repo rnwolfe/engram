@@ -808,8 +808,7 @@ export async function reconcile(
       // Validate proposal structure before attempting project()
       const validationError = validateProposal(proposal, knownKinds);
       if (validationError) {
-        // Skip malformed proposals — log-worthy but not fatal
-        // In production this would be a warn() call; for now just skip.
+        console.warn(`[engram] reconcile: skipping proposal — ${validationError}`);
         continue;
       }
 
