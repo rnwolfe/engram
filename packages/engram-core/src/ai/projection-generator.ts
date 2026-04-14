@@ -70,6 +70,14 @@ export type AssessVerdict =
 
 export interface ProjectionGenerator {
   /**
+   * Returns true when the generator has a valid API key and will make real
+   * LLM calls. Returns false in stub mode (no key). Used by reconcile() to
+   * avoid advancing the discover cursor when running without a key would
+   * silently consume the delta without authoring anything.
+   */
+  isConfigured(): boolean;
+
+  /**
    * Generate a markdown body (with YAML frontmatter) from resolved inputs.
    *
    * @param inputs - Resolved substrate elements to synthesize from.
@@ -100,6 +108,10 @@ export interface ProjectionGenerator {
 // ─── NullGenerator ───────────────────────────────────────────────────────────
 
 export class NullGenerator implements ProjectionGenerator {
+  isConfigured(): boolean {
+    return false;
+  }
+
   async generate(
     _inputs: ResolvedInput[],
     _kind: string,
@@ -158,6 +170,10 @@ export class AnthropicGenerator implements ProjectionGenerator {
     this.model = opts?.model ?? "claude-sonnet-4-6";
     this.promptTemplateId = opts?.promptTemplateId ?? "default.v1";
     this.apiKey = opts?.apiKey ?? process.env.ANTHROPIC_API_KEY;
+  }
+
+  isConfigured(): boolean {
+    return !!this.apiKey;
   }
 
   async generate(

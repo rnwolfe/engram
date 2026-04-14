@@ -185,6 +185,12 @@ export function registerReconcile(program: Command): void {
           "Budget exhausted — partial run recorded. Re-run to continue.",
         );
       }
+      if (result.stub_mode) {
+        log.warn(
+          "Generator has no API key — discover phase was a no-op and cursor was NOT advanced.\n" +
+            "Set the API key env var (e.g. GEMINI_API_KEY, ANTHROPIC_API_KEY) and re-run.",
+        );
+      }
 
       outro("Done");
       process.exit(0);

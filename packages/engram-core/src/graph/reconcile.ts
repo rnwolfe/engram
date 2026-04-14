@@ -72,6 +72,8 @@ export interface ReconciliationRunResult {
   completed_at: string;
   /** Set when status='partial' to explain why the run did not complete. */
   error?: string;
+  /** True when the generator has no API key — cursor was not advanced. */
+  stub_mode?: boolean;
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
@@ -593,8 +595,18 @@ export async function reconcile(
   const budget = new Budget(opts?.maxCost);
   const dryRun = opts?.dryRun ?? false;
   const phases = opts?.phases ?? ["assess", "discover"];
+  // If the generator has no API key, treat this run as a dry-run for cursor
+  // purposes so the discover cursor is not advanced and the same delta is
+  // retried once a key is configured.
+  const stubMode = !generator.isConfigured();
+  const effectiveDryRun = dryRun || stubMode;
 
-  startReconciliationRun(graph, runId, opts ?? {}, startedAt);
+  startReconciliationRun(
+    graph,
+    runId,
+    { ...(opts ?? {}), dryRun: effectiveDryRun },
+    startedAt,
+  );
 
   let assessed = 0;
   let superseded = 0;
@@ -602,6 +614,13 @@ export async function reconcile(
   let discovered = 0;
   let budgetHit = false;
   let partialReason: string | undefined;
+
+  if (stubMode && phases.includes("discover")) {
+    console.warn(
+      "[engram] reconcile: generator is not configured (no API key) — " +
+        "discover phase will not advance the cursor. Set the API key env var and re-run.",
+    );
+  }
 
   // ── Phase 1: assess existing active projections ────────────────────────────
   if (phases.includes("assess")) {
@@ -635,7 +654,7 @@ export async function reconcile(
             graph,
             projection.id,
           );
-          if (!dryRun) {
+          if (!effectiveDryRun) {
             softRefresh(
               graph,
               projection.id,
@@ -659,7 +678,7 @@ export async function reconcile(
           const generated = await generator.regenerate(projection, inputs);
           budget.consume(1);
 
-          if (!dryRun) {
+          if (!effectiveDryRun) {
             // Recompute fingerprint from current substrate state — never inherit
             // from the old projection or rely on generator frontmatter, which
             // would cause the new projection to read as immediately stale.
@@ -700,6 +719,8 @@ export async function reconcile(
   // 7. Budget exhaustion mid-phase sets status='partial' and records reason.
   //
   // Dry runs count proposals but skip project() authoring and do not advance cursor.
+  // Unconfigured generators (no API key) are treated as dry runs: the discover
+  // cursor is NOT advanced so the same delta is retried once a key is set.
   if (phases.includes("discover") && !budgetHit) {
     const kindCatalog = loadKindCatalog();
     const knownKinds = new Set(kindCatalog.map((k) => k.name));
@@ -731,7 +752,7 @@ export async function reconcile(
         continue;
       }
 
-      if (!dryRun) {
+      if (!effectiveDryRun) {
         try {
           await project(graph, {
             kind: proposal.kind,
@@ -754,7 +775,7 @@ export async function reconcile(
           continue;
         }
       } else {
-        // Dry run: count the proposal but don't author it
+        // Dry run (or stub mode): count the proposal but don't author it
         discovered++;
       }
 
@@ -789,6 +810,7 @@ export async function reconcile(
     superseded,
     soft_refreshed: softRefreshed,
     discovered,
+    ...(stubMode ? { stub_mode: true } : {}),
     started_at: startedAt,
     completed_at: completedAt,
     ...(partialReason !== undefined ? { error: partialReason } : {}),

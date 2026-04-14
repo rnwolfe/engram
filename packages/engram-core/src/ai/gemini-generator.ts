@@ -45,6 +45,10 @@ export class GeminiGenerator implements ProjectionGenerator {
     this.apiKey = opts?.apiKey ?? process.env.GEMINI_API_KEY;
   }
 
+  isConfigured(): boolean {
+    return !!this.apiKey;
+  }
+
   private async call(
     systemPrompt: string,
     userPrompt: string,

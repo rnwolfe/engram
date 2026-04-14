@@ -95,6 +95,9 @@ function makeRecordingGenerator(opts?: {
   const calls: RecordingCall[] = [];
   return {
     calls,
+    isConfigured(): boolean {
+      return true;
+    },
     async generate(
       inputs: ResolvedInput[],
     ): Promise<{ body: string; confidence: number }> {
