@@ -54,6 +54,7 @@ export class GeminiGenerator implements ProjectionGenerator {
     userPrompt: string,
     maxTokens: number,
     responseFormat: "text" | "json" = "text",
+    responseSchema?: object,
   ): Promise<string> {
     const { GoogleGenAI } = await import("@google/genai");
     const genai = new GoogleGenAI({ apiKey: this.apiKey as string });
@@ -63,7 +64,10 @@ export class GeminiGenerator implements ProjectionGenerator {
         systemInstruction: systemPrompt,
         maxOutputTokens: maxTokens,
         ...(responseFormat === "json"
-          ? { responseMimeType: "application/json" }
+          ? {
+              responseMimeType: "application/json",
+              ...(responseSchema ? { responseSchema } : {}),
+            }
           : {}),
       },
       contents: userPrompt,
@@ -150,7 +154,36 @@ export class GeminiGenerator implements ProjectionGenerator {
       return [];
     }
     const { system, user } = buildDiscoverPrompt(delta, catalog, kinds);
-    const text = await this.call(system, user, 4096, "json");
+    const schema = {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          kind: { type: "string", enum: kinds.map((k) => k.name) },
+          anchor: {
+            type: "object",
+            nullable: true,
+            properties: {
+              type: { type: "string" },
+              id: { type: "string" },
+            },
+          },
+          inputs: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                type: { type: "string" },
+                id: { type: "string" },
+              },
+            },
+          },
+          rationale: { type: "string" },
+        },
+        required: ["kind", "inputs", "rationale"],
+      },
+    };
+    const text = await this.call(system, user, 4096, "json", schema);
     return parseDiscoverProposals(text);
   }
 }
