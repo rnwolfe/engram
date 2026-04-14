@@ -67,6 +67,29 @@ export function registerReconcile(program: Command): void {
     .action(async (opts: ReconcileOpts) => {
       intro("engram reconcile");
 
+      // ── Reset cursor (no other flags required) ──────────────────────────────
+      if (opts.resetCursor) {
+        const dbPath = path.resolve(opts.db);
+        let graph: EngramGraph | undefined;
+        try {
+          graph = openGraph(dbPath);
+        } catch (err) {
+          log.error(
+            `Cannot open graph: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          process.exit(1);
+        }
+        const deleted = (
+          graph.db
+            .prepare("DELETE FROM reconciliation_runs")
+            .run() as { changes: number }
+        ).changes;
+        closeGraph(graph);
+        log.info(`Cursor reset — deleted ${deleted} reconciliation run(s). Re-run without --reset-cursor to discover from scratch.`);
+        outro("Done");
+        process.exit(0);
+      }
+
       // ── Validate --phase ────────────────────────────────────────────────────
       const validPhases = ["assess", "discover", "both"];
       if (!validPhases.includes(opts.phase)) {
@@ -128,19 +151,6 @@ export function registerReconcile(program: Command): void {
           `Cannot open graph: ${err instanceof Error ? err.message : String(err)}`,
         );
         process.exit(1);
-      }
-
-      // ── Reset cursor ────────────────────────────────────────────────────────
-      if (opts.resetCursor) {
-        const deleted = (
-          graph.db
-            .prepare("DELETE FROM reconciliation_runs")
-            .run() as { changes: number }
-        ).changes;
-        log.info(`Cursor reset — deleted ${deleted} reconciliation run(s). Re-run without --reset-cursor to discover from scratch.`);
-        closeGraph(graph);
-        outro("Done");
-        process.exit(0);
       }
 
       // ── Build phase list ────────────────────────────────────────────────────
