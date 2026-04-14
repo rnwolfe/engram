@@ -28,7 +28,7 @@ import type {
   SubstrateDelta,
 } from "./projection-generator.js";
 
-const DEFAULT_MODEL = "gemini-3.1-pro-preview";
+const DEFAULT_MODEL = "gemini-3-flash-preview";
 
 export class GeminiGenerator implements ProjectionGenerator {
   private readonly model: string;
@@ -45,22 +45,38 @@ export class GeminiGenerator implements ProjectionGenerator {
     this.apiKey = opts?.apiKey ?? process.env.GEMINI_API_KEY;
   }
 
+  isConfigured(): boolean {
+    return !!this.apiKey;
+  }
+
   private async call(
     systemPrompt: string,
     userPrompt: string,
     maxTokens: number,
+    responseFormat: "text" | "json" = "text",
+    responseSchema?: object,
   ): Promise<string> {
     const { GoogleGenAI } = await import("@google/genai");
-    const genai = new GoogleGenAI({ apiKey: this.apiKey! });
+    const genai = new GoogleGenAI({ apiKey: this.apiKey as string });
     const response = await genai.models.generateContent({
       model: this.model,
       config: {
         systemInstruction: systemPrompt,
         maxOutputTokens: maxTokens,
+        ...(responseFormat === "json"
+          ? {
+              responseMimeType: "application/json",
+              ...(responseSchema ? { responseSchema } : {}),
+            }
+          : {}),
       },
       contents: userPrompt,
     });
-    return response.text ?? "";
+    const text = response.text ?? "";
+    if (process.env.ENGRAM_DEBUG) {
+      console.error("[engram][gemini] raw response:", text.slice(0, 1000));
+    }
+    return text;
   }
 
   async generate(
@@ -138,7 +154,36 @@ export class GeminiGenerator implements ProjectionGenerator {
       return [];
     }
     const { system, user } = buildDiscoverPrompt(delta, catalog, kinds);
-    const text = await this.call(system, user, 1024);
+    const schema = {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          kind: { type: "string", enum: kinds.map((k) => k.name) },
+          anchor: {
+            type: "object",
+            nullable: true,
+            properties: {
+              type: { type: "string" },
+              id: { type: "string" },
+            },
+          },
+          inputs: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                type: { type: "string" },
+                id: { type: "string" },
+              },
+            },
+          },
+          rationale: { type: "string" },
+        },
+        required: ["kind", "inputs", "rationale"],
+      },
+    };
+    const text = await this.call(system, user, 4096, "json", schema);
     return parseDiscoverProposals(text);
   }
 }

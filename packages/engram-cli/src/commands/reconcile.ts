@@ -11,6 +11,7 @@
  */
 
 import * as path from "node:path";
+import { intro, log, outro, spinner } from "@clack/prompts";
 import type { Command } from "commander";
 import type { EngramGraph } from "engram-core";
 import { closeGraph, createGenerator, openGraph, reconcile } from "engram-core";
@@ -21,7 +22,9 @@ interface ReconcileOpts {
   phase: "assess" | "discover" | "both";
   scope?: string;
   maxCost?: string;
+  maxDeltaItems?: string;
   dryRun: boolean;
+  resetCursor: boolean;
   db: string;
 }
 
@@ -37,40 +40,6 @@ function validateScope(scope: string): string | null {
   return `Invalid --scope value: "${scope}". Expected format: kind:<value> or anchor:<value>`;
 }
 
-// ─── Progress output ──────────────────────────────────────────────────────────
-
-function printPhaseHeader(phase: string): void {
-  console.log(`\n  [reconcile] ${phase} phase starting...`);
-}
-
-function printProgress(label: string, value: number | string): void {
-  console.log(`    ${label}: ${value}`);
-}
-
-function printSummary(
-  runId: string,
-  status: string,
-  assessed: number,
-  softRefreshed: number,
-  superseded: number,
-  startedAt: string,
-  completedAt: string,
-  dryRun: boolean,
-): void {
-  const elapsed = (
-    (new Date(completedAt).getTime() - new Date(startedAt).getTime()) /
-    1000
-  ).toFixed(1);
-
-  console.log("\n  Reconciliation complete");
-  console.log(`  Status:          ${status}${dryRun ? " (dry-run)" : ""}`);
-  console.log(`  Run ID:          ${runId}`);
-  console.log(`  Elapsed:         ${elapsed}s`);
-  console.log(`  Assessed:        ${assessed}`);
-  console.log(`  Soft-refreshed:  ${softRefreshed}`);
-  console.log(`  Superseded:      ${superseded}`);
-}
-
 // ─── Command registration ─────────────────────────────────────────────────────
 
 export function registerReconcile(program: Command): void {
@@ -84,14 +53,50 @@ export function registerReconcile(program: Command): void {
     )
     .option("--scope <filter>", "limit scope: kind:<value> or anchor:<value>")
     .option("--max-cost <n>", "token budget cap (required unless --dry-run)")
+    .option(
+      "--max-delta-items <n>",
+      "max substrate items per discover call — larger values use more tokens (default: 500)",
+    )
     .option("--dry-run", "assess but do not persist any changes", false)
+    .option(
+      "--reset-cursor",
+      "clear reconciliation history so the next run re-processes all substrate data",
+      false,
+    )
     .option("--db <path>", "path to .engram file", ".engram")
     .action(async (opts: ReconcileOpts) => {
+      intro("engram reconcile");
+
+      // ── Reset cursor (no other flags required) ──────────────────────────────
+      if (opts.resetCursor) {
+        const dbPath = path.resolve(opts.db);
+        let graph: EngramGraph | undefined;
+        try {
+          graph = openGraph(dbPath);
+        } catch (err) {
+          log.error(
+            `Cannot open graph: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          process.exit(1);
+        }
+        const deleted = (
+          graph.db.prepare("DELETE FROM reconciliation_runs").run() as {
+            changes: number;
+          }
+        ).changes;
+        closeGraph(graph);
+        log.info(
+          `Cursor reset — deleted ${deleted} reconciliation run(s). Re-run without --reset-cursor to discover from scratch.`,
+        );
+        outro("Done");
+        process.exit(0);
+      }
+
       // ── Validate --phase ────────────────────────────────────────────────────
       const validPhases = ["assess", "discover", "both"];
       if (!validPhases.includes(opts.phase)) {
-        console.error(
-          `Error: --phase must be one of: assess, discover, both (got "${opts.phase}")`,
+        log.error(
+          `--phase must be one of: assess, discover, both (got "${opts.phase}")`,
         );
         process.exit(2);
       }
@@ -100,17 +105,16 @@ export function registerReconcile(program: Command): void {
       if (opts.scope) {
         const scopeErr = validateScope(opts.scope);
         if (scopeErr) {
-          console.error(`Error: ${scopeErr}`);
+          log.error(scopeErr);
           process.exit(2);
         }
       }
 
       // ── Require --max-cost unless --dry-run ─────────────────────────────────
       if (!opts.dryRun && opts.maxCost === undefined) {
-        console.error(
-          "Error: --max-cost <n> is required for non-dry-run reconcile.\n" +
-            "  This forces you to acknowledge the token budget before making changes.\n" +
-            "  Use --dry-run to assess without persisting, or set --max-cost to proceed.",
+        log.error(
+          "--max-cost <n> is required for non-dry-run reconcile.\n" +
+            "Use --dry-run to assess without persisting, or set --max-cost to proceed.",
         );
         process.exit(2);
       }
@@ -120,8 +124,20 @@ export function registerReconcile(program: Command): void {
       if (opts.maxCost !== undefined) {
         maxCost = Number(opts.maxCost);
         if (!Number.isFinite(maxCost) || maxCost < 0) {
-          console.error(
-            `Error: --max-cost must be a non-negative number (got "${opts.maxCost}")`,
+          log.error(
+            `--max-cost must be a non-negative number (got "${opts.maxCost}")`,
+          );
+          process.exit(2);
+        }
+      }
+
+      // ── Parse --max-delta-items ─────────────────────────────────────────────
+      let maxDeltaItems: number | undefined;
+      if (opts.maxDeltaItems !== undefined) {
+        maxDeltaItems = Number(opts.maxDeltaItems);
+        if (!Number.isFinite(maxDeltaItems) || maxDeltaItems < 1) {
+          log.error(
+            `--max-delta-items must be a positive number (got "${opts.maxDeltaItems}")`,
           );
           process.exit(2);
         }
@@ -133,8 +149,8 @@ export function registerReconcile(program: Command): void {
       try {
         graph = openGraph(dbPath);
       } catch (err) {
-        console.error(
-          `Error opening graph: ${err instanceof Error ? err.message : String(err)}`,
+        log.error(
+          `Cannot open graph: ${err instanceof Error ? err.message : String(err)}`,
         );
         process.exit(1);
       }
@@ -144,50 +160,46 @@ export function registerReconcile(program: Command): void {
         opts.phase === "both" ? ["assess", "discover"] : [opts.phase];
 
       // ── Print plan ──────────────────────────────────────────────────────────
-      console.log("  Reconciling projections...");
-      if (opts.dryRun) {
-        console.log("  Mode:  dry-run (no writes)");
-      }
-      if (opts.scope) {
-        console.log(`  Scope: ${opts.scope}`);
-      }
-      if (maxCost !== undefined) {
-        console.log(`  Budget: ${maxCost} tokens`);
-      }
+      const planLines = [`Phases: ${phases.join(", ")}`];
+      if (opts.dryRun) planLines.push("Mode:   dry-run (no writes)");
+      if (opts.scope) planLines.push(`Scope:  ${opts.scope}`);
+      if (maxCost !== undefined) planLines.push(`Budget: ${maxCost} tokens`);
+      planLines.push(
+        `Delta:  up to ${maxDeltaItems ?? 500} items/discover call`,
+      );
+      log.info(planLines.join("\n"));
 
       // ── Create generator ────────────────────────────────────────────────────
-      // createGenerator() resolves the provider from ENGRAM_AI_PROVIDER
-      // (anthropic | gemini | openai) or auto-detects from present API keys.
-      // Falls back to NullGenerator when nothing is configured, which will
-      // error on the first LLM call with a clear message.
       const generator = createGenerator();
 
       // ── Run reconciliation ──────────────────────────────────────────────────
+      const s = spinner();
+      s.start(
+        phases.length === 2
+          ? "Running assess + discover phases"
+          : `Running ${phases[0]} phase`,
+      );
+
       let result: Awaited<ReturnType<typeof reconcile>>;
       try {
-        if (phases.includes("assess")) {
-          printPhaseHeader("assess");
-        }
-
         result = await reconcile(graph, generator, {
           scope: opts.scope,
           phases,
           maxCost,
           dryRun: opts.dryRun,
+          maxDeltaItems,
         });
-
-        if (phases.includes("discover")) {
-          printPhaseHeader("discover");
-        }
+        s.stop("Reconciliation complete");
       } catch (err) {
+        s.stop("Reconciliation failed");
         const errMsg = err instanceof Error ? err.message : String(err);
-        console.error(`\n  Reconcile failed: ${errMsg}`);
+        log.error(errMsg);
         if (
           errMsg.includes("NullGenerator") ||
           errMsg.includes("no AI provider configured")
         ) {
-          console.error(
-            "\n  No AI provider configured. Set ANTHROPIC_API_KEY, GEMINI_API_KEY, or OPENAI_API_KEY to enable projection authoring.",
+          log.warn(
+            "No AI provider configured. Set ANTHROPIC_API_KEY, GEMINI_API_KEY, or OPENAI_API_KEY to enable projection authoring.",
           );
         }
         closeGraph(graph);
@@ -196,35 +208,43 @@ export function registerReconcile(program: Command): void {
 
       closeGraph(graph);
 
-      // ── Print per-phase progress ────────────────────────────────────────────
+      // ── Summary ─────────────────────────────────────────────────────────────
+      const elapsed = (
+        (new Date(result.completed_at).getTime() -
+          new Date(result.started_at).getTime()) /
+        1000
+      ).toFixed(1);
+
+      const summaryLines = [
+        `Status:   ${result.status}${opts.dryRun ? " (dry-run)" : ""}`,
+        `Elapsed:  ${elapsed}s`,
+      ];
       if (phases.includes("assess")) {
-        printProgress("Projections assessed", result.assessed);
-        printProgress("Soft-refreshed", result.soft_refreshed);
-        printProgress("Superseded", result.superseded);
+        summaryLines.push(
+          `Assessed: ${result.assessed}`,
+          `Refreshed:   ${result.soft_refreshed}`,
+          `Superseded:  ${result.superseded}`,
+        );
       }
+      if (phases.includes("discover")) {
+        summaryLines.push(`Discovered:  ${result.discovered}`);
+      }
+      summaryLines.push(`Run ID:   ${result.run_id}`);
+      log.info(summaryLines.join("\n"));
 
-      // ── Handle partial (budget exhausted) ──────────────────────────────────
       if (result.status === "partial") {
-        console.log(
-          "\n  Budget exhausted — partial run recorded. Re-run to continue.",
+        log.warn(
+          "Budget exhausted — partial run recorded. Re-run to continue.",
         );
-        console.log(
-          `  Cursor saved in reconciliation_runs.id = ${result.run_id}`,
+      }
+      if (result.stub_mode) {
+        log.warn(
+          "Generator has no API key — discover phase was a no-op and cursor was NOT advanced.\n" +
+            "Set the API key env var (e.g. GEMINI_API_KEY, ANTHROPIC_API_KEY) and re-run.",
         );
       }
 
-      // ── Final summary ───────────────────────────────────────────────────────
-      printSummary(
-        result.run_id,
-        result.status,
-        result.assessed,
-        result.soft_refreshed,
-        result.superseded,
-        result.started_at,
-        result.completed_at,
-        opts.dryRun,
-      );
-
+      outro("Done");
       process.exit(0);
     });
 }

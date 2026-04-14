@@ -116,7 +116,7 @@ export {
   supersedeProjection,
 } from "./graph/index.js";
 export type { EnrichmentAdapter, EnrichOpts } from "./ingest/adapter.js";
-export { GitHubAdapter } from "./ingest/adapters/github.js";
+export { GitHubAdapter, GitHubAuthError } from "./ingest/adapters/github.js";
 export type { GitIngestOpts, IngestResult } from "./ingest/git.js";
 export { ingestGitRepo } from "./ingest/git.js";
 export type { MarkdownIngestOpts } from "./ingest/markdown.js";

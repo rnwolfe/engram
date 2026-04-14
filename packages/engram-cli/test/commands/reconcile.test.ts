@@ -41,18 +41,22 @@ function tmpDb(): { tmpDir: string; dbPath: string } {
   return { tmpDir, dbPath };
 }
 
-/** Run a CLI command with a patched process.exit and captured console output. */
+/** Run a CLI command with a patched process.exit and captured stdout output. */
 async function runCommand(
   args: string[],
 ): Promise<{ exitCode: number | undefined; output: string }> {
   const program = new Command().exitOverride();
   registerReconcile(program);
 
-  const logs: string[] = [];
-  const origLog = console.log;
-  const origError = console.error;
-  console.log = (...a: unknown[]) => logs.push(a.join(" "));
-  console.error = (...a: unknown[]) => logs.push(a.join(" "));
+  const chunks: string[] = [];
+  const origWrite = process.stdout.write.bind(process.stdout);
+  // biome-ignore lint/suspicious/noExplicitAny: test shim
+  (process.stdout as any).write = (chunk: string | Uint8Array) => {
+    chunks.push(
+      typeof chunk === "string" ? chunk : Buffer.from(chunk).toString(),
+    );
+    return true;
+  };
 
   let exitCode: number | undefined;
   const origExit = process.exit;
@@ -67,13 +71,16 @@ async function runCommand(
   } catch {
     // either exitOverride or our process.exit mock
   } finally {
-    console.log = origLog;
-    console.error = origError;
+    // biome-ignore lint/suspicious/noExplicitAny: restoring process.stdout.write
+    (process.stdout as any).write = origWrite;
     // biome-ignore lint/suspicious/noExplicitAny: restoring process.exit
     (process as any).exit = origExit;
   }
 
-  return { exitCode, output: logs.join("\n") };
+  // Strip ANSI escape codes so assertions can match plain text
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: intentionally matching ANSI escape sequences
+  const output = chunks.join("").replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "");
+  return { exitCode, output };
 }
 
 /** A recording generator that tracks all calls and returns 'still_accurate' by default. */
@@ -88,6 +95,9 @@ function makeRecordingGenerator(opts?: {
   const calls: RecordingCall[] = [];
   return {
     calls,
+    isConfigured(): boolean {
+      return true;
+    },
     async generate(
       inputs: ResolvedInput[],
     ): Promise<{ body: string; confidence: number }> {
@@ -259,7 +269,7 @@ describe("reconcile assess phase", () => {
     ]);
 
     expect(exitCode).toBe(1);
-    expect(output).toContain("Reconcile failed");
+    expect(output).toContain("Reconciliation failed");
   });
 });
 
@@ -516,7 +526,7 @@ describe("reconcile summary output", () => {
     expect(output).toContain("Status:");
     expect(output).toContain("Elapsed:");
     expect(output).toContain("Assessed:");
-    expect(output).toContain("Soft-refreshed:");
+    expect(output).toContain("Refreshed:");
     expect(output).toContain("Superseded:");
   });
 
@@ -547,7 +557,7 @@ describe("reconcile --scope", () => {
       dbPath,
     ]);
     expect(exitCode).toBe(0);
-    expect(output).toContain("Scope: kind:entity_summary");
+    expect(output).toContain("kind:entity_summary");
     expect(output).toContain("Reconciliation complete");
   });
 
@@ -562,7 +572,7 @@ describe("reconcile --scope", () => {
       dbPath,
     ]);
     expect(exitCode).toBe(0);
-    expect(output).toContain("Scope: anchor:entity");
+    expect(output).toContain("anchor:entity");
     expect(output).toContain("Reconciliation complete");
   });
 
@@ -578,7 +588,7 @@ describe("reconcile --scope", () => {
       dbPath,
     ]);
     expect(exitCode).toBe(0);
-    expect(output).toContain("Scope: anchor:entity:01HXABC123");
+    expect(output).toContain("anchor:entity:01HXABC123");
     expect(output).toContain("Reconciliation complete");
   });
 });

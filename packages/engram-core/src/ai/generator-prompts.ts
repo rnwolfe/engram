@@ -180,10 +180,12 @@ export function buildDiscoverPrompt(
       ? catalog.map((p) => `  [${p.id}] ${p.kind}: ${p.title}`).join("\n")
       : "  (none)";
 
+  const validKindNames = kinds.map((k) => `"${k.name}"`).join(", ");
+
   const system =
     `You are a knowledge coverage analyst. Given a substrate delta and an existing projection catalog, propose new projections to fill coverage gaps.\n\n` +
     `Respond with a JSON array of proposal objects. Each object must have:\n` +
-    `  kind: string (must match one of the available kinds)\n` +
+    `  kind: string — MUST be one of these exact strings: ${validKindNames}\n` +
     `  anchor: { type: string, id: string } | null\n` +
     `  inputs: Array<{ type: string, id: string }>\n` +
     `  rationale: string\n\n` +

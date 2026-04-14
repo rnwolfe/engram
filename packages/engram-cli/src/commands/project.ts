@@ -8,6 +8,7 @@
  */
 
 import * as path from "node:path";
+import { intro, log, outro, spinner } from "@clack/prompts";
 import type { Command } from "commander";
 import type {
   AnchorType,
@@ -221,12 +222,13 @@ export function registerProject(program: Command): void {
     )
     .option("--db <path>", "path to .engram file", ".engram")
     .action(async (opts: ProjectOpts) => {
+      intro("engram project");
+
       // ── Parse & validate opts ───────────────────────────────────────────────
 
-      // Validate --kind against safe identifier pattern (prevents path traversal)
       if (!/^[a-z][a-z0-9_]*$/.test(opts.kind)) {
-        console.error(
-          `Error: --kind "${opts.kind}" is invalid. Must match /^[a-z][a-z0-9_]*$/ (lowercase letter, then lowercase letters, digits, or underscores).`,
+        log.error(
+          `--kind "${opts.kind}" is invalid. Must match /^[a-z][a-z0-9_]*$/.`,
         );
         process.exit(2);
         return;
@@ -241,7 +243,7 @@ export function registerProject(program: Command): void {
         inputs = rawInputs.map(parseInput);
       } catch (err) {
         if (err instanceof UsageError) {
-          console.error(`Error: ${err.message}`);
+          log.error(err.message);
           process.exit(2);
           return;
         }
@@ -255,8 +257,8 @@ export function registerProject(program: Command): void {
       try {
         graph = openGraph(dbPath);
       } catch (err) {
-        console.error(
-          `Error opening graph: ${err instanceof Error ? err.message : String(err)}`,
+        log.error(
+          `Cannot open graph: ${err instanceof Error ? err.message : String(err)}`,
         );
         process.exit(1);
         return;
@@ -268,7 +270,7 @@ export function registerProject(program: Command): void {
           inputs = resolveDefaultInputs(graph, anchor);
         } catch (err) {
           if (err instanceof UsageError) {
-            console.error(`Error: ${err.message}`);
+            log.error(err.message);
             closeGraph(graph);
             process.exit(1);
             return;
@@ -277,8 +279,8 @@ export function registerProject(program: Command): void {
         }
 
         if (inputs.length === 0 && anchor.type !== "none") {
-          console.error(
-            `Error: no inputs found for anchor ${opts.anchor}. Specify --input explicitly or ensure the anchor has evidence.`,
+          log.error(
+            `No inputs found for anchor ${opts.anchor}. Specify --input explicitly or ensure the anchor has evidence.`,
           );
           closeGraph(graph);
           process.exit(1);
@@ -288,16 +290,18 @@ export function registerProject(program: Command): void {
 
       // ── Dry-run: print what would be authored ──────────────────────────────
       if (opts.dryRun) {
-        console.log("Dry run — no changes will be written.\n");
-        console.log(`  kind:    ${opts.kind}`);
-        console.log(
-          `  anchor:  ${anchor.type}${anchor.id ? `:${anchor.id}` : ""}`,
+        const inputList = inputs.map((i) => `  - ${i.type}:${i.id}`).join("\n");
+        log.info(
+          [
+            "Dry run — no changes will be written.",
+            `Kind:    ${opts.kind}`,
+            `Anchor:  ${anchor.type}${anchor.id ? `:${anchor.id}` : ""}`,
+            `Inputs:  ${inputs.length}`,
+            inputList,
+          ].join("\n"),
         );
-        console.log(`  inputs:  ${inputs.length}`);
-        for (const inp of inputs) {
-          console.log(`    - ${inp.type}:${inp.id}`);
-        }
         closeGraph(graph);
+        outro("Done (dry-run)");
         process.exit(0);
         return;
       }
@@ -308,7 +312,7 @@ export function registerProject(program: Command): void {
         generator = createGenerator();
       } catch (err) {
         if (err instanceof UsageError) {
-          console.error(`Error: ${err.message}`);
+          log.error(err.message);
           closeGraph(graph);
           process.exit(2);
           return;
@@ -316,11 +320,9 @@ export function registerProject(program: Command): void {
         throw err;
       }
 
-      // Detect NullGenerator early and provide a friendly error
       if (generator instanceof NullGenerator) {
-        console.error(
-          "Error: no AI provider configured for projection authoring. " +
-            "No AI provider configured for projection authoring. " +
+        log.error(
+          "No AI provider configured for projection authoring.\n" +
             "Set ANTHROPIC_API_KEY, GEMINI_API_KEY, or OPENAI_API_KEY (or set ENGRAM_AI_PROVIDER explicitly).",
         );
         closeGraph(graph);
@@ -329,7 +331,6 @@ export function registerProject(program: Command): void {
       }
 
       // ── Query for existing projection before calling project() ─────────────
-      // Used for reliable idempotence detection: compare returned ID to pre-existing ID.
       const anchorIdForQuery = anchor.id ?? null;
       const existingBeforeCall = listActiveProjections(graph, {
         kind: opts.kind,
@@ -342,6 +343,9 @@ export function registerProject(program: Command): void {
           : null;
 
       // ── Author the projection ──────────────────────────────────────────────
+      const s = spinner();
+      s.start(`Authoring ${opts.kind} projection`);
+
       let projection: import("engram-core").Projection;
       try {
         projection = await project(graph, {
@@ -350,39 +354,38 @@ export function registerProject(program: Command): void {
           inputs,
           generator,
         });
+        s.stop("Projection authored");
       } catch (err) {
-        if (
+        s.stop("Projection authoring failed");
+        const msg =
           err instanceof ProjectionCycleError ||
           err instanceof ProjectionInputMissingError ||
           err instanceof ProjectionFrontmatterError
-        ) {
-          console.error(`Error: ${err.message}`);
-        } else {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.error(`Error: ${msg}`);
-        }
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : String(err);
+        log.error(msg);
         closeGraph(graph);
         process.exit(1);
         return;
       }
 
-      // Determine result status: idempotent if the returned projection ID matches
-      // the pre-existing ID (same projection, fingerprint matched → no-op).
       const wasIdempotent =
         preExistingId !== null && projection.id === preExistingId;
 
-      console.log("Projection authored successfully.\n");
-      console.log(`  id:      ${projection.id}`);
-      console.log(`  kind:    ${projection.kind}`);
-      console.log(
-        `  anchor:  ${projection.anchor_type}${projection.anchor_id ? `:${projection.anchor_id}` : ""}`,
-      );
-      console.log(`  inputs:  ${inputs.length}`);
-      console.log(`  model:   ${projection.model}`);
-      console.log(
-        `  status:  ${wasIdempotent ? "idempotent (no-op, already up to date)" : "authored"}`,
+      log.info(
+        [
+          `ID:      ${projection.id}`,
+          `Kind:    ${projection.kind}`,
+          `Anchor:  ${projection.anchor_type}${projection.anchor_id ? `:${projection.anchor_id}` : ""}`,
+          `Inputs:  ${inputs.length}`,
+          `Model:   ${projection.model}`,
+          `Status:  ${wasIdempotent ? "idempotent (already up to date)" : "authored"}`,
+        ].join("\n"),
       );
 
       closeGraph(graph);
+      outro("Done");
     });
 }

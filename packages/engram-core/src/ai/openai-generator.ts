@@ -45,6 +45,10 @@ export class OpenAIGenerator implements ProjectionGenerator {
     this.apiKey = opts?.apiKey ?? process.env.OPENAI_API_KEY;
   }
 
+  isConfigured(): boolean {
+    return !!this.apiKey;
+  }
+
   private async call(
     systemPrompt: string,
     userPrompt: string,

@@ -3,10 +3,15 @@
  *
  * Creates a new .engram database at the given path.
  * Optionally runs git ingestion immediately after creation.
+ *
+ * Note: git ingestion uses execFileSync internally (blocking), so a spinner
+ * cannot animate during the operation. We print a clear "starting" line
+ * before the call and results after.
  */
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { intro, log, outro } from "@clack/prompts";
 import type { Command } from "commander";
 import type { EngramGraph } from "engram-core";
 import { closeGraph, createGraph, ingestGitRepo } from "engram-core";
@@ -23,36 +28,46 @@ export function registerInit(program: Command): void {
     .option("--from-git <path>", "also ingest a git repository after creating")
     .option("--db <path>", "path for the .engram file", ".engram")
     .action(async (opts: InitOpts) => {
+      intro("engram init");
+
       const dbPath = path.resolve(opts.db);
 
       if (fs.existsSync(dbPath)) {
-        console.error(`Error: .engram file already exists at ${dbPath}`);
+        log.error(`File already exists: ${dbPath}`);
         process.exit(1);
       }
 
       let graph: EngramGraph | undefined;
       try {
         graph = createGraph(dbPath);
-        console.log(`Created ${dbPath}`);
+        log.success(`Created ${dbPath}`);
       } catch (err) {
-        console.error(
-          `Error creating graph: ${err instanceof Error ? err.message : String(err)}`,
+        log.error(
+          `Failed to create graph: ${err instanceof Error ? err.message : String(err)}`,
         );
         process.exit(1);
       }
 
       if (opts.fromGit) {
         const repoPath = path.resolve(opts.fromGit);
-        console.log(`Ingesting git repository: ${repoPath}`);
+        // Git ingestion is synchronous (execFileSync + SQLite writes).
+        // A spinner cannot animate while the event loop is blocked, so we
+        // print a plain message before starting and results when done.
+        log.info(
+          `Ingesting git repository at ${repoPath} — this may take a while...`,
+        );
         try {
           const result = await ingestGitRepo(graph, repoPath);
-          console.log(`Git ingestion complete:`);
-          console.log(`  Episodes created:  ${result.episodesCreated}`);
-          console.log(`  Episodes skipped:  ${result.episodesSkipped}`);
-          console.log(`  Entities created:  ${result.entitiesCreated}`);
-          console.log(`  Edges created:     ${result.edgesCreated}`);
+          log.success(
+            [
+              "Git ingestion complete",
+              `  Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
+              `  Entities: ${result.entitiesCreated} created`,
+              `  Edges:    ${result.edgesCreated} created`,
+            ].join("\n"),
+          );
         } catch (err) {
-          console.error(
+          log.error(
             `Git ingestion failed: ${err instanceof Error ? err.message : String(err)}`,
           );
           closeGraph(graph);
@@ -61,5 +76,6 @@ export function registerInit(program: Command): void {
       }
 
       closeGraph(graph);
+      outro("Done");
     });
 }

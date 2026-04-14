@@ -58,6 +58,12 @@ export interface ReconcileOpts {
   maxCost?: number;
   /** If true, assess but don't write any changes to the database. */
   dryRun?: boolean;
+  /**
+   * Maximum number of substrate delta items to include in a single discover
+   * call. Items are sampled proportionally from episodes/entities/edges,
+   * taking the most recent. Defaults to 500.
+   */
+  maxDeltaItems?: number;
 }
 
 export interface ReconciliationRunResult {
@@ -72,6 +78,8 @@ export interface ReconciliationRunResult {
   completed_at: string;
   /** Set when status='partial' to explain why the run did not complete. */
   error?: string;
+  /** True when the generator has no API key — cursor was not advanced. */
+  stub_mode?: boolean;
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
@@ -536,6 +544,54 @@ function validateProposal(
   return null;
 }
 
+// ─── Delta sampling ───────────────────────────────────────────────────────────
+
+/**
+ * Samples a SubstrateDelta down to at most maxTotal items, preserving the
+ * proportional ratio of episodes/entities/edges and taking the most recent
+ * items of each type (delta items are ordered ASC, so we slice from the tail).
+ *
+ * Returns the sampled delta and the original total item count so callers can
+ * log how much was dropped.
+ */
+function sampleDelta(
+  delta: SubstrateDelta,
+  maxTotal: number,
+): { sampled: SubstrateDelta; totalItems: number; sampledCount: number } {
+  const totalItems =
+    delta.episodes.length + delta.entities.length + delta.edges.length;
+
+  if (totalItems <= maxTotal) {
+    return { sampled: delta, totalItems, sampledCount: totalItems };
+  }
+
+  // Proportional allocation — at least 1 of each non-empty type
+  const epRatio = delta.episodes.length / totalItems;
+  const entRatio = delta.entities.length / totalItems;
+  const edgeRatio = delta.edges.length / totalItems;
+
+  const maxEp =
+    delta.episodes.length > 0 ? Math.max(1, Math.round(maxTotal * epRatio)) : 0;
+  const maxEnt =
+    delta.entities.length > 0
+      ? Math.max(1, Math.round(maxTotal * entRatio))
+      : 0;
+  const maxEdge =
+    delta.edges.length > 0 ? Math.max(1, Math.round(maxTotal * edgeRatio)) : 0;
+
+  const sampled: SubstrateDelta = {
+    since: delta.since,
+    episodes: delta.episodes.slice(-maxEp),
+    entities: delta.entities.slice(-maxEnt),
+    edges: delta.edges.slice(-maxEdge),
+  };
+
+  const sampledCount =
+    sampled.episodes.length + sampled.entities.length + sampled.edges.length;
+
+  return { sampled, totalItems, sampledCount };
+}
+
 // ─── Scope filter helper ──────────────────────────────────────────────────────
 
 /**
@@ -593,8 +649,18 @@ export async function reconcile(
   const budget = new Budget(opts?.maxCost);
   const dryRun = opts?.dryRun ?? false;
   const phases = opts?.phases ?? ["assess", "discover"];
+  // If the generator has no API key, treat this run as a dry-run for cursor
+  // purposes so the discover cursor is not advanced and the same delta is
+  // retried once a key is configured.
+  const stubMode = !generator.isConfigured();
+  const effectiveDryRun = dryRun || stubMode;
 
-  startReconciliationRun(graph, runId, opts ?? {}, startedAt);
+  startReconciliationRun(
+    graph,
+    runId,
+    { ...(opts ?? {}), dryRun: effectiveDryRun },
+    startedAt,
+  );
 
   let assessed = 0;
   let superseded = 0;
@@ -602,6 +668,13 @@ export async function reconcile(
   let discovered = 0;
   let budgetHit = false;
   let partialReason: string | undefined;
+
+  if (stubMode && phases.includes("discover")) {
+    console.warn(
+      "[engram] reconcile: generator is not configured (no API key) — " +
+        "discover phase will not advance the cursor. Set the API key env var and re-run.",
+    );
+  }
 
   // ── Phase 1: assess existing active projections ────────────────────────────
   if (phases.includes("assess")) {
@@ -635,7 +708,7 @@ export async function reconcile(
             graph,
             projection.id,
           );
-          if (!dryRun) {
+          if (!effectiveDryRun) {
             softRefresh(
               graph,
               projection.id,
@@ -659,7 +732,7 @@ export async function reconcile(
           const generated = await generator.regenerate(projection, inputs);
           budget.consume(1);
 
-          if (!dryRun) {
+          if (!effectiveDryRun) {
             // Recompute fingerprint from current substrate state — never inherit
             // from the old projection or rely on generator frontmatter, which
             // would cause the new projection to read as immediately stale.
@@ -700,12 +773,27 @@ export async function reconcile(
   // 7. Budget exhaustion mid-phase sets status='partial' and records reason.
   //
   // Dry runs count proposals but skip project() authoring and do not advance cursor.
+  // Unconfigured generators (no API key) are treated as dry runs: the discover
+  // cursor is NOT advanced so the same delta is retried once a key is set.
   if (phases.includes("discover") && !budgetHit) {
     const kindCatalog = loadKindCatalog();
     const knownKinds = new Set(kindCatalog.map((k) => k.name));
 
     const cursor = lastNonDryRunCompletedAt(graph, opts?.scope);
-    const delta = computeSubstrateDelta(graph, cursor);
+    const rawDelta = computeSubstrateDelta(graph, cursor);
+    const {
+      sampled: delta,
+      totalItems,
+      sampledCount,
+    } = sampleDelta(rawDelta, opts?.maxDeltaItems ?? 500);
+
+    if (sampledCount < totalItems) {
+      console.warn(
+        `[engram] reconcile: delta has ${totalItems} items — sampled ${sampledCount} (most recent) for this discover call. ` +
+          `Run reconcile again after ingesting new data to process incrementally, or raise --max-delta-items.`,
+      );
+    }
+
     const catalog = loadActiveProjectionCatalog(graph, opts?.scope);
 
     // Single structured LLM call to propose new projections
@@ -726,12 +814,13 @@ export async function reconcile(
       // Validate proposal structure before attempting project()
       const validationError = validateProposal(proposal, knownKinds);
       if (validationError) {
-        // Skip malformed proposals — log-worthy but not fatal
-        // In production this would be a warn() call; for now just skip.
+        console.warn(
+          `[engram] reconcile: skipping proposal — ${validationError}`,
+        );
         continue;
       }
 
-      if (!dryRun) {
+      if (!effectiveDryRun) {
         try {
           await project(graph, {
             kind: proposal.kind,
@@ -754,7 +843,7 @@ export async function reconcile(
           continue;
         }
       } else {
-        // Dry run: count the proposal but don't author it
+        // Dry run (or stub mode): count the proposal but don't author it
         discovered++;
       }
 
@@ -789,6 +878,7 @@ export async function reconcile(
     superseded,
     soft_refreshed: softRefreshed,
     discovered,
+    ...(stubMode ? { stub_mode: true } : {}),
     started_at: startedAt,
     completed_at: completedAt,
     ...(partialReason !== undefined ? { error: partialReason } : {}),
