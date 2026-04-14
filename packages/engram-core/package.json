@@ -18,7 +18,10 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.88.0",
     "@google/genai": "^1.48.0",
+    "@noble/hashes": "^1.7.2",
+    "ignore": "^6.0.2",
     "openai": "^6.34.0",
-    "ulid": "^2.3.0"
+    "ulid": "^2.3.0",
+    "web-tree-sitter": "^0.25.6"
   }
 }
