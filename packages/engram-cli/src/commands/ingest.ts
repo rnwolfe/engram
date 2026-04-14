@@ -4,9 +4,11 @@
  * Subcommands:
  *   - ingest git [<path>] [--since] [--branch]
  *   - ingest md <glob>
+ *   - ingest source [<path>] [--exclude] [--no-gitignore] [--dry-run] [--verbose]
  *   - ingest enrich github [--token] [--repo] [--verbose]
  */
 
+import * as fs from "node:fs";
 import * as path from "node:path";
 import { intro, log, outro, spinner } from "@clack/prompts";
 
@@ -15,13 +17,14 @@ import { intro, log, outro, spinner } from "@clack/prompts";
 // For those commands we log a "starting" line and print results when done.
 // spinner() is only used for async operations (GitHub fetch, LLM calls).
 import type { Command } from "commander";
-import type { EngramGraph } from "engram-core";
+import type { EngramGraph, SourceProgressEvent } from "engram-core";
 import {
   closeGraph,
   GitHubAdapter,
   GitHubAuthError,
   ingestGitRepo,
   ingestMarkdown,
+  ingestSource,
   openGraph,
 } from "engram-core";
 
@@ -32,6 +35,14 @@ interface IngestGitOpts {
 }
 
 interface IngestMdOpts {
+  db: string;
+}
+
+interface IngestSourceOpts {
+  exclude?: string[];
+  gitignore: boolean;
+  dryRun?: boolean;
+  verbose?: boolean;
   db: string;
 }
 
@@ -133,6 +144,125 @@ export function registerIngest(program: Command): void {
       } catch (err) {
         log.error(
           `Markdown ingestion failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        closeGraph(graph);
+        process.exit(1);
+      }
+
+      closeGraph(graph);
+      outro("Done");
+    });
+
+  // ingest source
+  ingest
+    .command("source [sourcePath]")
+    .description("Ingest source files into the knowledge graph")
+    .option(
+      "--exclude <glob>",
+      "additional exclude glob (repeatable)",
+      (val: string, prev: string[]) => [...prev, val],
+      [] as string[],
+    )
+    .option(
+      "--no-gitignore",
+      "skip .gitignore application (denylist still applies)",
+    )
+    .option("--dry-run", "walk and report counts without writing")
+    .option("--verbose", "emit per-file progress output")
+    .option("--db <path>", "path to .engram file", ".engram")
+    .action(async (sourcePath: string | undefined, opts: IngestSourceOpts) => {
+      intro("engram ingest source");
+
+      const dbPath = path.resolve(opts.db);
+      const resolvedSource = path.resolve(sourcePath ?? ".");
+      const startMs = Date.now();
+
+      if (opts.dryRun) {
+        log.info("Dry-run mode — no writes will be made");
+      }
+
+      try {
+        const stat = fs.statSync(resolvedSource);
+        if (!stat.isDirectory()) {
+          log.error(`Source path is not a directory: ${resolvedSource}`);
+          process.exit(1);
+        }
+      } catch {
+        log.error(`Source path does not exist: ${resolvedSource}`);
+        process.exit(1);
+      }
+
+      let graph: EngramGraph | undefined;
+      try {
+        graph = openGraph(dbPath);
+      } catch (err) {
+        log.error(
+          `Cannot open graph: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        process.exit(1);
+      }
+
+      let fileIdx = 0;
+
+      const onProgress = opts.verbose
+        ? (event: SourceProgressEvent) => {
+            const label = {
+              file_parsed: "parsed  ",
+              file_skipped: "cached  ",
+              file_error: "error   ",
+              file_scanned: null, // suppress raw scan events
+            }[event.type];
+            if (!label) return;
+            fileIdx++;
+            const suffix = event.message ? `  ${event.message}` : "";
+            log.info(`[${fileIdx}] ${label} ${event.relPath}${suffix}`);
+          }
+        : undefined;
+
+      const s = opts.verbose ? undefined : spinner();
+      if (s) s.start(`Scanning ${resolvedSource}`);
+
+      try {
+        const result = await ingestSource(graph, {
+          root: resolvedSource,
+          exclude: opts.exclude?.length ? opts.exclude : undefined,
+          respectGitignore: opts.gitignore,
+          dryRun: opts.dryRun,
+          onProgress,
+        });
+
+        if (s) s.stop("Scan complete");
+
+        const elapsedSec = ((Date.now() - startMs) / 1000).toFixed(1);
+        const uncached = result.filesScanned - result.filesSkipped;
+        const summaryLines = [
+          opts.dryRun
+            ? "Source ingestion dry-run complete."
+            : "Source ingestion complete.",
+          `  Scanned:  ${result.filesScanned} files`,
+          `  Parsed:   ${result.filesParsed} files (${result.filesSkipped} unchanged, ${uncached - result.filesParsed} unsupported/errored)`,
+          `  Skipped:  ${result.filesSkipped} files`,
+          `  Archived: ${result.deletedArchived} files`,
+          `  Entities: ${result.entitiesCreated} created`,
+          `  Edges:    ${result.edgesCreated} created`,
+          `  Errors:   ${result.errors.length}`,
+          `  Elapsed:  ${elapsedSec}s`,
+        ];
+        log.success(summaryLines.join("\n"));
+
+        if (result.errors.length > 0) {
+          const errLines = result.errors
+            .slice(0, 10)
+            .map((e) => `  ${e.relPath}: ${e.message}`);
+          if (result.errors.length > 10) {
+            errLines.push(`  … and ${result.errors.length - 10} more`);
+          }
+          log.warn(`Per-file errors (not fatal):\n${errLines.join("\n")}`);
+        }
+      } catch (err) {
+        if (s) s.stop("Source ingestion failed");
+        log.error(
+          `Source ingestion failed: ${err instanceof Error ? err.message : String(err)}`,
         );
         closeGraph(graph);
         process.exit(1);
