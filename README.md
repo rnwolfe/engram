@@ -63,6 +63,21 @@ engram visualize   # opens http://127.0.0.1:7878
 
 The result is a single `.engram` file — a SQLite database you can copy, back up, and version alongside your repo.
 
+### Source code ingestion
+
+`engram ingest source` walks your working tree, parses source files with tree-sitter,
+and creates file, module, and symbol entities in the graph. Respects `.gitignore` by
+default and always skips `node_modules`, build artifacts, and lockfiles.
+
+TypeScript and JavaScript are supported in v0.2. Additional languages land in later versions.
+
+```bash
+engram ingest source                            # current directory
+engram ingest source packages/engram-core       # specific path
+engram ingest source --exclude "*.test.ts"      # extra exclusions
+engram ingest source --dry-run --verbose        # see what would happen
+```
+
 ### Enrichment — decision context from code review
 
 Git tells you what changed. Enrichment adapters tell you why — PR discussions, review comments, linked issues, the rationale behind decisions.
