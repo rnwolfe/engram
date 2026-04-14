@@ -121,6 +121,12 @@ export type { GitIngestOpts, IngestResult } from "./ingest/git.js";
 export { ingestGitRepo } from "./ingest/git.js";
 export type { MarkdownIngestOpts } from "./ingest/markdown.js";
 export { ingestMarkdown } from "./ingest/markdown.js";
+export type {
+  ProgressEvent as SourceProgressEvent,
+  SourceIngestOptions,
+  SourceIngestResult,
+} from "./ingest/source/index.js";
+export { ingestSource } from "./ingest/source/index.js";
 export type { TextIngestOpts } from "./ingest/text.js";
 export { ingestText } from "./ingest/text.js";
 export type {
