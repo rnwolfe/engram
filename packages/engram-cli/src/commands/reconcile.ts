@@ -80,12 +80,14 @@ export function registerReconcile(program: Command): void {
           process.exit(1);
         }
         const deleted = (
-          graph.db
-            .prepare("DELETE FROM reconciliation_runs")
-            .run() as { changes: number }
+          graph.db.prepare("DELETE FROM reconciliation_runs").run() as {
+            changes: number;
+          }
         ).changes;
         closeGraph(graph);
-        log.info(`Cursor reset — deleted ${deleted} reconciliation run(s). Re-run without --reset-cursor to discover from scratch.`);
+        log.info(
+          `Cursor reset — deleted ${deleted} reconciliation run(s). Re-run without --reset-cursor to discover from scratch.`,
+        );
         outro("Done");
         process.exit(0);
       }
@@ -162,7 +164,9 @@ export function registerReconcile(program: Command): void {
       if (opts.dryRun) planLines.push("Mode:   dry-run (no writes)");
       if (opts.scope) planLines.push(`Scope:  ${opts.scope}`);
       if (maxCost !== undefined) planLines.push(`Budget: ${maxCost} tokens`);
-      planLines.push(`Delta:  up to ${maxDeltaItems ?? 500} items/discover call`);
+      planLines.push(
+        `Delta:  up to ${maxDeltaItems ?? 500} items/discover call`,
+      );
       log.info(planLines.join("\n"));
 
       // ── Create generator ────────────────────────────────────────────────────

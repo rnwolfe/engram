@@ -53,7 +53,9 @@ export function registerInit(program: Command): void {
         // Git ingestion is synchronous (execFileSync + SQLite writes).
         // A spinner cannot animate while the event loop is blocked, so we
         // print a plain message before starting and results when done.
-        log.info(`Ingesting git repository at ${repoPath} — this may take a while...`);
+        log.info(
+          `Ingesting git repository at ${repoPath} — this may take a while...`,
+        );
         try {
           const result = await ingestGitRepo(graph, repoPath);
           log.success(

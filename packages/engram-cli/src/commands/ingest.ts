@@ -73,7 +73,9 @@ export function registerIngest(program: Command): void {
         process.exit(1);
       }
 
-      log.info(`Ingesting git repo at ${resolvedRepo} — this may take a while...`);
+      log.info(
+        `Ingesting git repo at ${resolvedRepo} — this may take a while...`,
+      );
       try {
         const result = await ingestGitRepo(graph, resolvedRepo, {
           since: opts.since,

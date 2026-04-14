@@ -186,7 +186,7 @@ async function apiGet<T>(
     "X-GitHub-Api-Version": "2022-11-28",
   };
   if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+    headers.Authorization = `Bearer ${token}`;
   }
 
   const resp = await fetchFn(url, { headers });
