@@ -206,4 +206,4 @@ Depth of internal details (data flow, query text, trade-offs, alternatives consi
 - [x] README: add `engram ingest source` to the ingestion section with a one-paragraph explanation
 - [x] CLAUDE.md: add `packages/engram-core/src/ingest/source/` to the Key Files table and the File Organization tree
 - [x] `docs/internal/specs/source-ingestion.md` (this file) — mark as Implemented after shipping
-- [ ] `docs/internal/specs/source-ingestion-design.md` — design doc (companion to this spec)
+- [x] `docs/internal/specs/source-ingestion-design.md` — design doc (companion to this spec)

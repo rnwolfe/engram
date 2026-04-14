@@ -1,7 +1,7 @@
 # Source Code Ingestion — Design
 
 **Companion to**: [`source-ingestion.md`](source-ingestion.md)
-**Status**: Draft
+**Status**: Implemented
 **Authored**: 2026-04-14
 
 This document is the implementation plan behind the source-ingestion spec. The spec defines the contract (what ships, what it guarantees, acceptance criteria). This document defines *how* it's built: module internals, data flow, trade-offs, alternatives considered, and the sequence of work.

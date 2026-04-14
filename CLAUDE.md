@@ -45,6 +45,7 @@ engram/
 │   │   │   │   ├── markdown.ts
 │   │   │   │   ├── text.ts
 │   │   │   │   └── source/            # Source code ingestion (tree-sitter)
+│   │   │   │       ├── index.ts       # Orchestrator — ingestSource() entry point
 │   │   │   │       ├── walker.ts      # File walker (respects .gitignore, denylist)
 │   │   │   │       ├── parser.ts      # tree-sitter WASM wrapper
 │   │   │   │       ├── extractors/    # Language-specific symbol extractors
