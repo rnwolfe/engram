@@ -125,6 +125,12 @@ export function resolveImport(
   const EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"];
   const INDEX_FILES = ["index.ts", "index.tsx", "index.js"];
 
+  // 0. Check if specifier already includes an explicit known extension (e.g. './utils.ts')
+  const asIs = path.relative(root, resolvedAbs).split(path.sep).join("/");
+  if (knownFiles.has(asIs)) {
+    return asIs;
+  }
+
   // 1. Try adding an extension directly
   for (const ext of EXTENSIONS) {
     const candidate = path.relative(root, resolvedAbs + ext);

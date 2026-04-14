@@ -14,7 +14,9 @@
 (program (export_statement declaration: (enum_declaration name: (identifier) @symbol.enum.exported)))
 (program (export_statement declaration: (lexical_declaration (variable_declarator name: (identifier) @symbol.const.exported))))
 
-; --- Default export (identifier reference) ---
+; --- Default export (identifier reference): export default someVar ---
+; Note: export default function/class are already captured by the exported variants above
+; via the `declaration:` field which tree-sitter-typescript uses for default declarations too.
 (program (export_statement value: (identifier) @symbol.default.ref))
 
 ; --- Imports ---

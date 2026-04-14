@@ -103,13 +103,32 @@ export const expConst = 1;
 
 describe("extractTypeScript — default exports", () => {
   it("extracts export default identifier as kind=default, exported=true", () => {
-    // Use a unique name that won't collide with other symbols
     const src = `export default someExternalVar;`;
     const { symbols } = extractTypeScript(captureFor(src));
     const def = symbols.find((s) => s.kind === "default");
     expect(def).toBeDefined();
     expect(def?.name).toBe("someExternalVar");
     expect(def?.exported).toBe(true);
+  });
+
+  it("export default function is captured as kind=function, exported=true (via declaration: field)", () => {
+    // tree-sitter-typescript uses the `declaration:` field for export default function too,
+    // so it matches the exported pattern and gets kind=function, not kind=default.
+    const src = `export default function myFn() {}`;
+    const { symbols } = extractTypeScript(captureFor(src));
+    const sym = symbols.find((s) => s.name === "myFn");
+    expect(sym).toBeDefined();
+    expect(sym?.kind).toBe("function");
+    expect(sym?.exported).toBe(true);
+  });
+
+  it("export default class is captured as kind=class, exported=true (via declaration: field)", () => {
+    const src = `export default class MyDefaultClass {}`;
+    const { symbols } = extractTypeScript(captureFor(src));
+    const sym = symbols.find((s) => s.name === "MyDefaultClass");
+    expect(sym).toBeDefined();
+    expect(sym?.kind).toBe("class");
+    expect(sym?.exported).toBe(true);
   });
 });
 
@@ -294,6 +313,24 @@ describe("resolveImport — directory index resolution", () => {
     const knownFiles = new Set(["src/foo.ts", "src/foo/index.ts", "src/a.ts"]);
     expect(resolveImport("./foo", "src/a.ts", knownFiles, root)).toBe(
       "src/foo.ts",
+    );
+  });
+});
+
+describe("resolveImport — explicit extension", () => {
+  const root = "/repo";
+
+  it("resolves ./utils.ts when specifier already has explicit extension", () => {
+    const knownFiles = new Set(["src/utils.ts", "src/a.ts"]);
+    expect(resolveImport("./utils.ts", "src/a.ts", knownFiles, root)).toBe(
+      "src/utils.ts",
+    );
+  });
+
+  it("resolves ./logo.png when specifier has explicit non-TS extension", () => {
+    const knownFiles = new Set(["src/logo.png", "src/a.ts"]);
+    expect(resolveImport("./logo.png", "src/a.ts", knownFiles, root)).toBe(
+      "src/logo.png",
     );
   });
 });
