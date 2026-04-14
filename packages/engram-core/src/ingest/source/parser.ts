@@ -10,7 +10,14 @@ const GRAMMAR_FILES: Record<Language, string> = {
   tsx: "tree-sitter-tsx.wasm",
 };
 
-const TS_EXTENSIONS: Set<string> = new Set([".ts", ".cts", ".mts", ".js", ".cjs", ".mjs"]);
+const TS_EXTENSIONS: Set<string> = new Set([
+  ".ts",
+  ".cts",
+  ".mts",
+  ".js",
+  ".cjs",
+  ".mjs",
+]);
 const TSX_EXTENSIONS: Set<string> = new Set([".tsx", ".jsx"]);
 
 /**

@@ -88,7 +88,10 @@ describe("SourceParser", () => {
 
   it("parses JSX syntax under tsx grammar without errors", () => {
     // .jsx files use the tsx grammar; valid JSX should parse cleanly
-    const tree = parser.parse("const el = <span className='x'>hello</span>;", "tsx");
+    const tree = parser.parse(
+      "const el = <span className='x'>hello</span>;",
+      "tsx",
+    );
     expect(tree.rootNode.type).toBe("program");
     expect(tree.rootNode.hasError).toBe(false);
   });
