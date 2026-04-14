@@ -202,6 +202,15 @@ export async function* walk(opts: WalkOptions): AsyncIterable<FileEntry> {
           continue;
         }
 
+        // Size limit check (before reading file into memory)
+        const fileSize = stat.size;
+        if (fileSize > maxFileBytes) {
+          console.warn(
+            `[engram walker] skipping ${relPosix}: file size ${fileSize} exceeds limit ${maxFileBytes}`,
+          );
+          continue;
+        }
+
         // Read the file
         let fileBuffer: Buffer;
         try {
@@ -212,15 +221,6 @@ export async function* walk(opts: WalkOptions): AsyncIterable<FileEntry> {
 
         // Binary detection: check first 4KB for null bytes
         if (isBinary(fileBuffer)) {
-          continue;
-        }
-
-        // Size limit check
-        const fileSize = stat.size;
-        if (fileSize > maxFileBytes) {
-          console.warn(
-            `[engram walker] skipping ${relPosix}: file size ${fileSize} exceeds limit ${maxFileBytes}`,
-          );
           continue;
         }
 
