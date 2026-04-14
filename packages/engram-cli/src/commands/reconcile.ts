@@ -22,6 +22,7 @@ interface ReconcileOpts {
   phase: "assess" | "discover" | "both";
   scope?: string;
   maxCost?: string;
+  maxDeltaItems?: string;
   dryRun: boolean;
   db: string;
 }
@@ -51,6 +52,10 @@ export function registerReconcile(program: Command): void {
     )
     .option("--scope <filter>", "limit scope: kind:<value> or anchor:<value>")
     .option("--max-cost <n>", "token budget cap (required unless --dry-run)")
+    .option(
+      "--max-delta-items <n>",
+      "max substrate items per discover call — larger values use more tokens (default: 500)",
+    )
     .option("--dry-run", "assess but do not persist any changes", false)
     .option("--db <path>", "path to .engram file", ".engram")
     .action(async (opts: ReconcileOpts) => {
@@ -95,6 +100,18 @@ export function registerReconcile(program: Command): void {
         }
       }
 
+      // ── Parse --max-delta-items ─────────────────────────────────────────────
+      let maxDeltaItems: number | undefined;
+      if (opts.maxDeltaItems !== undefined) {
+        maxDeltaItems = Number(opts.maxDeltaItems);
+        if (!Number.isFinite(maxDeltaItems) || maxDeltaItems < 1) {
+          log.error(
+            `--max-delta-items must be a positive number (got "${opts.maxDeltaItems}")`,
+          );
+          process.exit(2);
+        }
+      }
+
       // ── Open graph ──────────────────────────────────────────────────────────
       const dbPath = path.resolve(opts.db);
       let graph: EngramGraph | undefined;
@@ -116,6 +133,7 @@ export function registerReconcile(program: Command): void {
       if (opts.dryRun) planLines.push("Mode:   dry-run (no writes)");
       if (opts.scope) planLines.push(`Scope:  ${opts.scope}`);
       if (maxCost !== undefined) planLines.push(`Budget: ${maxCost} tokens`);
+      planLines.push(`Delta:  up to ${maxDeltaItems ?? 500} items/discover call`);
       log.info(planLines.join("\n"));
 
       // ── Create generator ────────────────────────────────────────────────────
@@ -136,6 +154,7 @@ export function registerReconcile(program: Command): void {
           phases,
           maxCost,
           dryRun: opts.dryRun,
+          maxDeltaItems,
         });
         s.stop("Reconciliation complete");
       } catch (err) {

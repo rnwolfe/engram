@@ -58,6 +58,12 @@ export interface ReconcileOpts {
   maxCost?: number;
   /** If true, assess but don't write any changes to the database. */
   dryRun?: boolean;
+  /**
+   * Maximum number of substrate delta items to include in a single discover
+   * call. Items are sampled proportionally from episodes/entities/edges,
+   * taking the most recent. Defaults to 500.
+   */
+  maxDeltaItems?: number;
 }
 
 export interface ReconciliationRunResult {
@@ -538,6 +544,49 @@ function validateProposal(
   return null;
 }
 
+// ─── Delta sampling ───────────────────────────────────────────────────────────
+
+/**
+ * Samples a SubstrateDelta down to at most maxTotal items, preserving the
+ * proportional ratio of episodes/entities/edges and taking the most recent
+ * items of each type (delta items are ordered ASC, so we slice from the tail).
+ *
+ * Returns the sampled delta and the original total item count so callers can
+ * log how much was dropped.
+ */
+function sampleDelta(
+  delta: SubstrateDelta,
+  maxTotal: number,
+): { sampled: SubstrateDelta; totalItems: number; sampledCount: number } {
+  const totalItems =
+    delta.episodes.length + delta.entities.length + delta.edges.length;
+
+  if (totalItems <= maxTotal) {
+    return { sampled: delta, totalItems, sampledCount: totalItems };
+  }
+
+  // Proportional allocation — at least 1 of each non-empty type
+  const epRatio = delta.episodes.length / totalItems;
+  const entRatio = delta.entities.length / totalItems;
+  const edgeRatio = delta.edges.length / totalItems;
+
+  const maxEp = delta.episodes.length > 0 ? Math.max(1, Math.round(maxTotal * epRatio)) : 0;
+  const maxEnt = delta.entities.length > 0 ? Math.max(1, Math.round(maxTotal * entRatio)) : 0;
+  const maxEdge = delta.edges.length > 0 ? Math.max(1, Math.round(maxTotal * edgeRatio)) : 0;
+
+  const sampled: SubstrateDelta = {
+    since: delta.since,
+    episodes: delta.episodes.slice(-maxEp),
+    entities: delta.entities.slice(-maxEnt),
+    edges: delta.edges.slice(-maxEdge),
+  };
+
+  const sampledCount =
+    sampled.episodes.length + sampled.entities.length + sampled.edges.length;
+
+  return { sampled, totalItems, sampledCount };
+}
+
 // ─── Scope filter helper ──────────────────────────────────────────────────────
 
 /**
@@ -726,7 +775,19 @@ export async function reconcile(
     const knownKinds = new Set(kindCatalog.map((k) => k.name));
 
     const cursor = lastNonDryRunCompletedAt(graph, opts?.scope);
-    const delta = computeSubstrateDelta(graph, cursor);
+    const rawDelta = computeSubstrateDelta(graph, cursor);
+    const { sampled: delta, totalItems, sampledCount } = sampleDelta(
+      rawDelta,
+      opts?.maxDeltaItems ?? 500,
+    );
+
+    if (sampledCount < totalItems) {
+      console.warn(
+        `[engram] reconcile: delta has ${totalItems} items — sampled ${sampledCount} (most recent) for this discover call. ` +
+          `Run reconcile again after ingesting new data to process incrementally, or raise --max-delta-items.`,
+      );
+    }
+
     const catalog = loadActiveProjectionCatalog(graph, opts?.scope);
 
     // Single structured LLM call to propose new projections
