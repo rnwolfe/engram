@@ -544,8 +544,8 @@ export async function ingestSource(
     for (const ep of sweepCandidates) {
       if (!ep.source_ref) continue;
       const atIdx = ep.source_ref.lastIndexOf("@");
-      const epRelPath =
-        atIdx >= 0 ? ep.source_ref.slice(0, atIdx) : ep.source_ref;
+      if (atIdx < 0) continue; // malformed source_ref — skip rather than over-archive
+      const epRelPath = ep.source_ref.slice(0, atIdx);
       if (!visitedRelPaths.has(epRelPath)) {
         graph.db
           .prepare(`UPDATE episodes SET status = 'archived' WHERE id = ?`)
@@ -567,8 +567,8 @@ export async function ingestSource(
     for (const ep of sweepCandidates) {
       if (!ep.source_ref) continue;
       const atIdx = ep.source_ref.lastIndexOf("@");
-      const epRelPath =
-        atIdx >= 0 ? ep.source_ref.slice(0, atIdx) : ep.source_ref;
+      if (atIdx < 0) continue; // malformed source_ref — skip rather than over-archive
+      const epRelPath = ep.source_ref.slice(0, atIdx);
       if (!visitedRelPaths.has(epRelPath)) {
         result.deletedArchived++;
       }
