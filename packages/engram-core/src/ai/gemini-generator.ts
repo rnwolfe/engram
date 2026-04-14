@@ -64,7 +64,11 @@ export class GeminiGenerator implements ProjectionGenerator {
       },
       contents: userPrompt,
     });
-    return response.text ?? "";
+    const text = response.text ?? "";
+    if (process.env.ENGRAM_DEBUG) {
+      console.error("[engram][gemini] raw response:", text.slice(0, 500));
+    }
+    return text;
   }
 
   async generate(

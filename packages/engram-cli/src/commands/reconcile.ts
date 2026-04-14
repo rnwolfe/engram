@@ -24,6 +24,7 @@ interface ReconcileOpts {
   maxCost?: string;
   maxDeltaItems?: string;
   dryRun: boolean;
+  resetCursor: boolean;
   db: string;
 }
 
@@ -57,6 +58,11 @@ export function registerReconcile(program: Command): void {
       "max substrate items per discover call — larger values use more tokens (default: 500)",
     )
     .option("--dry-run", "assess but do not persist any changes", false)
+    .option(
+      "--reset-cursor",
+      "clear reconciliation history so the next run re-processes all substrate data",
+      false,
+    )
     .option("--db <path>", "path to .engram file", ".engram")
     .action(async (opts: ReconcileOpts) => {
       intro("engram reconcile");
@@ -122,6 +128,19 @@ export function registerReconcile(program: Command): void {
           `Cannot open graph: ${err instanceof Error ? err.message : String(err)}`,
         );
         process.exit(1);
+      }
+
+      // ── Reset cursor ────────────────────────────────────────────────────────
+      if (opts.resetCursor) {
+        const deleted = (
+          graph.db
+            .prepare("DELETE FROM reconciliation_runs")
+            .run() as { changes: number }
+        ).changes;
+        log.info(`Cursor reset — deleted ${deleted} reconciliation run(s). Re-run without --reset-cursor to discover from scratch.`);
+        closeGraph(graph);
+        outro("Done");
+        process.exit(0);
       }
 
       // ── Build phase list ────────────────────────────────────────────────────
