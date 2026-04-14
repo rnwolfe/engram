@@ -10,15 +10,8 @@ const GRAMMAR_FILES: Record<Language, string> = {
   tsx: "tree-sitter-tsx.wasm",
 };
 
-const TS_EXTENSIONS: Set<string> = new Set([
-  ".ts",
-  ".cts",
-  ".mts",
-  ".js",
-  ".jsx",
-  ".cjs",
-  ".mjs",
-]);
+const TS_EXTENSIONS: Set<string> = new Set([".ts", ".cts", ".mts", ".js", ".cjs", ".mjs"]);
+const TSX_EXTENSIONS: Set<string> = new Set([".tsx", ".jsx"]);
 
 /**
  * Maps a relative file path to the Language enum value to use when parsing it,
@@ -26,7 +19,7 @@ const TS_EXTENSIONS: Set<string> = new Set([
  */
 export function languageForPath(relPath: string): Language | null {
   const ext = path.extname(relPath).toLowerCase();
-  if (ext === ".tsx") return "tsx";
+  if (TSX_EXTENSIONS.has(ext)) return "tsx";
   if (TS_EXTENSIONS.has(ext)) return "typescript";
   return null;
 }

@@ -21,8 +21,8 @@ describe("languageForPath", () => {
     expect(languageForPath("src/foo.js")).toBe("typescript");
   });
 
-  it("maps .jsx to typescript", () => {
-    expect(languageForPath("src/foo.jsx")).toBe("typescript");
+  it("maps .jsx to tsx (JSX syntax requires the tsx grammar)", () => {
+    expect(languageForPath("src/foo.jsx")).toBe("tsx");
   });
 
   it("maps .cjs to typescript", () => {
@@ -86,6 +86,13 @@ describe("SourceParser", () => {
     expect(tree.rootNode.type).toBe("program");
   });
 
+  it("parses JSX syntax under tsx grammar without errors", () => {
+    // .jsx files use the tsx grammar; valid JSX should parse cleanly
+    const tree = parser.parse("const el = <span className='x'>hello</span>;", "tsx");
+    expect(tree.rootNode.type).toBe("program");
+    expect(tree.rootNode.hasError).toBe(false);
+  });
+
   it("malformed TypeScript returns a tree with hasError = true", () => {
     const tree = parser.parse("function (((", "typescript");
     expect(tree).toBeDefined();
@@ -106,11 +113,9 @@ describe("SourceParser", () => {
     expect(tsxTree.rootNode.type).toBe("program");
   });
 
-  it("dispose() does not throw", () => {
-    // Create a separate instance so the shared one is unaffected
-    expect(async () => {
-      const p = await SourceParser.create();
-      p.dispose();
-    }).not.toThrow();
+  it("dispose() does not throw", async () => {
+    // Create a separate instance so the shared one (in afterAll) is unaffected
+    const p = await SourceParser.create();
+    expect(() => p.dispose()).not.toThrow();
   });
 });
