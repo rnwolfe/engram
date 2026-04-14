@@ -3,6 +3,10 @@
  *
  * Wires walker + parser + extractor into the engram graph with full evidence-first
  * invariant, idempotency fast path, and supersession on file change.
+ *
+ * In dryRun mode the walker, parser, and extractor run normally but no rows
+ * are written to the database. Counts in the result reflect what would be created
+ * on a fresh ingest, including module hierarchy and import edges.
  */
 
 import path from "node:path";
@@ -56,7 +60,7 @@ export interface SourceIngestResult {
 /**
  * Upsert an entity by canonical_name. Returns {id, created}.
  * If entity already exists, adds a new evidence link (INSERT OR IGNORE — safe to
- * call multiple times for same episode due to PK constraint).
+ * call multiple times for same episode due to PK constraint on entity_evidence).
  */
 function upsertEntity(
   graph: EngramGraph,
@@ -91,7 +95,8 @@ function upsertEntity(
 
 /**
  * Upsert an active edge by (source_id, target_id, relation_type). Returns true if
- * a new edge was created, false if existing edge was found (evidence link still added).
+ * a new edge was created, false if an existing active edge was found (evidence link
+ * still added in the latter case).
  */
 function upsertEdge(
   graph: EngramGraph,
@@ -189,16 +194,20 @@ export async function ingestSource(
 
   const parser = await SourceParser.create();
 
-  // Per-file data for post-processing passes
-  // relPath → { episodeId, rawImports }
+  // Per-file data for post-processing passes.
+  // In dryRun mode, episodeId and entity IDs are placeholder strings ("dry:…")
+  // since nothing is written to the DB; they are only used for edge counting logic.
   const fileData = new Map<
     string,
     { episodeId: string; rawImports: string[] }
   >();
-  // relPath → entity id
+  // relPath → entity id (real ULID in normal mode, "dry:…" placeholder in dryRun)
   const fileEntityIds = new Map<string, string>();
-  // dirPath → representative episode id (any file under this dir)
+  // dirPath → representative episode id (first file episode seen for this dir)
   const dirEpisodes = new Map<string, string>();
+
+  // Monotone counter used to generate unique placeholder IDs in dryRun mode.
+  let dryCounter = 0;
 
   try {
     for await (const entry of walk({ root, exclude, respectGitignore })) {
@@ -218,7 +227,7 @@ export async function ingestSource(
           .get(SOURCE_TYPE, sourceRef);
         if (existing) {
           result.filesSkipped++;
-          // Still record file entity id for import resolution if it exists
+          // Still record the file entity id so the import resolution pass can use it.
           const fe = findEntities(graph, { canonical_name: relPath });
           if (fe.length > 0) fileEntityIds.set(relPath, fe[0].id);
           onProgress?.({ type: "file_skipped", relPath });
@@ -226,7 +235,9 @@ export async function ingestSource(
         }
       }
 
-      // Parse file if language is supported
+      // Parse file if language is supported.
+      // On parse error, execution continues — an episode is still created with no
+      // symbols so that the idempotency fast path will fire on the next run.
       let extracted: ExtractedFile = { symbols: [], rawImports: [] };
       const lang = languageForPath(relPath);
       if (lang !== null) {
@@ -242,6 +253,7 @@ export async function ingestSource(
               relPath,
               message: "tree has errors",
             });
+            // extracted remains empty — episode is still created below
           } else {
             const captures = parser.runQuery(tree, lang);
             extracted = extractTypeScript(captures);
@@ -255,133 +267,141 @@ export async function ingestSource(
         }
       }
 
+      // Assign an episode id and file entity id.
+      // In dryRun mode these are placeholder strings; in normal mode they are real ULIDs
+      // written to the DB.
+      let episodeId: string;
+      let fileEntityId: string;
+
       if (dryRun) {
-        // Count what would be created without writing to DB
+        episodeId = `dry:ep:${dryCounter}`;
+        fileEntityId = `dry:file:${dryCounter}`;
+        dryCounter++;
         result.episodesCreated++;
         result.entitiesCreated++; // file entity
         result.entitiesCreated += extracted.symbols.length;
         result.edgesCreated += extracted.symbols.length * 2; // file→contains + symbol→defined_in
-        // Module and import edges counted in post-processing
-        continue;
+      } else {
+        // SUPERSESSION — invalidate old episode if file content changed
+        const oldEpisode = findActiveEpisodeForPath(graph, relPath);
+        if (oldEpisode) {
+          supersedeEpisode(graph, oldEpisode.id);
+        }
+
+        const episode = addEpisode(graph, {
+          source_type: SOURCE_TYPE,
+          source_ref: sourceRef,
+          content: body,
+          timestamp: now,
+        });
+        episodeId = episode.id;
+        result.episodesCreated++;
+
+        const ev: EvidenceInput[] = [
+          { episode_id: episodeId, extractor: EXTRACTOR, confidence: 1.0 },
+        ];
+
+        // Upsert file entity
+        const { id, created: fileCreated } = upsertEntity(
+          graph,
+          { canonical_name: relPath, entity_type: "file" },
+          ev,
+        );
+        fileEntityId = id;
+        if (fileCreated) result.entitiesCreated++;
+
+        // Upsert symbol entities + file→contains + symbol→defined_in edges
+        for (const sym of extracted.symbols) {
+          const symName = `${relPath}::${sym.name}`;
+          const { id: symEntityId, created: symCreated } = upsertEntity(
+            graph,
+            { canonical_name: symName, entity_type: "symbol" },
+            ev,
+          );
+          if (symCreated) result.entitiesCreated++;
+
+          const c1 = upsertEdge(
+            graph,
+            {
+              source_id: fileEntityId,
+              target_id: symEntityId,
+              relation_type: "contains",
+              edge_kind: "observed",
+              fact: `${relPath} defines ${sym.name}`,
+            },
+            ev,
+          );
+          if (c1) result.edgesCreated++;
+
+          const c2 = upsertEdge(
+            graph,
+            {
+              source_id: symEntityId,
+              target_id: fileEntityId,
+              relation_type: "defined_in",
+              edge_kind: "observed",
+              fact: `${sym.name} is defined in ${relPath}`,
+            },
+            ev,
+          );
+          if (c2) result.edgesCreated++;
+        }
       }
 
-      // SUPERSESSION — invalidate old episode if file content changed
-      const oldEpisode = findActiveEpisodeForPath(graph, relPath);
-      if (oldEpisode) {
-        supersedeEpisode(graph, oldEpisode.id);
-      }
-
-      // Create episode for this file
-      const episode = addEpisode(graph, {
-        source_type: SOURCE_TYPE,
-        source_ref: sourceRef,
-        content: body,
-        timestamp: now,
-      });
-      result.episodesCreated++;
-
-      const ev: EvidenceInput[] = [
-        { episode_id: episode.id, extractor: EXTRACTOR, confidence: 1.0 },
-      ];
-
-      // Upsert file entity
-      const { id: fileEntityId, created: fileCreated } = upsertEntity(
-        graph,
-        { canonical_name: relPath, entity_type: "file" },
-        ev,
-      );
-      if (fileCreated) result.entitiesCreated++;
+      // Populate tracking maps for post-processing passes (both modes).
       fileEntityIds.set(relPath, fileEntityId);
       fileData.set(relPath, {
-        episodeId: episode.id,
+        episodeId,
         rawImports: extracted.rawImports,
       });
 
-      // Record this episode for the directory and all ancestors (for module evidence)
+      // Record this episode for the directory and all ancestors.
       const dirParts = relPath.split("/");
       for (let i = 1; i < dirParts.length; i++) {
         const dirPath = dirParts.slice(0, i).join("/");
         if (!dirEpisodes.has(dirPath)) {
-          dirEpisodes.set(dirPath, episode.id);
+          dirEpisodes.set(dirPath, episodeId);
         }
-      }
-
-      // Upsert symbol entities + file→contains + symbol→defined_in edges
-      for (const sym of extracted.symbols) {
-        const symName = `${relPath}::${sym.name}`;
-        const { id: symEntityId, created: symCreated } = upsertEntity(
-          graph,
-          { canonical_name: symName, entity_type: "symbol" },
-          ev,
-        );
-        if (symCreated) result.entitiesCreated++;
-
-        // file → contains → symbol
-        const c1 = upsertEdge(
-          graph,
-          {
-            source_id: fileEntityId,
-            target_id: symEntityId,
-            relation_type: "contains",
-            edge_kind: "observed",
-            fact: `${relPath} defines ${sym.name}`,
-          },
-          ev,
-        );
-        if (c1) result.edgesCreated++;
-
-        // symbol → defined_in → file
-        const c2 = upsertEdge(
-          graph,
-          {
-            source_id: symEntityId,
-            target_id: fileEntityId,
-            relation_type: "defined_in",
-            edge_kind: "observed",
-            fact: `${sym.name} is defined in ${relPath}`,
-          },
-          ev,
-        );
-        if (c2) result.edgesCreated++;
       }
     }
   } finally {
     parser.dispose();
   }
 
-  if (dryRun) {
-    return result;
-  }
-
   // ---------------------------------------------------------------------------
   // MODULE HIERARCHY PASS
-  // Collect all populated directories and emit module entities + hierarchy edges.
+  // Runs in both normal and dryRun mode: counts entities/edges either way,
+  // only writes to DB when !dryRun.
   // ---------------------------------------------------------------------------
 
-  // All directories containing ingested files (from dirEpisodes)
-  const allDirs = new Set<string>(dirEpisodes.keys());
-
-  // Sort by depth ascending (shortest path first) so parent modules are created before children
-  const sortedDirs = Array.from(allDirs).sort(
+  const sortedDirs = Array.from(dirEpisodes.keys()).sort(
     (a, b) => a.split("/").length - b.split("/").length,
   );
 
+  // dirPath → entity id (real or placeholder)
   const moduleEntityIds = new Map<string, string>();
 
   for (const dirPath of sortedDirs) {
     const episodeId = dirEpisodes.get(dirPath);
     if (!episodeId) continue;
 
-    const ev: EvidenceInput[] = [
-      { episode_id: episodeId, extractor: EXTRACTOR, confidence: 1.0 },
-    ];
+    let modEntityId: string;
 
-    const { id: modEntityId, created: modCreated } = upsertEntity(
-      graph,
-      { canonical_name: dirPath, entity_type: "module" },
-      ev,
-    );
-    if (modCreated) result.entitiesCreated++;
+    if (dryRun) {
+      modEntityId = `dry:mod:${dryCounter++}`;
+      result.entitiesCreated++;
+    } else {
+      const ev: EvidenceInput[] = [
+        { episode_id: episodeId, extractor: EXTRACTOR, confidence: 1.0 },
+      ];
+      const { id, created: modCreated } = upsertEntity(
+        graph,
+        { canonical_name: dirPath, entity_type: "module" },
+        ev,
+      );
+      modEntityId = id;
+      if (modCreated) result.entitiesCreated++;
+    }
     moduleEntityIds.set(dirPath, modEntityId);
 
     // Parent module → contains → this module
@@ -391,24 +411,32 @@ export async function ingestSource(
       parentDir !== "" &&
       moduleEntityIds.has(parentDir)
     ) {
-      const parentEpisodeId = dirEpisodes.get(parentDir) ?? episodeId;
-      const parentEv: EvidenceInput[] = [
-        { episode_id: parentEpisodeId, extractor: EXTRACTOR, confidence: 1.0 },
-      ];
-      const parentModId = moduleEntityIds.get(parentDir);
-      if (parentModId) {
-        const created = upsertEdge(
-          graph,
+      if (dryRun) {
+        result.edgesCreated++;
+      } else {
+        const parentEpisodeId = dirEpisodes.get(parentDir) ?? episodeId;
+        const parentEv: EvidenceInput[] = [
           {
-            source_id: parentModId,
-            target_id: modEntityId,
-            relation_type: "contains",
-            edge_kind: "observed",
-            fact: `${parentDir} contains module ${dirPath}`,
+            episode_id: parentEpisodeId,
+            extractor: EXTRACTOR,
+            confidence: 1.0,
           },
-          parentEv,
-        );
-        if (created) result.edgesCreated++;
+        ];
+        const parentModId = moduleEntityIds.get(parentDir);
+        if (parentModId) {
+          const created = upsertEdge(
+            graph,
+            {
+              source_id: parentModId,
+              target_id: modEntityId,
+              relation_type: "contains",
+              edge_kind: "observed",
+              fact: `${parentDir} contains module ${dirPath}`,
+            },
+            parentEv,
+          );
+          if (created) result.edgesCreated++;
+        }
       }
     }
   }
@@ -420,34 +448,38 @@ export async function ingestSource(
     const modEntityId = moduleEntityIds.get(normalizedDir);
     if (!modEntityId) continue;
 
-    const fileEpData = fileData.get(relPath);
-    if (!fileEpData) continue;
+    if (dryRun) {
+      result.edgesCreated++;
+    } else {
+      const fileEpData = fileData.get(relPath);
+      if (!fileEpData) continue;
 
-    const ev: EvidenceInput[] = [
-      {
-        episode_id: fileEpData.episodeId,
-        extractor: EXTRACTOR,
-        confidence: 1.0,
-      },
-    ];
-
-    const created = upsertEdge(
-      graph,
-      {
-        source_id: modEntityId,
-        target_id: fileEntityId,
-        relation_type: "contains",
-        edge_kind: "observed",
-        fact: `${normalizedDir} contains file ${relPath}`,
-      },
-      ev,
-    );
-    if (created) result.edgesCreated++;
+      const ev: EvidenceInput[] = [
+        {
+          episode_id: fileEpData.episodeId,
+          extractor: EXTRACTOR,
+          confidence: 1.0,
+        },
+      ];
+      const created = upsertEdge(
+        graph,
+        {
+          source_id: modEntityId,
+          target_id: fileEntityId,
+          relation_type: "contains",
+          edge_kind: "observed",
+          fact: `${normalizedDir} contains file ${relPath}`,
+        },
+        ev,
+      );
+      if (created) result.edgesCreated++;
+    }
   }
 
   // ---------------------------------------------------------------------------
   // IMPORT RESOLUTION PASS
   // Build known-files set, resolve imports, emit file → imports → file edges.
+  // Runs in both normal and dryRun mode.
   // ---------------------------------------------------------------------------
 
   const knownFiles = new Set<string>(fileEntityIds.keys());
@@ -456,10 +488,6 @@ export async function ingestSource(
     const fromEntityId = fileEntityIds.get(relPath);
     if (!fromEntityId) continue;
 
-    const ev: EvidenceInput[] = [
-      { episode_id: episodeId, extractor: EXTRACTOR, confidence: 1.0 },
-    ];
-
     for (const specifier of rawImports) {
       const resolved = resolveImport(specifier, relPath, knownFiles, root);
       if (!resolved) continue;
@@ -467,18 +495,25 @@ export async function ingestSource(
       const toEntityId = fileEntityIds.get(resolved);
       if (!toEntityId) continue;
 
-      const created = upsertEdge(
-        graph,
-        {
-          source_id: fromEntityId,
-          target_id: toEntityId,
-          relation_type: "imports",
-          edge_kind: "observed",
-          fact: `${relPath} imports ${resolved}`,
-        },
-        ev,
-      );
-      if (created) result.edgesCreated++;
+      if (dryRun) {
+        result.edgesCreated++;
+      } else {
+        const ev: EvidenceInput[] = [
+          { episode_id: episodeId, extractor: EXTRACTOR, confidence: 1.0 },
+        ];
+        const created = upsertEdge(
+          graph,
+          {
+            source_id: fromEntityId,
+            target_id: toEntityId,
+            relation_type: "imports",
+            edge_kind: "observed",
+            fact: `${relPath} imports ${resolved}`,
+          },
+          ev,
+        );
+        if (created) result.edgesCreated++;
+      }
     }
   }
 

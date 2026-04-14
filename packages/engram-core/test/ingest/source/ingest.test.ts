@@ -407,6 +407,8 @@ describe("dryRun mode", () => {
     expect(result.filesScanned).toBe(3);
     expect(result.episodesCreated).toBeGreaterThan(0);
     expect(result.entitiesCreated).toBeGreaterThan(0);
+    // edgesCreated must include module hierarchy + symbol edges (not just symbol edges)
+    expect(result.edgesCreated).toBeGreaterThan(result.filesScanned * 2);
 
     // Nothing written to DB
     const episodes = graph.db
