@@ -53,6 +53,7 @@ export class GeminiGenerator implements ProjectionGenerator {
     systemPrompt: string,
     userPrompt: string,
     maxTokens: number,
+    responseFormat: "text" | "json" = "text",
   ): Promise<string> {
     const { GoogleGenAI } = await import("@google/genai");
     const genai = new GoogleGenAI({ apiKey: this.apiKey as string });
@@ -61,12 +62,15 @@ export class GeminiGenerator implements ProjectionGenerator {
       config: {
         systemInstruction: systemPrompt,
         maxOutputTokens: maxTokens,
+        ...(responseFormat === "json"
+          ? { responseMimeType: "application/json" }
+          : {}),
       },
       contents: userPrompt,
     });
     const text = response.text ?? "";
     if (process.env.ENGRAM_DEBUG) {
-      console.error("[engram][gemini] raw response:", text.slice(0, 500));
+      console.error("[engram][gemini] raw response:", text.slice(0, 1000));
     }
     return text;
   }
@@ -146,7 +150,7 @@ export class GeminiGenerator implements ProjectionGenerator {
       return [];
     }
     const { system, user } = buildDiscoverPrompt(delta, catalog, kinds);
-    const text = await this.call(system, user, 1024);
+    const text = await this.call(system, user, 4096, "json");
     return parseDiscoverProposals(text);
   }
 }
