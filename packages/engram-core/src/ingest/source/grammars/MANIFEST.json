@@ -1,0 +1,12 @@
+{
+  "typescript": {
+    "version": "0.23.2",
+    "commit": "f975a621f4e7f532fe322e13c4f79495e0a7b2e7",
+    "source": "https://github.com/tree-sitter/tree-sitter-typescript"
+  },
+  "tsx": {
+    "version": "0.23.2",
+    "commit": "f975a621f4e7f532fe322e13c4f79495e0a7b2e7",
+    "source": "https://github.com/tree-sitter/tree-sitter-typescript"
+  }
+}
