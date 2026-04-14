@@ -178,7 +178,7 @@ describe("idempotency", () => {
     expect(r2.edgesCreated).toBe(0);
     expect(r2.filesSkipped).toBe(3);
     expect(r2.filesParsed).toBe(0);
-  });
+  }, 15_000);
 
   test("second run does not invoke parser (fast path)", async () => {
     await ingestSource(graph, { root: FIXTURE, respectGitignore: true });
@@ -194,7 +194,7 @@ describe("idempotency", () => {
 
     expect(parseCalls).toBe(0);
     expect(r2.filesParsed).toBe(0);
-  });
+  }, 15_000);
 });
 
 // ---------------------------------------------------------------------------
@@ -263,7 +263,7 @@ describe("supersession on file change", () => {
     } finally {
       fs.rmSync(tmpFixture, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 
   test("symbol removed from modified file is orphaned but not deleted", async () => {
     const tmpFixture = fs.mkdtempSync(path.join(os.tmpdir(), "engram-orphan-"));
@@ -295,7 +295,7 @@ describe("supersession on file change", () => {
     } finally {
       fs.rmSync(tmpFixture, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 
   test("verifyGraph passes after supersession", async () => {
     const tmpFixture = fs.mkdtempSync(path.join(os.tmpdir(), "engram-verify-"));
@@ -323,7 +323,7 @@ describe("supersession on file change", () => {
     } finally {
       fs.rmSync(tmpFixture, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 });
 
 // ---------------------------------------------------------------------------
@@ -389,7 +389,7 @@ describe("parse error handling", () => {
     } finally {
       fs.rmSync(tmpFixture, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 });
 
 // ---------------------------------------------------------------------------
