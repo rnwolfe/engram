@@ -206,7 +206,6 @@ export function registerIngest(program: Command): void {
 
       const onProgress = opts.verbose
         ? (event: SourceProgressEvent) => {
-            fileIdx++;
             const label = {
               file_parsed: "parsed  ",
               file_skipped: "cached  ",
@@ -214,6 +213,7 @@ export function registerIngest(program: Command): void {
               file_scanned: null, // suppress raw scan events
             }[event.type];
             if (!label) return;
+            fileIdx++;
             const suffix = event.message ? `  ${event.message}` : "";
             log.info(`[${fileIdx}] ${label} ${event.relPath}${suffix}`);
           }
