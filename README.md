@@ -19,7 +19,7 @@ Installs the `engram` binary to `/usr/local/bin` (or `~/.local/bin` if not writa
 
 Engram runs a three-layer pipeline:
 
-1. **Ingest** — pull knowledge from where it already lives: git history (free, no tokens), GitHub PRs and review comments (optional enrichment), markdown documents. Every piece of source material becomes an immutable episode in the graph.
+1. **Ingest** — pull knowledge from where it already lives: git history (free, no tokens), source code (tree-sitter AST parsing), GitHub PRs and review comments (optional enrichment), markdown documents. Every piece of source material becomes an immutable episode in the graph.
 
 2. **Graph** — encode that evidence as a temporal knowledge graph: entities, relationships, and facts with validity windows. Every edge traces back to source material. Every claim knows when it was true.
 
@@ -34,16 +34,19 @@ The result is a self-maintaining wiki grounded in evidence — not a snapshot, n
 cd your-repo
 engram init --from-git .
 
-# Step 2 — enrich with PR and issue context (optional)
+# Step 2 — ingest source code (free, no tokens needed)
+engram ingest source
+
+# Step 3 — enrich with PR and issue context (optional)
 # Public repos work without a token. Private repos require GITHUB_TOKEN.
 engram ingest enrich github --repo owner/repo
 engram ingest enrich github --repo owner/repo --token $GITHUB_TOKEN  # private repos
 
-# Step 3 — synthesize living documents from the graph (needs ANTHROPIC_API_KEY)
+# Step 4 — synthesize living documents from the graph (needs ANTHROPIC_API_KEY)
 ANTHROPIC_API_KEY=<key> engram reconcile --max-cost 50000
 engram export wiki --out ./wiki
 
-# Step 4 — query and explore
+# Step 5 — query and explore
 engram search "who owns the auth module"
 engram search "what changed in the last 30 days"
 engram visualize   # opens http://127.0.0.1:7878
