@@ -570,9 +570,14 @@ function sampleDelta(
   const entRatio = delta.entities.length / totalItems;
   const edgeRatio = delta.edges.length / totalItems;
 
-  const maxEp = delta.episodes.length > 0 ? Math.max(1, Math.round(maxTotal * epRatio)) : 0;
-  const maxEnt = delta.entities.length > 0 ? Math.max(1, Math.round(maxTotal * entRatio)) : 0;
-  const maxEdge = delta.edges.length > 0 ? Math.max(1, Math.round(maxTotal * edgeRatio)) : 0;
+  const maxEp =
+    delta.episodes.length > 0 ? Math.max(1, Math.round(maxTotal * epRatio)) : 0;
+  const maxEnt =
+    delta.entities.length > 0
+      ? Math.max(1, Math.round(maxTotal * entRatio))
+      : 0;
+  const maxEdge =
+    delta.edges.length > 0 ? Math.max(1, Math.round(maxTotal * edgeRatio)) : 0;
 
   const sampled: SubstrateDelta = {
     since: delta.since,
@@ -776,10 +781,11 @@ export async function reconcile(
 
     const cursor = lastNonDryRunCompletedAt(graph, opts?.scope);
     const rawDelta = computeSubstrateDelta(graph, cursor);
-    const { sampled: delta, totalItems, sampledCount } = sampleDelta(
-      rawDelta,
-      opts?.maxDeltaItems ?? 500,
-    );
+    const {
+      sampled: delta,
+      totalItems,
+      sampledCount,
+    } = sampleDelta(rawDelta, opts?.maxDeltaItems ?? 500);
 
     if (sampledCount < totalItems) {
       console.warn(
@@ -808,7 +814,9 @@ export async function reconcile(
       // Validate proposal structure before attempting project()
       const validationError = validateProposal(proposal, knownKinds);
       if (validationError) {
-        console.warn(`[engram] reconcile: skipping proposal — ${validationError}`);
+        console.warn(
+          `[engram] reconcile: skipping proposal — ${validationError}`,
+        );
         continue;
       }
 

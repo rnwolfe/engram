@@ -43,7 +43,14 @@ engram/
 │   │   │   │   ├── adapters/
 │   │   │   │   │   └── github.ts    # GitHub PRs + Issues (v0.1)
 │   │   │   │   ├── markdown.ts
-│   │   │   │   └── text.ts
+│   │   │   │   ├── text.ts
+│   │   │   │   └── source/            # Source code ingestion (tree-sitter)
+│   │   │   │       ├── index.ts       # Orchestrator — ingestSource() entry point
+│   │   │   │       ├── walker.ts      # File walker (respects .gitignore, denylist)
+│   │   │   │       ├── parser.ts      # tree-sitter WASM wrapper
+│   │   │   │       ├── extractors/    # Language-specific symbol extractors
+│   │   │   │       ├── queries/       # tree-sitter query files
+│   │   │   │       └── grammars/      # Bundled WASM grammar files
 │   │   │   ├── ai/           # LLM integration (entity extraction, embeddings)
 │   │   │   │   ├── provider.ts      # Abstract interface
 │   │   │   │   ├── ollama.ts
@@ -285,6 +292,7 @@ When creating a PR that implements a GitHub issue:
 | `packages/engram-core/src/ai/kinds.ts` | Kind catalog loader — `loadKindCatalog()`, `KindEntry`, `KindCatalog` |
 | `packages/engram-core/src/ingest/git.ts` | Git VCS ingestion (the "money command" engine) |
 | `packages/engram-core/src/ingest/adapter.ts` | EnrichmentAdapter interface |
+| `packages/engram-core/src/ingest/source/` | Source code ingestion — walks working tree, parses TS/JS with tree-sitter, creates file/module/symbol entities |
 
 ## MCP Tools
 

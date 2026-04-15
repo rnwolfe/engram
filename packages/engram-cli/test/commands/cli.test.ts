@@ -68,6 +68,7 @@ describe("CLI command registration", () => {
     const subNames = ingest.commands.map((c) => c.name());
     expect(subNames).toContain("git");
     expect(subNames).toContain("md");
+    expect(subNames).toContain("source");
     expect(subNames).toContain("enrich");
   });
 
