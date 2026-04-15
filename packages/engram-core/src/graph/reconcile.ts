@@ -811,6 +811,16 @@ export async function reconcile(
     });
     budget.consume(1); // one discover call counts as one budget unit
 
+    // Build the set of IDs we actually showed to the generator. Any input ID
+    // the model returns that isn't in this set was hallucinated and cannot
+    // be resolved against the graph — skip those proposals early with a
+    // clear diagnostic, instead of surfacing them as "input not found".
+    const deltaIds = {
+      episode: new Set(delta.episodes.map((e) => e.id)),
+      entity: new Set(delta.entities.map((e) => e.id)),
+      edge: new Set(delta.edges.map((e) => e.id)),
+    };
+
     for (const proposal of proposals) {
       if (budget.exhausted()) {
         budgetHit = true;
@@ -823,6 +833,29 @@ export async function reconcile(
       if (validationError) {
         console.warn(
           `[engram] reconcile: skipping proposal — ${validationError}`,
+        );
+        continue;
+      }
+
+      // Check for hallucinated input IDs. Entities used as anchors are also
+      // validated here because an anchor is often echoed as an input.
+      const hallucinated: string[] = [];
+      for (const inp of proposal.inputs) {
+        const validIds =
+          inp.type === "episode"
+            ? deltaIds.episode
+            : inp.type === "entity"
+              ? deltaIds.entity
+              : inp.type === "edge"
+                ? deltaIds.edge
+                : null;
+        if (validIds && !validIds.has(inp.id)) {
+          hallucinated.push(`${inp.type}:${inp.id}`);
+        }
+      }
+      if (hallucinated.length > 0) {
+        console.warn(
+          `[engram] reconcile: skipping ${proposal.kind} proposal — ${hallucinated.length} input(s) not in substrate delta (likely hallucinated): ${hallucinated.join(", ")}`,
         );
         continue;
       }
