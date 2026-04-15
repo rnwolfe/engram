@@ -74,7 +74,13 @@ export class GeminiGenerator implements ProjectionGenerator {
     });
     const text = response.text ?? "";
     if (process.env.ENGRAM_DEBUG) {
-      console.error("[engram][gemini] raw response:", text.slice(0, 1000));
+      const finishReason =
+        (response as unknown as { candidates?: Array<{ finishReason?: string }> })
+          .candidates?.[0]?.finishReason ?? "unknown";
+      console.error(
+        `[engram][gemini] response: ${text.length} chars, finishReason=${finishReason}`,
+      );
+      console.error(`[engram][gemini] raw response:\n${text}`);
     }
     return text;
   }
@@ -185,7 +191,7 @@ export class GeminiGenerator implements ProjectionGenerator {
         required: ["kind", "anchor", "inputs", "rationale"],
       },
     };
-    const text = await this.call(system, user, 4096, "json", schema);
+    const text = await this.call(system, user, 16384, "json", schema);
     return parseDiscoverProposals(text);
   }
 }

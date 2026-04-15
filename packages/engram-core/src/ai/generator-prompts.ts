@@ -243,9 +243,26 @@ export function parseDiscoverProposals(text: string): ProjectionProposal[] {
       .replace(/^```(?:json)?\n?/i, "")
       .replace(/\n?```$/, "");
     const proposals = JSON.parse(stripped);
-    if (!Array.isArray(proposals)) return [];
+    if (!Array.isArray(proposals)) {
+      if (process.env.ENGRAM_DEBUG) {
+        console.error(
+          `[engram] parseDiscoverProposals: parsed value is not an array (type=${typeof proposals})`,
+        );
+      }
+      return [];
+    }
+    if (process.env.ENGRAM_DEBUG) {
+      console.error(
+        `[engram] parseDiscoverProposals: parsed ${proposals.length} proposals`,
+      );
+    }
     return proposals as ProjectionProposal[];
-  } catch {
+  } catch (err) {
+    if (process.env.ENGRAM_DEBUG) {
+      console.error(
+        `[engram] parseDiscoverProposals: JSON parse failed — ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
     return [];
   }
 }

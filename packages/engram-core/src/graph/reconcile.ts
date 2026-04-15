@@ -777,6 +777,13 @@ export async function reconcile(
   // cursor is NOT advanced so the same delta is retried once a key is set.
   if (phases.includes("discover") && !budgetHit) {
     const kindCatalog = loadKindCatalog();
+    if (kindCatalog.length === 0) {
+      throw new Error(
+        "reconcile: kind catalog is empty — built-in kinds could not be loaded. " +
+          "This is a build/packaging bug: the kinds/ directory is missing from the runtime location. " +
+          "If running the bundled CLI, ensure the build step copies src/ai/kinds/*.yaml into dist/kinds/.",
+      );
+    }
     const knownKinds = new Set(kindCatalog.map((k) => k.name));
 
     const cursor = lastNonDryRunCompletedAt(graph, opts?.scope);
@@ -837,9 +844,18 @@ export async function reconcile(
             generator,
           });
           discovered++;
-        } catch (_err) {
+        } catch (err) {
           // project() throws on cycle detection, missing inputs, etc.
           // Skip this proposal and continue — partial authoring is valid.
+          const anchorStr = proposal.anchor
+            ? `${proposal.anchor.type}:${proposal.anchor.id}`
+            : "none";
+          const inputsStr = proposal.inputs
+            .map((i) => `${i.type}:${i.id}`)
+            .join(", ");
+          console.warn(
+            `[engram] reconcile: project() failed for ${proposal.kind} (anchor=${anchorStr}, inputs=[${inputsStr}]) — ${err instanceof Error ? err.message : String(err)}`,
+          );
           continue;
         }
       } else {
