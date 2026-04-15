@@ -189,7 +189,9 @@ export function buildDiscoverPrompt(
     `  anchor: { type: string, id: string } | null\n` +
     `  inputs: Array<{ type: string, id: string }>\n` +
     `  rationale: string\n\n` +
-    `Use only entity/edge/episode IDs that appear in the substrate delta.\n` +
+    `CRITICAL: Every input entry MUST include both "type" and "id". The "id" value must be copied exactly from the bracketed IDs in the substrate delta (e.g. [01JXYZ...]).\n` +
+    `Example of a valid proposal:\n` +
+    `  { "kind": "${kinds[0]?.name ?? "entity_summary"}", "anchor": { "type": "entity", "id": "01JXYZ_ENTITY_ID" }, "inputs": [{ "type": "episode", "id": "01JXYZ_EPISODE_ID" }, { "type": "entity", "id": "01JXYZ_ENTITY_ID" }], "rationale": "..." }\n\n` +
     `Anchor type must be one of: entity, edge, episode, projection. Use null anchor for graph-wide projections.\n` +
     `Return [] if no new projections are warranted.\n` +
     `Output only the JSON array — no prose, no markdown fences.`;

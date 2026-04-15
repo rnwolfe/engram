@@ -167,6 +167,7 @@ export class GeminiGenerator implements ProjectionGenerator {
               type: { type: "string" },
               id: { type: "string" },
             },
+            required: ["type", "id"],
           },
           inputs: {
             type: "array",
@@ -176,11 +177,12 @@ export class GeminiGenerator implements ProjectionGenerator {
                 type: { type: "string" },
                 id: { type: "string" },
               },
+              required: ["type", "id"],
             },
           },
           rationale: { type: "string" },
         },
-        required: ["kind", "inputs", "rationale"],
+        required: ["kind", "anchor", "inputs", "rationale"],
       },
     };
     const text = await this.call(system, user, 4096, "json", schema);
