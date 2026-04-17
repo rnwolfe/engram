@@ -38,11 +38,11 @@ Examples:
   # Text search across the knowledge graph
   engram search "auth middleware"
 
-  # Filtered by entity type
-  engram search "database" --entity-type module
+  # Limit results and output as JSON
+  engram search "database" --limit 5 --format json
 
-  # JSON output for scripting
-  engram search "api gateway" --format json
+  # Filter edges valid at a point in time
+  engram search "api gateway" --valid-at 2024-06-01T00:00:00Z
 
 When to use:
   Use search when you know a term to look for but not the entity ID.
