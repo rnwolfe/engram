@@ -9,9 +9,13 @@ export type {
   AIConfig,
   AIProvider,
   EntityHint,
+  ReachabilityResult,
   ReindexProgress,
 } from "./ai/index.js";
 export {
+  checkGoogle,
+  checkOllama,
+  checkOpenAI,
   countEmbeddings,
   createGenerator,
   createProvider,
