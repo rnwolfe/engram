@@ -56,7 +56,7 @@ export function registerMaintenance(program: Command): void {
   // serve
   program
     .command("serve")
-    .description("Start the MCP server (stdio transport)")
+    .description("Start the model context protocol server (stdio transport)")
     .option("--db <path>", "path to .engram file", ".engram")
     .action((_opts: MaintenanceOpts) => {
       console.log("MCP server not yet implemented.");

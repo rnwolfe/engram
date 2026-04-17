@@ -63,6 +63,27 @@ export function registerIngest(program: Command): void {
   ingest
     .command("git [repoPath]")
     .description("Ingest a git repository (VCS layer)")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  # Ingest the current repository
+  engram ingest git
+
+  # Ingest a specific repository
+  engram ingest git /path/to/repo
+
+  # Ingest only commits since a date
+  engram ingest git --since 2024-01-01
+
+When to use:
+  Run after engram init to populate git history, and periodically to
+  pick up new commits (--since keeps it incremental).
+
+See also:
+  engram ingest source   Ingest source symbols
+  engram ingest enrich github  Enrich with PR and issue data`,
+    )
     .option(
       "--since <date>",
       "only ingest commits since this date (ISO8601 or relative)",
@@ -117,6 +138,23 @@ export function registerIngest(program: Command): void {
   ingest
     .command("md <glob>")
     .description("Ingest markdown files matching a glob pattern")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  # Ingest all markdown in docs/
+  engram ingest md "docs/**/*.md"
+
+  # Ingest a single file
+  engram ingest md README.md
+
+When to use:
+  Use to index design docs, ADRs, or changelogs that aren't committed
+  as code but contain important context.
+
+See also:
+  engram ingest git   Ingest commit history`,
+    )
     .option("--db <path>", "path to .engram file", ".engram")
     .action(async (glob: string, opts: IngestMdOpts) => {
       intro("engram ingest md");
@@ -158,6 +196,29 @@ export function registerIngest(program: Command): void {
   ingest
     .command("source [sourcePath]")
     .description("Ingest source files into the knowledge graph")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  # Ingest source from current directory
+  engram ingest source
+
+  # Dry-run to preview what would be indexed
+  engram ingest source --dry-run
+
+  # Exclude test and generated files
+  engram ingest source --exclude "**/*.test.ts" --exclude "dist/**"
+
+  # Verbose per-file output
+  engram ingest source --verbose
+
+When to use:
+  Run after engram ingest git to add symbol-level entities (functions,
+  classes, modules) for code navigation queries.
+
+See also:
+  engram ingest git   Ingest commit history`,
+    )
     .option(
       "--exclude <glob>",
       "additional exclude glob (repeatable)",
@@ -281,6 +342,26 @@ export function registerIngest(program: Command): void {
   enrich
     .command("github")
     .description("Enrich with GitHub PRs and issues")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  # Enrich with GitHub PRs and issues (reads GITHUB_TOKEN from env)
+  engram ingest enrich github
+
+  # Specify repo explicitly
+  engram ingest enrich github --repo owner/repo
+
+  # Pass token directly (for CI)
+  engram ingest enrich github --token ghp_…
+
+When to use:
+  Run after engram ingest git to add PR discussion and issue context.
+  Requires GITHUB_TOKEN or --token for private repos and higher rate limits.
+
+See also:
+  engram ingest git    Ingest git history first`,
+    )
     .option(
       "--token <token>",
       "GitHub API token (or set GITHUB_TOKEN env var). Optional for public repos.",
