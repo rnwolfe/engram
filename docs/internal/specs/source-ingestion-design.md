@@ -365,7 +365,7 @@ Each step is a separate commit. Step 4 is the highest-risk commit — it's where
 
 ## What the benchmark should say
 
-Before merging, run `engramark` against the engram repo (or the fastify benchmark target) with source ingestion enabled vs disabled and compare:
+Before merging, run a manual benchmark against the engram repo (or the fastify benchmark target) with source ingestion enabled vs disabled and compare:
 
 - Retrieval precision / recall on queries about specific functions or classes
 - Number of entities in the graph (expected: roughly 5–10x larger with source ingestion)

@@ -1,5 +1,5 @@
 /**
- * datasets/stale-knowledge/loader.ts — Loader and preparer for the stale-knowledge dataset.
+ * stale-knowledge/datasets/loader.ts — Loader and preparer for the stale-knowledge dataset.
  *
  * Loads StaleKnowledgeDataset from the JSON fixture file, validates it,
  * and prepares scenarios by authoring projections at commit X using project().
@@ -187,7 +187,7 @@ function resolveAnchor(
 /**
  * Authors a minimal synthetic projection body for a given scenario.
  *
- * This is used in tests and benchmarks where no real AI generator is available.
+ * This is used in tests where no real AI generator is available.
  * The body includes required frontmatter and a placeholder content section.
  */
 function buildSyntheticBody(
@@ -309,10 +309,8 @@ export async function prepareScenarios(
 /**
  * A ProjectionGenerator that produces synthetic bodies without any AI call.
  *
- * Used in tests and benchmarks where NullGenerator would throw. The body
- * includes the minimal required frontmatter so project() can parse and store it.
- * Accepts the scenario's kind and anchorId at construction so the generated body
- * accurately reflects the projection's actual kind and anchor.
+ * Used in tests where NullGenerator would throw. The body includes the minimal
+ * required frontmatter so project() can parse and store it.
  */
 class SyntheticGenerator {
   private readonly kind: string;
