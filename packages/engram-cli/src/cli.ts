@@ -3,8 +3,6 @@
 import { Command } from "commander";
 import { ENGINE_VERSION } from "engram-core";
 import { registerAdd } from "./commands/add.js";
-import { registerCompanion } from "./commands/companion.js";
-import { registerContext } from "./commands/context.js";
 import { registerDecay } from "./commands/decay.js";
 import { registerEmbed } from "./commands/embed.js";
 import { registerExport } from "./commands/export.js";
@@ -31,8 +29,6 @@ const program = new Command()
 registerInit(program);
 registerAdd(program);
 registerEmbed(program);
-registerCompanion(program);
-registerContext(program);
 registerSearch(program);
 registerShow(program);
 registerHistory(program);
