@@ -17,6 +17,12 @@ export {
   NullGenerator,
 } from "./projection-generator.js";
 export type { AIConfig, AIProvider, EntityHint } from "./provider.js";
+export type { ReachabilityResult } from "./reachability.js";
+export {
+  checkGoogle,
+  checkOllama,
+  checkOpenAI,
+} from "./reachability.js";
 export type { ReindexProgress } from "./utils.js";
 export {
   countEmbeddings,
