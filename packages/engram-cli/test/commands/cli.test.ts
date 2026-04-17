@@ -57,7 +57,6 @@ describe("CLI command registration", () => {
     expect(names).toContain("export");
     expect(names).toContain("verify");
     expect(names).toContain("rebuild-index");
-    expect(names).toContain("serve");
   });
 
   it("registers ingest subcommands", () => {

@@ -157,10 +157,9 @@ engram export wiki --out ./wiki
 ```
 engram-core          Library (the product). Graph, temporal, retrieval, ingestion, projection engines.
 engram-cli           CLI wrapper. commander + @clack/prompts.
-engram-mcp           MCP server (stdio). Read and authoring tool surface for AI agents.
 ```
 
-The `.engram` file format is the durable contract. The CLI and MCP server are reference implementations over that contract.
+The `.engram` file format is the durable contract. The CLI is the reference implementation over that contract.
 
 ## Design Principles
 
@@ -169,7 +168,7 @@ The `.engram` file format is the durable contract. The CLI and MCP server are re
 3. **Temporal by default** — every fact has a validity window
 4. **Evidence-first** — every claim traces back to source material
 5. **Deterministic substrate, AI-authored projections — both versioned in time** — the graph is correct without AI; projections are where the LLM compounds value between queries, and both layers share the same temporal model
-6. **Developer-native** — CLI interface, MCP integration surface, git-first ingestors
+6. **Developer-native** — CLI interface, git-first ingestors
 7. **Format over features** — the `.engram` format is the contract
 8. **Personal today, tribal tomorrow** — provenance from day one, merge later
 

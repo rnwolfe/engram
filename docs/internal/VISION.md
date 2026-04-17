@@ -4,15 +4,15 @@
 
 ## Identity
 
-**What it is**: Engram extracts knowledge from where it already lives — git history, code review discussions, commit messages, documents — and encodes it as a temporal knowledge graph: entities, relationships, and facts that track how understanding evolves over time. On top of that substrate, an AI-authored projection layer compiles synthesized summaries and decision pages that re-reconcile themselves as new evidence lands. It's a library first, CLI second, MCP server third.
+**What it is**: Engram extracts knowledge from where it already lives — git history, code review discussions, commit messages, documents — and encodes it as a temporal knowledge graph: entities, relationships, and facts that track how understanding evolves over time. On top of that substrate, an AI-authored projection layer compiles synthesized summaries and decision pages that re-reconcile themselves as new evidence lands. It's a library first, CLI second.
 
-**Who it's for**: Engineers and AI agents that need grounded, evidence-backed answers about a codebase — who owns what, why decisions were made, what knowledge is decaying. The primary consumers are locally-running agents (Claude Code via MCP, Cursor) that need a knowledge substrate with provenance and temporal validity.
+**Who it's for**: Engineers and AI agents that need grounded, evidence-backed answers about a codebase — who owns what, why decisions were made, what knowledge is decaying. The primary consumers are locally-running agents (Claude Code via `engram context`, Cursor) that need a knowledge substrate with provenance and temporal validity.
 
 **Why it exists**: Your company's most critical knowledge is encoded in git blame, auto-deleting Slack threads, and the head of an engineer who just gave notice. Every knowledge management tool wants manual transcription. Every AI agent treats context as ephemeral. Engram doesn't ask you to take notes — it builds the graph from source material that already exists, and every claim traces back to evidence.
 
 ## Design Principles
 
-1. **Embeddable, not monolithic.** Engram is a library first. Other tools depend on it — it doesn't depend on them. The CLI and MCP server are reference implementations over the core engine.
+1. **Embeddable, not monolithic.** Engram is a library first. Other tools depend on it — it doesn't depend on them. The CLI is the reference implementation over the core engine.
 
 2. **Local-first, single-file portable.** The entire knowledge graph lives in one `.engram` file (SQLite). Copy it, rsync it, back it up. No external databases. No cloud requirements.
 
@@ -22,7 +22,7 @@
 
 5. **Deterministic substrate, AI-authored projections — both versioned in time.** The substrate (episodes, entities, edges, evidence chains, validity windows) is deterministic and acts as an audit ledger. On top of it sits a projection layer: AI-authored syntheses (entity summaries, decision pages, contradiction reports) that are first-class artifacts, versioned by the same temporal model as edges. The substrate is correct without AI. The projection layer is where the LLM compounds value between queries — and because every projection traces back to the substrate, *what we believed and when* becomes a first-class query. With no AI configured you still have the substrate; with AI you get a temporally-versioned wiki that re-reconciles itself as new evidence arrives.
 
-6. **Developer-native.** First-class ingestors understand git and code. Primary interface is a CLI. Integration surface is MCP. Infrastructure for engineers, not a productivity app.
+6. **Developer-native.** First-class ingestors understand git and code. Primary interface is a CLI. Infrastructure for engineers, not a productivity app.
 
 7. **Format over features.** The `.engram` format is the durable contract. If the format is good enough, the ecosystem builds itself.
 
@@ -54,7 +54,6 @@ The `.engram` format, the core engine, and the "money command":
 - `engram ingest git` (VCS-layer, universal, no API needed)
 - `engram ingest enrich github` (PR/issue enrichment)
 - `engram ingest md` (markdown files)
-- MCP server (stdio) with read-heavy tool surface
 - AI-enhanced mode when LLM available, graceful no-AI fallback
 - EngRAMark v0.1 benchmarked against Fastify
 
@@ -82,7 +81,7 @@ The `.engram` format, the core engine, and the "money command":
 ## Prior Art & Constraints
 
 - **Technology**: TypeScript (Bun), SQLite via `better-sqlite3`, ULIDs for IDs, pluggable embedding/LLM providers
-- **Monorepo structure**: `packages/engram-core`, `packages/engram-cli`, `packages/engram-mcp`
+- **Monorepo structure**: `packages/engram-core`, `packages/engram-cli`
 - **Key differentiator vs Copilot @workspace / Sourcegraph Cody**: Provenance and temporal model. When an agent says "Alice owns auth," it can cite the commits, show the validity window, and distinguish observed from inferred.
 - **Key differentiator vs git-fame / hercules**: Compositional queries across signals (ownership + co-change + evidence strength + temporal validity), not just static reports
 - **The no-AI story**: The substrate (episodes, entities, edges, evidence) is correct without AI — that's the cold-start path and the audit/compliance story. The differentiator is what sits on top: an AI-authored projection layer that compounds over time *and* is versioned by the temporal model, so the answer to "what did we believe in March about the auth refactor" is a first-class query. No other system in this space has both compounding LLM-authored synthesis and temporal versioning of that synthesis.
