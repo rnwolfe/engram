@@ -267,7 +267,11 @@ function getOrCreatePerson(
   email: string,
   name: string,
   episodeId: string,
-  counts: { entitiesCreated: number; entitiesResolved: number },
+  counts: {
+    entitiesCreated: number;
+    entitiesResolved: number;
+    newEntityIds: Set<string>;
+  },
 ): string {
   // Try canonical name (email) first, then name
   const existing =
@@ -290,6 +294,7 @@ function getOrCreatePerson(
   );
 
   counts.entitiesCreated++;
+  counts.newEntityIds.add(entity.id);
   return entity.id;
 }
 
@@ -297,7 +302,11 @@ function getOrCreateModule(
   graph: EngramGraph,
   filePath: string,
   episodeId: string,
-  counts: { entitiesCreated: number; entitiesResolved: number },
+  counts: {
+    entitiesCreated: number;
+    entitiesResolved: number;
+    newEntityIds: Set<string>;
+  },
 ): string {
   const existing = resolveEntity(graph, filePath, "module");
 
@@ -316,6 +325,7 @@ function getOrCreateModule(
   );
 
   counts.entitiesCreated++;
+  counts.newEntityIds.add(entity.id);
   return entity.id;
 }
 
@@ -364,6 +374,7 @@ export async function ingestGitRepo(
     entitiesResolved: 0,
     edgesCreated: 0,
     edgesSuperseded: 0,
+    newEntityIds: new Set<string>(),
   };
 
   try {
@@ -734,14 +745,10 @@ export async function ingestGitRepo(
           ...episodeIds.values(),
         ]);
       }
-      if (counts.entitiesCreated > 0) {
-        const newEntityIds = [
-          ...new Set([
-            ...fileEntityCache.values(),
-            ...authorEntityCache.values(),
-          ]),
-        ];
-        await generateEntityEmbeddings(graph, opts.provider, newEntityIds);
+      if (counts.newEntityIds.size > 0) {
+        await generateEntityEmbeddings(graph, opts.provider, [
+          ...counts.newEntityIds,
+        ]);
       }
     }
 

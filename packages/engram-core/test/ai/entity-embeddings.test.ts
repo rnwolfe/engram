@@ -19,12 +19,10 @@ import {
 
 // Stub provider that returns a fixed embedding per text (deterministic)
 function makeStubProvider(dims = 3): AIProvider {
-  const _callCount = 0;
   return {
     modelName: () => "stub-model",
     embed: async (texts: string[]) => {
       return texts.map((_t, i) => {
-        // Embed as a unit vector pointing in a direction derived from text length + call
         const v = new Array(dims).fill(0) as number[];
         v[i % dims] = 1;
         return v;

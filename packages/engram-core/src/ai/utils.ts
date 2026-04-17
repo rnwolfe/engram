@@ -76,7 +76,8 @@ export async function generateEpisodeEmbeddings(
  * Build the embedding text for an entity: name + optional summary.
  */
 function entityEmbeddingText(name: string, summary: string | null): string {
-  return summary ? `${name} ${summary}` : name;
+  const trimmed = summary?.trim();
+  return trimmed ? `${name.trim()} ${trimmed}` : name.trim();
 }
 
 /**
@@ -90,15 +91,12 @@ export async function generateEntityEmbeddings(
 ): Promise<void> {
   if (entityIds.length === 0) return;
 
-  const rows: EntityTextRow[] = [];
-  for (const id of entityIds) {
-    const row = graph.db
-      .query<EntityTextRow, [string]>(
-        "SELECT id, canonical_name, summary FROM entities WHERE id = ? AND status = 'active'",
-      )
-      .get(id);
-    if (row) rows.push(row);
-  }
+  const placeholders = entityIds.map(() => "?").join(", ");
+  const rows = graph.db
+    .query<EntityTextRow, string[]>(
+      `SELECT id, canonical_name, summary FROM entities WHERE id IN (${placeholders}) AND status = 'active'`,
+    )
+    .all(...entityIds);
 
   if (rows.length === 0) return;
 
