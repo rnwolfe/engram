@@ -16,12 +16,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { Command } from "commander";
 import type { EngramGraph } from "engram-core";
-import {
-  closeGraph,
-  countEmbeddings,
-  getEmbeddingModel,
-  openGraph,
-} from "engram-core";
+import { closeGraph, getEmbeddingModel, openGraph } from "engram-core";
 
 interface StatusOpts {
   db: string;
@@ -118,8 +113,11 @@ async function checkGoogle(apiKey: string): Promise<ReachabilityResult> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 3000);
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=1`,
-      { signal: controller.signal },
+      "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1",
+      {
+        headers: { "x-goog-api-key": apiKey },
+        signal: controller.signal,
+      },
     );
     clearTimeout(timer);
     if (res.ok) return { ok: true, message: "reachable" };
@@ -177,7 +175,25 @@ function collectDb(graph: EngramGraph, dbPath: string): DbSection {
 
 function collectEmbedding(graph: EngramGraph): EmbeddingSection {
   const stored = getEmbeddingModel(graph);
-  const counts = countEmbeddings(graph);
+
+  // Count embeddings for active entities/episodes only (joined to filter soft-deleted rows)
+  const entityEmbedCount =
+    graph.db
+      .query<CountRow, []>(
+        `SELECT COUNT(*) as count FROM embeddings em
+         JOIN entities e ON e.id = em.target_id
+         WHERE em.target_type = 'entity' AND e.status = 'active'`,
+      )
+      .get()?.count ?? 0;
+
+  const episodeEmbedCount =
+    graph.db
+      .query<CountRow, []>(
+        `SELECT COUNT(*) as count FROM embeddings em
+         JOIN episodes ep ON ep.id = em.target_id
+         WHERE em.target_type = 'episode' AND ep.status = 'active'`,
+      )
+      .get()?.count ?? 0;
 
   const activeEntities =
     graph.db
@@ -226,8 +242,11 @@ function collectEmbedding(graph: EngramGraph): EmbeddingSection {
     dimensions: stored?.dimensions ?? null,
     provider,
     providerEndpoint,
-    entityCoverage: { withEmbedding: counts.entities, total: activeEntities },
-    episodeCoverage: { withEmbedding: counts.episodes, total: activeEpisodes },
+    entityCoverage: { withEmbedding: entityEmbedCount, total: activeEntities },
+    episodeCoverage: {
+      withEmbedding: episodeEmbedCount,
+      total: activeEpisodes,
+    },
   };
 }
 
