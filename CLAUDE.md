@@ -71,20 +71,6 @@ engram/
 │   │       │   │             #   engram_ownership_report,
 │   │       │   │             #   engram_add_episode, engram_add_entity, engram_add_edge
 │   │       └── server.ts     # stdio transport
-│   └── engramark/            # Benchmark suite
-│       └── src/
-│           ├── datasets/     # Ground-truth Q&A for test repos
-│           │   ├── fastify/  # v0.1 retrieval benchmark target
-│           │   └── stale-knowledge/  # Stale-knowledge detection scenarios
-│           │       ├── fastify.json  # 10 scenarios (sk-001..sk-010), 7 stale + 3 fresh
-│           │       └── loader.ts     # loadDataset(), prepareScenarios() with project()
-│           ├── runners/      # Benchmark execution
-│           │   ├── stale-naive-rag.ts      # Baseline: always "not stale" (score 0.0)
-│           │   ├── stale-read-time.ts      # Read-time: getProjection() stale flag only
-│           │   └── stale-full-reconcile.ts # Full: reconcile() assess phase
-│           ├── scoring/
-│           │   └── stale-knowledge.ts  # computeStaleKnowledgeMetrics() — recall, precision, F1
-│           └── report.ts     # Results formatting (includes stale-knowledge tables)
 ├── docs/
 │   ├── internal/
 │   │   ├── VISION.md         # Product vision and design principles
@@ -187,7 +173,7 @@ Conservative in v0.1: exact canonical name or alias match only. `resolveEntity()
 
 - Unit tests for all core engine operations (graph CRUD, temporal logic, evidence chains)
 - Integration tests for ingestion pipeline against real git repos
-- Benchmark tests in `engramark` package against Fastify repo
+- Stale-knowledge detection tests in `packages/engram-core/test/stale-knowledge/`
 - Test file naming: `*.test.ts` colocated with source
 - Use real SQLite databases in tests (in-memory `:memory:` or temp files), not mocks
 - Test temporal invariants explicitly: validity windows, supersession chains, evidence integrity

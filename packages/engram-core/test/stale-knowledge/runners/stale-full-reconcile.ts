@@ -13,8 +13,8 @@
 
 import type { EngramGraph } from "engram-core";
 import { getProjection, NullGenerator, reconcile } from "engram-core";
-import type { PreparedScenario } from "../datasets/stale-knowledge/loader.js";
-import type { ScenarioResult } from "../scoring/stale-knowledge.js";
+import type { PreparedScenario } from "../datasets/loader.js";
+import type { ScenarioResult } from "../scoring.js";
 import type { StaleKnowledgeBenchmarkRunner } from "./stale-naive-rag.js";
 
 export const RUNNER_NAME = "stale-full-reconcile";
@@ -116,7 +116,7 @@ export const fullReconcileRunner: StaleKnowledgeBenchmarkRunner = {
 };
 
 /**
- * Run the full-reconcile stale-knowledge benchmark.
+ * Run the full-reconcile stale-knowledge detection.
  *
  * @param graph - Graph at commit Y.
  * @param scenarios - Prepared scenarios with projections authored at commit X.

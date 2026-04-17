@@ -82,7 +82,7 @@ The `.engram` format, the core engine, and the "money command":
 ## Prior Art & Constraints
 
 - **Technology**: TypeScript (Bun), SQLite via `better-sqlite3`, ULIDs for IDs, pluggable embedding/LLM providers
-- **Monorepo structure**: `packages/engram-core`, `packages/engram-cli`, `packages/engram-mcp`, `packages/engramark`
+- **Monorepo structure**: `packages/engram-core`, `packages/engram-cli`, `packages/engram-mcp`
 - **Key differentiator vs Copilot @workspace / Sourcegraph Cody**: Provenance and temporal model. When an agent says "Alice owns auth," it can cite the commits, show the validity window, and distinguish observed from inferred.
 - **Key differentiator vs git-fame / hercules**: Compositional queries across signals (ownership + co-change + evidence strength + temporal validity), not just static reports
 - **The no-AI story**: The substrate (episodes, entities, edges, evidence) is correct without AI — that's the cold-start path and the audit/compliance story. The differentiator is what sits on top: an AI-authored projection layer that compounds over time *and* is versioned by the temporal model, so the answer to "what did we believe in March about the auth refactor" is a first-class query. No other system in this space has both compounding LLM-authored synthesis and temporal versioning of that synthesis.

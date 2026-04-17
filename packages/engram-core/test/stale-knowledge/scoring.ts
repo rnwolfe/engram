@@ -1,15 +1,15 @@
 /**
- * scoring/stale-knowledge.ts — Metrics computation for stale-knowledge detection benchmarks.
+ * stale-knowledge/scoring.ts — Metrics computation for stale-knowledge detection tests.
  *
  * Computes precision, recall, F1, and placeholder fields for the stale-knowledge
- * detection benchmark. Each ScenarioResult records what the runner detected
+ * detection test. Each ScenarioResult records what the runner detected
  * versus the ground-truth expected_stale flag.
  */
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 /**
- * Result of running a single benchmark scenario through a runner.
+ * Result of running a single test scenario through a runner.
  */
 export interface ScenarioResult {
   /** Scenario ID (e.g. 'sk-001'). */
@@ -25,7 +25,7 @@ export interface ScenarioResult {
 }
 
 /**
- * Aggregated metrics for a stale-knowledge detection benchmark run.
+ * Aggregated metrics for a stale-knowledge detection run.
  */
 export interface StaleKnowledgeMetrics {
   /**

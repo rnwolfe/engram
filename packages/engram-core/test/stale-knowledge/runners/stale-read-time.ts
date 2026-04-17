@@ -11,8 +11,8 @@
 
 import type { EngramGraph } from "engram-core";
 import { getProjection } from "engram-core";
-import type { PreparedScenario } from "../datasets/stale-knowledge/loader.js";
-import type { ScenarioResult } from "../scoring/stale-knowledge.js";
+import type { PreparedScenario } from "../datasets/loader.js";
+import type { ScenarioResult } from "../scoring.js";
 import type { StaleKnowledgeBenchmarkRunner } from "./stale-naive-rag.js";
 
 export const RUNNER_NAME = "stale-read-time";
@@ -81,7 +81,7 @@ export const readTimeRunner: StaleKnowledgeBenchmarkRunner = {
 };
 
 /**
- * Run the read-time staleness benchmark against prepared scenarios.
+ * Run the read-time staleness detection against prepared scenarios.
  *
  * @param graph - Graph at commit Y (advanced past commit X).
  * @param scenarios - Prepared scenarios with projections authored at commit X.

@@ -158,7 +158,6 @@ engram export wiki --out ./wiki
 engram-core          Library (the product). Graph, temporal, retrieval, ingestion, projection engines.
 engram-cli           CLI wrapper. commander + @clack/prompts.
 engram-mcp           MCP server (stdio). Read and authoring tool surface for AI agents.
-engramark            Benchmark suite (EngRAMark). Validated against Fastify and stale-knowledge scenarios.
 ```
 
 The `.engram` file format is the durable contract. The CLI and MCP server are reference implementations over that contract.

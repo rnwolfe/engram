@@ -5,12 +5,12 @@
  * "cannot detect staleness", scoring 0.0 detected_stale for every scenario.
  *
  * Purpose: establishes a lower-bound baseline to contrast against read-time
- * and full-reconcile runners in the benchmark comparison table.
+ * and full-reconcile runners in the comparison table.
  */
 
 import type { EngramGraph } from "engram-core";
-import type { PreparedScenario } from "../datasets/stale-knowledge/loader.js";
-import type { ScenarioResult } from "../scoring/stale-knowledge.js";
+import type { PreparedScenario } from "../datasets/loader.js";
+import type { ScenarioResult } from "../scoring.js";
 
 export const RUNNER_NAME = "stale-naive-rag";
 
@@ -59,7 +59,7 @@ export const naiveRagRunner: StaleKnowledgeBenchmarkRunner = {
 };
 
 /**
- * Run the naive-rag benchmark against prepared scenarios.
+ * Run the naive-rag detection against prepared scenarios.
  *
  * @param graph - Graph at commit Y.
  * @param scenarios - Prepared scenarios.

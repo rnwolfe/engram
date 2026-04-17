@@ -30,7 +30,7 @@
 
 ### Next Up
 
-- [ ] EngRAMark AI benchmarking extension (#32, specced at `docs/internal/specs/engramark-ai-benchmarking.md`)
+- [ ] AI benchmarking extension (#32)
   - `ai-enhanced` runner, `--all` comparison mode, CI baseline regression detection
   - **Blocked by**: #31
 
@@ -53,5 +53,5 @@ Planned per VISION.md:
 ## Architecture Stats
 
 - **Test count**: ~293 (as of EngRAMark merge)
-- **Packages**: 4 (engram-core, engram-cli, engram-mcp, engramark)
-- **Specs**: 3 (format-v0.1, ai-providers, engramark-ai-benchmarking)
+- **Packages**: 3 (engram-core, engram-cli, engram-mcp)
+- **Specs**: 2 (format-v0.1, ai-providers)
