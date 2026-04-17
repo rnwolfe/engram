@@ -331,6 +331,76 @@ interface EvidenceRow {
 }
 
 /**
+ * Returns true for config/lockfile/fixture entities that tend to crowd out
+ * real results when a large commit touches many files. These are low-signal in
+ * almost every query — they contain no architectural rationale.
+ *
+ * Applied as a post-filter in the episode-body fallback path, where a single
+ * large commit can link 15+ files as entities at equal rank.
+ */
+function isConfigNoise(canonicalName: string): boolean {
+  const base = (canonicalName.split("/").pop() ?? canonicalName).toLowerCase();
+  const NOISE_BASENAMES = new Set([
+    "package.json",
+    "package-lock.json",
+    "bun.lock",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "biome.json",
+    "eslint.json",
+    ".eslintrc.json",
+    "prettier.json",
+    ".prettierrc.json",
+    "tsconfig.json",
+    "tsconfig.build.json",
+    "tsconfig.base.json",
+  ]);
+  if (NOISE_BASENAMES.has(base)) return true;
+  if (base.endsWith(".lock")) return true;
+  if (
+    base.endsWith(".toml") &&
+    base !== "forge.toml" &&
+    base !== "cargo.toml" &&
+    base !== "pyproject.toml"
+  ) {
+    return true;
+  }
+  // Binary / generated / distribution artifacts
+  if (
+    base.endsWith(".bin") ||
+    base.endsWith(".wasm") ||
+    /\.min\.[cm]?js$/.test(base) ||
+    base === "bundle.js"
+  ) {
+    return true;
+  }
+  // Test fixture paths and generated data paths — high entity count, zero rationale
+  if (
+    canonicalName.includes("/test/fixtures/") ||
+    canonicalName.includes("/node_modules/") ||
+    canonicalName.includes("/dist/") ||
+    canonicalName.includes("/datasets/")
+  ) {
+    return true;
+  }
+  // Test files — they shadow the source modules they test and add no unique rationale
+  // in the episode-fallback path (the source file itself is more authoritative).
+  if (base.endsWith(".test.ts") || base.endsWith(".test.js")) {
+    return true;
+  }
+  // Build/copy scripts and benchmark runners — infrastructure, not architecture.
+  if (
+    base === "copy-assets.ts" ||
+    base === "copy-assets.js" ||
+    canonicalName.includes("/engramark/") ||
+    canonicalName.includes("/scripts/")
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Returns true for low-signal entities that tend to crowd out real results.
  * Specifically: all-caps DDL/schema constants like CREATE_EDGE_EVIDENCE,
  * INDEX_ENTITIES, etc. — they match query terms like "edge" or "entity"
@@ -448,17 +518,45 @@ function searchEntitiesLike(
  *
  * Prefers source episodes over git_commit episodes (source bodies contain
  * actual field usage in context; commit messages are less structured).
+ *
+ * Fix 1: Config/lockfile entities (biome.json, package.json, *.lock, etc.)
+ * are filtered out — they crowd out relevant code entities when a large commit
+ * touches many files and all share the same baseline rank.
+ *
+ * Fix 2: Entities whose canonical name contains one of the raw query terms
+ * get a better rank (-0.1 vs -0.3) so they sort above generic noise entities
+ * after normalization.
  */
 function searchEntitiesViaEpisodeFts(
   graph: EngramGraph,
   terms: string[],
   excludeIds: Set<string>,
   limit: number,
+  rawQueryTerms: string[],
 ): EntityFtsRow[] {
   if (terms.length === 0) return [];
   // AND all terms so only episodes that mention every term are returned.
   // Terms are already FTS-quoted from the caller; reconstruct as AND expression.
   const andExpr = terms.join(" AND ");
+  // Bare terms (without FTS quoting) for name-matching heuristic.
+  const bareTerms = terms.map((t) => t.replace(/^"|"$/g, "").toLowerCase());
+  // First, get matching episodes with their BM25 scores.
+  const episodeScores = new Map<string, number>();
+  try {
+    const epRows = graph.db
+      .query<{ id: string; rank: number }, [string]>(
+        `SELECT episodes.id, bm25(episodes_fts) AS rank
+         FROM episodes_fts
+         JOIN episodes ON episodes._rowid = episodes_fts.rowid
+         WHERE episodes_fts MATCH ?
+           AND episodes.status = 'active'`,
+      )
+      .all(andExpr);
+    for (const r of epRows) episodeScores.set(r.id, r.rank);
+  } catch {
+    // ignore; falls back to flat -0.3 rank below
+  }
+
   try {
     const rows = graph.db
       .query<EntityFtsRow, [string]>(
@@ -477,8 +575,66 @@ function searchEntitiesViaEpisodeFts(
          LIMIT ${limit * 3}`,
       )
       .all(andExpr);
+
+    // Collect matching episode bodies for entity-name frequency scoring.
+    // We count how often each entity's file stem appears in the matching episode
+    // bodies — entities like "reconcile.ts" appear 50+ times in a commit about
+    // the reconcile phase, vs 2 times for unrelated "gemini-generator.ts".
+    const epBodies: string[] = [];
+    for (const [epId] of episodeScores) {
+      try {
+        const ep = graph.db
+          .query<{ content: string }, [string]>(
+            "SELECT content FROM episodes WHERE id = ?",
+          )
+          .get(epId);
+        if (ep) epBodies.push(ep.content.toLowerCase());
+      } catch {
+        // ignore
+      }
+    }
+
+    // Fix 1: filter config/noise files; Fix 2: boost rank for term-matching entities.
+    // Note: BM25 ranks are negative — more negative = better match. Normalization:
+    //   score = abs(rank) / abs(minRank), so a more negative rank → higher score.
+    //
+    // Rank assignment (applied in priority order, first match wins):
+    // a) Entity canonical_name contains a raw query term or episode AND term → -0.5
+    // b) Entity file stem appears frequently (≥ 5 times) in matching episode bodies → -0.45
+    // c) Entity file stem appears rarely (1-4 times) → -0.35
+    // d) Default fallback rank: -0.3
+    const allTermsToMatch = [
+      ...rawQueryTerms.map((t) => t.toLowerCase()),
+      ...bareTerms,
+    ].filter((t) => t.length > 0);
     return rows
-      .filter((r) => !excludeIds.has(r.id) && !isLowSignalEntity(r))
+      .filter(
+        (r) =>
+          !excludeIds.has(r.id) &&
+          !isLowSignalEntity(r) &&
+          !isConfigNoise(r.canonical_name),
+      )
+      .map((r) => {
+        const lowerName = r.canonical_name.toLowerCase();
+        // Priority a: canonical name contains a raw query term or episode AND term.
+        if (allTermsToMatch.some((t) => lowerName.includes(t))) {
+          return { ...r, rank: -0.5 };
+        }
+        // Priority b/c: file stem frequency in matching episode bodies.
+        // Extract file stem (base name without extension).
+        const base = r.canonical_name.split("/").pop() ?? "";
+        const stem = base.replace(/\.[^.]+$/, "").toLowerCase();
+        if (stem.length >= 6 && epBodies.length > 0) {
+          const stemRe = new RegExp(`\\b${stem}`, "gi");
+          const totalCount = epBodies.reduce((sum, body) => {
+            return sum + (body.match(stemRe) ?? []).length;
+          }, 0);
+          if (totalCount >= 5) return { ...r, rank: -0.45 };
+          if (totalCount >= 1) return { ...r, rank: -0.35 };
+        }
+        return r; // keep default -0.3
+      })
+      .sort((a, b) => a.rank - b.rank) // more negative rank = better score, sort ascending
       .slice(0, limit);
   } catch {
     return [];
@@ -750,11 +906,13 @@ async function assembleContextPack(
     });
     const termsForEpisode =
       identifierTerms.length > 0 ? identifierTerms : ftsTerms.slice(0, 2);
+    const rawTerms = ftsTerms.map((t) => t.replace(/^"|"$/g, ""));
     const episodeRows = searchEntitiesViaEpisodeFts(
       graph,
       termsForEpisode,
       seenEntityIds,
       15,
+      rawTerms,
     );
     for (const r of episodeRows) {
       entityRows.push(r);
@@ -1047,6 +1205,16 @@ async function assembleContextPack(
               : 0.5,
       provenance,
     });
+  }
+
+  // Fix 3: Suggest enrichment when the pack is sparse and no discussions found.
+  // A pack with fewer than 3 entities and no confident discussion hits is likely
+  // the result of an under-populated knowledge base (no markdown or source ingestion).
+  if (entities.length < 3 && discussions.length === 0) {
+    process.stderr.write(
+      "Note: fewer than 3 entities found. Run 'engram ingest md <docs-dir>' or\n" +
+        "'engram ingest source' to enrich the knowledge base.\n",
+    );
   }
 
   return {
