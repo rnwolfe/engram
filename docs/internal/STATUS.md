@@ -16,7 +16,6 @@
 - [x] Graph traversal — BFS neighbors, shortest path, temporal snapshots (#24)
 - [x] Knowledge decay detection — stale, contradicted, concentrated risk, dormant, orphaned (#25)
 - [x] CLI — full command surface: init, add, search, show, history, decay, stats, ingest, export, verify (#26)
-- [x] MCP server — stdio transport, 8 tools, 2 resources, context tool with budget-aware truncation (#27)
 - [x] Integrity verification — `verifyGraph()` with 8 checks, `engram verify` CLI command (#28)
 - [x] EngRAMark v0.1 — 20 ground-truth Q&A for Fastify, VCS-only + grep baselines (#29)
 - [x] Markdown and text ingestion (#30)
@@ -53,5 +52,5 @@ Planned per VISION.md:
 ## Architecture Stats
 
 - **Test count**: ~293 (as of EngRAMark merge)
-- **Packages**: 3 (engram-core, engram-cli, engram-mcp)
+- **Packages**: 2 (engram-core, engram-cli)
 - **Specs**: 2 (format-v0.1, ai-providers)

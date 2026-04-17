@@ -70,5 +70,4 @@ See also:
 
       closeGraph(graph);
     });
-
 }
