@@ -3,7 +3,7 @@ import { describe, expect, it } from "bun:test";
 import { execFileSync } from "node:child_process";
 import * as path from "node:path";
 
-const CLI = path.resolve(__dirname, "../dist/cli.js");
+const CLI = path.resolve(__dirname, "../src/cli.ts");
 
 function helpOutput(args: string[]): string {
   return execFileSync("bun", [CLI, ...args, "--help"], {
