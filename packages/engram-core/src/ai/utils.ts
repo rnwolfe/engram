@@ -12,6 +12,12 @@ interface EpisodeContentRow {
   content: string;
 }
 
+interface EntityTextRow {
+  id: string;
+  canonical_name: string;
+  summary: string | null;
+}
+
 /**
  * Generate embeddings for a batch of episode IDs using the given provider.
  * Never throws — embedding failures are logged and skipped.
@@ -66,6 +72,66 @@ export async function generateEpisodeEmbeddings(
   }
 }
 
+/**
+ * Build the embedding text for an entity: name + optional summary.
+ */
+function entityEmbeddingText(name: string, summary: string | null): string {
+  const trimmed = summary?.trim();
+  return trimmed ? `${name.trim()} ${trimmed}` : name.trim();
+}
+
+/**
+ * Generate embeddings for a batch of entity IDs using the given provider.
+ * Never throws — embedding failures are logged and skipped.
+ */
+export async function generateEntityEmbeddings(
+  graph: EngramGraph,
+  provider: AIProvider,
+  entityIds: string[],
+): Promise<void> {
+  if (entityIds.length === 0) return;
+
+  const placeholders = entityIds.map(() => "?").join(", ");
+  const rows = graph.db
+    .query<EntityTextRow, string[]>(
+      `SELECT id, canonical_name, summary FROM entities WHERE id IN (${placeholders}) AND status = 'active'`,
+    )
+    .all(...entityIds);
+
+  if (rows.length === 0) return;
+
+  try {
+    const texts = rows.map((r) =>
+      entityEmbeddingText(r.canonical_name, r.summary),
+    );
+    const embeddings = await provider.embed(texts);
+
+    for (let i = 0; i < rows.length; i++) {
+      const embedding = embeddings[i];
+      if (!embedding || embedding.length === 0) continue;
+
+      try {
+        storeEmbedding(
+          graph,
+          rows[i].id,
+          "entity",
+          provider.modelName(),
+          embedding,
+          texts[i].slice(0, 500),
+        );
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(
+          `[engram] generateEntityEmbeddings: skip ${rows[i].id}: ${msg}`,
+        );
+      }
+    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[engram] generateEntityEmbeddings: provider error: ${msg}`);
+  }
+}
+
 export interface ReindexProgress {
   total: number;
   done: number;
@@ -94,15 +160,39 @@ export async function reindexEmbeddings(
     )
     .all();
 
-  const total = allEpisodes.length;
+  const allEntities = graph.db
+    .query<EntityTextRow, []>(
+      "SELECT id, canonical_name, summary FROM entities WHERE status = 'active' ORDER BY id",
+    )
+    .all();
+
+  // Interleave episodes and entities into a unified work list
+  type WorkItem =
+    | { kind: "episode"; id: string; text: string }
+    | { kind: "entity"; id: string; text: string };
+
+  const workItems: WorkItem[] = [
+    ...allEpisodes.map((r) => ({
+      kind: "episode" as const,
+      id: r.id,
+      text: r.content,
+    })),
+    ...allEntities.map((r) => ({
+      kind: "entity" as const,
+      id: r.id,
+      text: entityEmbeddingText(r.canonical_name, r.summary),
+    })),
+  ];
+
+  const total = workItems.length;
   let done = 0;
   let errors = 0;
   let newDimensions = 0;
 
   const BATCH = 50;
-  for (let offset = 0; offset < allEpisodes.length; offset += BATCH) {
-    const batch = allEpisodes.slice(offset, offset + BATCH);
-    const texts = batch.map((r) => r.content);
+  for (let offset = 0; offset < workItems.length; offset += BATCH) {
+    const batch = workItems.slice(offset, offset + BATCH);
+    const texts = batch.map((r) => r.text);
 
     try {
       const embeddings = await provider.embed(texts);
@@ -118,10 +208,10 @@ export async function reindexEmbeddings(
           storeEmbeddingRaw(
             graph,
             batch[i].id,
-            "episode",
+            batch[i].kind,
             newModel,
             embedding,
-            batch[i].content.slice(0, 500),
+            batch[i].text.slice(0, 500),
           );
           if (newDimensions === 0) newDimensions = embedding.length;
           done++;

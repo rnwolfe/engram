@@ -10,7 +10,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { ulid } from "ulid";
 import type { AIProvider } from "../ai/provider.js";
-import { generateEpisodeEmbeddings } from "../ai/utils.js";
+import {
+  generateEntityEmbeddings,
+  generateEpisodeEmbeddings,
+} from "../ai/utils.js";
 import type { EngramGraph } from "../format/index.js";
 import { ENGINE_VERSION } from "../format/version.js";
 import { resolveEntity } from "../graph/aliases.js";
@@ -264,7 +267,11 @@ function getOrCreatePerson(
   email: string,
   name: string,
   episodeId: string,
-  counts: { entitiesCreated: number; entitiesResolved: number },
+  counts: {
+    entitiesCreated: number;
+    entitiesResolved: number;
+    newEntityIds: Set<string>;
+  },
 ): string {
   // Try canonical name (email) first, then name
   const existing =
@@ -287,6 +294,7 @@ function getOrCreatePerson(
   );
 
   counts.entitiesCreated++;
+  counts.newEntityIds.add(entity.id);
   return entity.id;
 }
 
@@ -294,7 +302,11 @@ function getOrCreateModule(
   graph: EngramGraph,
   filePath: string,
   episodeId: string,
-  counts: { entitiesCreated: number; entitiesResolved: number },
+  counts: {
+    entitiesCreated: number;
+    entitiesResolved: number;
+    newEntityIds: Set<string>;
+  },
 ): string {
   const existing = resolveEntity(graph, filePath, "module");
 
@@ -313,6 +325,7 @@ function getOrCreateModule(
   );
 
   counts.entitiesCreated++;
+  counts.newEntityIds.add(entity.id);
   return entity.id;
 }
 
@@ -361,6 +374,7 @@ export async function ingestGitRepo(
     entitiesResolved: 0,
     edgesCreated: 0,
     edgesSuperseded: 0,
+    newEntityIds: new Set<string>(),
   };
 
   try {
@@ -724,11 +738,18 @@ export async function ingestGitRepo(
       edges: counts.edgesCreated,
     });
 
-    // Post-ingest: generate embeddings for new episodes (best-effort, never blocks)
-    if (opts.provider && counts.episodesCreated > 0) {
-      await generateEpisodeEmbeddings(graph, opts.provider, [
-        ...episodeIds.values(),
-      ]);
+    // Post-ingest: generate embeddings for new episodes and entities (best-effort, never blocks)
+    if (opts.provider) {
+      if (counts.episodesCreated > 0) {
+        await generateEpisodeEmbeddings(graph, opts.provider, [
+          ...episodeIds.values(),
+        ]);
+      }
+      if (counts.newEntityIds.size > 0) {
+        await generateEntityEmbeddings(graph, opts.provider, [
+          ...counts.newEntityIds,
+        ]);
+      }
     }
 
     return { ...counts, runId };
