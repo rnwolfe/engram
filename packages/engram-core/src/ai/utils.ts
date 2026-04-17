@@ -151,38 +151,41 @@ export async function reindexEmbeddings(
   graph: EngramGraph,
   provider: AIProvider,
   onProgress?: (p: ReindexProgress) => void,
+  target: "all" | "episodes" | "entities" = "all",
 ): Promise<ReindexProgress> {
   const newModel = provider.modelName();
 
-  const allEpisodes = graph.db
-    .query<{ id: string; content: string }, []>(
-      "SELECT id, content FROM episodes WHERE status != 'redacted' ORDER BY id",
-    )
-    .all();
-
-  const allEntities = graph.db
-    .query<EntityTextRow, []>(
-      "SELECT id, canonical_name, summary FROM entities WHERE status = 'active' ORDER BY id",
-    )
-    .all();
-
-  // Interleave episodes and entities into a unified work list
   type WorkItem =
     | { kind: "episode"; id: string; text: string }
     | { kind: "entity"; id: string; text: string };
 
-  const workItems: WorkItem[] = [
-    ...allEpisodes.map((r) => ({
-      kind: "episode" as const,
-      id: r.id,
-      text: r.content,
-    })),
-    ...allEntities.map((r) => ({
-      kind: "entity" as const,
-      id: r.id,
-      text: entityEmbeddingText(r.canonical_name, r.summary),
-    })),
-  ];
+  const workItems: WorkItem[] = [];
+
+  if (target === "all" || target === "episodes") {
+    const rows = graph.db
+      .query<{ id: string; content: string }, []>(
+        "SELECT id, content FROM episodes WHERE status != 'redacted' ORDER BY id",
+      )
+      .all();
+    for (const r of rows) {
+      workItems.push({ kind: "episode", id: r.id, text: r.content });
+    }
+  }
+
+  if (target === "all" || target === "entities") {
+    const rows = graph.db
+      .query<EntityTextRow, []>(
+        "SELECT id, canonical_name, summary FROM entities WHERE status = 'active' ORDER BY id",
+      )
+      .all();
+    for (const r of rows) {
+      workItems.push({
+        kind: "entity",
+        id: r.id,
+        text: entityEmbeddingText(r.canonical_name, r.summary),
+      });
+    }
+  }
 
   const total = workItems.length;
   let done = 0;
@@ -226,10 +229,17 @@ export async function reindexEmbeddings(
     onProgress?.({ total, done, errors });
   }
 
-  // Atomic swap: delete stale embeddings and record the new model.
-  // Old embeddings with a different model are removed here, not before.
+  // Atomic swap: delete stale embeddings for targeted types and record the new model.
   graph.db.transaction(() => {
-    graph.db.run("DELETE FROM embeddings WHERE model != ?", newModel);
+    if (target === "all") {
+      graph.db.run("DELETE FROM embeddings WHERE model != ?", newModel);
+    } else {
+      graph.db.run(
+        "DELETE FROM embeddings WHERE target_type = ? AND model != ?",
+        target === "episodes" ? "episode" : "entity",
+        newModel,
+      );
+    }
     if (newDimensions > 0) {
       setEmbeddingModel(graph, newModel, newDimensions);
     }
