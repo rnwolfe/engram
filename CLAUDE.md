@@ -62,15 +62,7 @@ engram/
 │   │   └── test/
 │   ├── engram-cli/           # CLI application
 │   │   └── src/
-│   │       └── commands/     # init, add, search, show, decay, ingest, serve, export, project, reconcile
-│   ├── engram-mcp/           # MCP server (stdio transport)
-│   │   └── src/
-│   │       ├── tools/        # MCP tool implementations
-│   │       │   │             #   engram_search, engram_get_entity, engram_get_context,
-│   │       │   │             #   engram_get_decay, engram_get_history,
-│   │       │   │             #   engram_ownership_report,
-│   │       │   │             #   engram_add_episode, engram_add_entity, engram_add_edge
-│   │       └── server.ts     # stdio transport
+│   │       └── commands/     # init, add, search, show, decay, ingest, export, project, reconcile
 ├── docs/
 │   ├── internal/
 │   │   ├── VISION.md         # Product vision and design principles
@@ -85,7 +77,7 @@ engram/
 ```
 
 Rules:
-- `engram-core` is the product. CLI, MCP, and benchmark depend on it — never the reverse.
+- `engram-core` is the product. CLI and other consumers depend on it — never the reverse.
 - Tests live next to the code they test (colocated in `test/` directories within each package)
 - Keep files under 500 lines
 - New ingest adapters go in `packages/engram-core/src/ingest/adapters/`
@@ -97,7 +89,7 @@ Rules:
 
 1. **engram-core** (library) — all logic lives here. Zero CLI or transport dependencies.
 2. **engram-cli** — thin wrapper using `commander` + `@clack/prompts`. Calls core APIs.
-3. **engram-mcp** — thin wrapper using `@modelcontextprotocol/sdk`. Calls core APIs.
+3. **(future) engram-plugins** — pluggable transport/integration layer. Calls core APIs.
 
 ### Data Model
 
@@ -193,7 +185,7 @@ Conservative in v0.1: exact canonical name or alias match only. `resolveEntity()
 - NEVER commit `.env` files
 - API tokens for enrichment adapters are passed via environment variables or CLI flags, never stored in `.engram` files
 - The `.engram` file contains raw source content (commit messages, PR text) — treat it as potentially sensitive
-- Validate all user input at system boundaries (CLI args, MCP tool parameters)
+- Validate all user input at system boundaries (CLI args, tool parameters)
 - Sanitize file paths in git ingestion (prevent directory traversal)
 - Episode redaction (`status = 'redacted'`) is the mechanism for data deletion — preserve the row, clear the content
 
@@ -253,13 +245,12 @@ When creating a PR that implements a GitHub issue:
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Language | TypeScript (Bun) | Author expertise, fast iteration, npm ecosystem for MCP |
+| Language | TypeScript (Bun) | Author expertise, fast iteration, rich npm ecosystem |
 | Storage | SQLite via `better-sqlite3` | Zero dependency, single file, FTS5 built in |
 | Vector search | `sqlite-vec` or brute force | No external vector DB. Brute force fine for <50k embeddings |
 | IDs | ULIDs | Sortable, unique, no coordination. Enables future merge without collision |
 | Embedding default | `nomic-embed-text` via Ollama (384 dims) | Local-first, cloud optional |
 | CLI framework | `commander` + `@clack/prompts` | Simple, proven, interactive when needed |
-| MCP transport | stdio | Reference implementation for Claude Code/Cursor |
 
 ## Key Files
 
@@ -279,16 +270,3 @@ When creating a PR that implements a GitHub issue:
 | `packages/engram-core/src/ingest/git.ts` | Git VCS ingestion (the "money command" engine) |
 | `packages/engram-core/src/ingest/adapter.ts` | EnrichmentAdapter interface |
 | `packages/engram-core/src/ingest/source/` | Source code ingestion — walks working tree, parses TS/JS with tree-sitter, creates file/module/symbol entities |
-
-## MCP Tools
-
-Tools exposed by `engram-mcp` via stdio transport:
-
-| Tool | Purpose |
-|------|---------|
-| `engram_get_entity` | Retrieve a single entity by ID with edges and evidence chain |
-| `engram_add_entity` | Add a new entity with backing evidence episode |
-| `engram_search` | Hybrid search (FTS + vector + graph) across the knowledge graph |
-| `engram_get_neighbors` | Return subgraph within N hops of an anchor entity (BFS traversal) |
-| `engram_find_edges` | Filter edges by source, target, relation type, and/or time |
-| `engram_get_path` | Find shortest path between two entities via BFS traversal |

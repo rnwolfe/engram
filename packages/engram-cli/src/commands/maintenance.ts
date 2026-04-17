@@ -1,8 +1,7 @@
 /**
- * maintenance.ts — `engram rebuild-index` and `engram serve` commands.
+ * maintenance.ts — `engram rebuild-index` command.
  *
  * rebuild-index: rebuilds FTS5 indexes for entities, edges, episodes.
- * serve:         placeholder — MCP server not yet implemented.
  */
 
 import * as path from "node:path";
@@ -72,13 +71,4 @@ See also:
       closeGraph(graph);
     });
 
-  // serve
-  program
-    .command("serve")
-    .description("Start the model context protocol server (stdio transport)")
-    .option("--db <path>", "path to .engram file", ".engram")
-    .action((_opts: MaintenanceOpts) => {
-      console.log("The serve command is not yet implemented.");
-      console.log("Use the engram-mcp package directly when available.");
-    });
 }
