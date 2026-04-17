@@ -11,7 +11,9 @@ import {
 } from "@clack/prompts";
 import type { Command } from "commander";
 import {
+  checkGoogle,
   checkOllama,
+  checkOpenAI,
   closeGraph,
   createGraph,
   ingestGitRepo,
@@ -23,6 +25,9 @@ const EMBEDDING_DIMENSIONS: Record<string, number> = {
   "text-embedding-3-small": 1536,
   "text-embedding-004": 768,
 };
+
+const KNOWN_EMBEDDING_MODELS = new Set(Object.keys(EMBEDDING_DIMENSIONS));
+KNOWN_EMBEDDING_MODELS.add("none");
 
 interface InitOpts {
   fromGit?: string;
@@ -58,7 +63,9 @@ async function runInteractive(opts: InitOpts): Promise<void> {
   const dbPath = path.resolve(rawDb as string);
 
   if (fs.existsSync(dbPath)) {
-    log.error(`File already exists: ${dbPath}`);
+    log.error(
+      `File already exists: ${dbPath}\nUse a different --db path or remove it with:  rm ${dbPath}`,
+    );
     process.exit(1);
   }
 
@@ -66,14 +73,23 @@ async function runInteractive(opts: InitOpts): Promise<void> {
     await select({
       message: "Ingest source",
       options: [
-        {
-          value: "git",
-          label: "Current git repository (recommended)",
-        },
+        { value: "git", label: "Current git repository (recommended)" },
+        { value: "git-other", label: "A different path" },
         { value: "skip", label: "Skip for now" },
       ],
     }),
-  );
+  ) as string;
+
+  let ingestPath: string = path.resolve(".");
+  if (ingestChoice === "git-other") {
+    const rawPath = assertNotCancel(
+      await text({
+        message: "Repository path",
+        placeholder: "/path/to/repo",
+      }),
+    );
+    ingestPath = path.resolve(rawPath as string);
+  }
 
   const embeddingChoice = assertNotCancel(
     await select({
@@ -121,6 +137,30 @@ async function runInteractive(opts: InitOpts): Promise<void> {
         log.warn("Continuing anyway — you can fix this later.");
       }
     }
+  } else if (embeddingChoice === "text-embedding-3-small" && opts.verify) {
+    const s = spinner();
+    s.start("Checking OpenAI API key…");
+    const reach = await checkOpenAI(process.env.OPENAI_API_KEY);
+    if (reach.ok) {
+      s.stop(`OpenAI: ${reach.message}`);
+    } else {
+      s.stop(`OpenAI key check failed: ${reach.message}`);
+      if (reach.hint) log.warn(`Hint: ${reach.hint}`);
+      log.warn("Continuing anyway — set the key before running embeddings.");
+    }
+  } else if (embeddingChoice === "text-embedding-004" && opts.verify) {
+    const s = spinner();
+    s.start("Checking Google API key…");
+    const reach = await checkGoogle(
+      process.env.GOOGLE_API_KEY ?? process.env.GEMINI_API_KEY,
+    );
+    if (reach.ok) {
+      s.stop(`Google: ${reach.message}`);
+    } else {
+      s.stop(`Google key check failed: ${reach.message}`);
+      if (reach.hint) log.warn(`Hint: ${reach.hint}`);
+      log.warn("Continuing anyway — set the key before running embeddings.");
+    }
   }
 
   const _generatorChoice = assertNotCancel(
@@ -154,13 +194,12 @@ async function runInteractive(opts: InitOpts): Promise<void> {
     setEmbeddingModel(graph, embeddingChoice, dims);
   }
 
-  if (ingestChoice === "git") {
-    const repoPath = path.resolve(".");
+  if (ingestChoice === "git" || ingestChoice === "git-other") {
     log.info(
-      `Ingesting git repository at ${repoPath} — this may take a while…`,
+      `Ingesting git repository at ${ingestPath} — this may take a while…`,
     );
     try {
-      const result = await ingestGitRepo(graph, repoPath);
+      const result = await ingestGitRepo(graph, ingestPath);
       log.success(
         [
           "Git ingestion complete",
@@ -194,11 +233,20 @@ async function runNonInteractive(opts: InitOpts): Promise<void> {
   const dbPath = path.resolve(opts.db);
 
   if (fs.existsSync(dbPath)) {
-    log.error(`File already exists: ${dbPath}`);
+    log.error(
+      `File already exists: ${dbPath}\nUse a different --db path or remove it with:  rm ${dbPath}`,
+    );
     process.exit(1);
   }
 
   const embeddingModel = opts.embeddingModel ?? "nomic-embed-text";
+
+  if (!KNOWN_EMBEDDING_MODELS.has(embeddingModel)) {
+    log.error(
+      `Unknown embedding model: ${embeddingModel}\nValid values: ${[...KNOWN_EMBEDDING_MODELS].join(", ")}`,
+    );
+    process.exit(1);
+  }
 
   const graph = createGraph(dbPath);
 
@@ -208,7 +256,7 @@ async function runNonInteractive(opts: InitOpts): Promise<void> {
     );
     upsert.run("embedding_model", "none");
   } else {
-    const dims = EMBEDDING_DIMENSIONS[embeddingModel] ?? 0;
+    const dims = EMBEDDING_DIMENSIONS[embeddingModel];
     setEmbeddingModel(graph, embeddingModel, dims);
   }
 
@@ -234,14 +282,27 @@ async function runNonInteractive(opts: InitOpts): Promise<void> {
     }
   }
 
-  closeGraph(graph);
   log.success(`Created ${dbPath}`);
+  closeGraph(graph);
 }
 
 export function registerInit(program: Command): void {
   program
     .command("init")
     .description("Create a new .engram knowledge graph database")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  # Interactive setup with local Ollama (recommended)
+  engram init
+
+  # Non-interactive, BM25 only (no AI embedding), useful in CI
+  engram init --yes --embedding-model none --db .engram
+
+  # Non-interactive with OpenAI embeddings and git ingest
+  engram init --yes --embedding-model text-embedding-3-small --from-git . --no-verify`,
+    )
     .option("--db <path>", "path for the .engram file", ".engram")
     .option("--from-git <path>", "also ingest a git repository after creating")
     .option("--embedding-model <id|none>", "embedding model to use")
