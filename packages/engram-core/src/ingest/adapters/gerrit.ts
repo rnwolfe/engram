@@ -24,6 +24,7 @@
 
 import type { EngramGraph } from "../../format/index.js";
 import type { EnrichmentAdapter, EnrichOpts } from "../adapter.js";
+import { EnrichmentAdapterError } from "../adapter.js";
 import type { IngestResult } from "../git.js";
 
 export class GerritAdapter implements EnrichmentAdapter {
@@ -35,6 +36,9 @@ export class GerritAdapter implements EnrichmentAdapter {
   supportsCursor = true;
 
   enrich(_graph: EngramGraph, _opts: EnrichOpts): Promise<IngestResult> {
-    throw new Error("GerritAdapter: not implemented");
+    throw new EnrichmentAdapterError(
+      "server_error",
+      "GerritAdapter: not implemented",
+    );
   }
 }

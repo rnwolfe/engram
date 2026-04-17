@@ -74,7 +74,8 @@ const REPO_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 
 function validateRepo(repo: string): void {
   if (!REPO_RE.test(repo)) {
-    throw new Error(
+    throw new EnrichmentAdapterError(
+      "data_error",
       `GitHubAdapter: repo must be in 'owner/repo' format, got: ${repo}`,
     );
   }
@@ -210,7 +211,8 @@ async function apiGet<T>(
       );
     }
     if (resp.status === 404) {
-      throw new Error(
+      throw new EnrichmentAdapterError(
+        "data_error",
         `GitHubAdapter: repository not found. Check the owner/repo format and ensure the repository exists. (${url})`,
       );
     }
@@ -219,12 +221,14 @@ async function apiGet<T>(
       const resetMsg = resetAt
         ? ` Rate limit resets at ${new Date(Number(resetAt) * 1000).toISOString()}.`
         : "";
-      throw new Error(
+      throw new EnrichmentAdapterError(
+        "rate_limited",
         `GitHubAdapter: rate limit exceeded.${resetMsg}${!token ? " Provide a GITHUB_TOKEN to raise the limit from 60 to 5,000 requests/hour." : ""}`,
       );
     }
 
-    throw new Error(
+    throw new EnrichmentAdapterError(
+      "server_error",
       `GitHubAdapter: GET ${url} returned HTTP ${resp.status}: ${body}`,
     );
   }
