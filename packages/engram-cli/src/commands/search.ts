@@ -8,7 +8,13 @@
 import * as path from "node:path";
 import type { Command } from "commander";
 import type { EngramGraph, SearchResult } from "engram-core";
-import { closeGraph, createProvider, openGraph, search } from "engram-core";
+import {
+  closeGraph,
+  createProvider,
+  EmbeddingModelMismatchError,
+  openGraph,
+  search,
+} from "engram-core";
 
 interface SearchOpts {
   limit: string;
@@ -60,9 +66,26 @@ export function registerSearch(program: Command): void {
         });
         closeGraph(graph);
       } catch (err) {
-        console.error(
-          `Search failed: ${err instanceof Error ? err.message : String(err)}`,
-        );
+        if (err instanceof EmbeddingModelMismatchError) {
+          console.error(
+            [
+              "",
+              "Embedding model mismatch.",
+              `  Database was indexed with:  ${err.storedModel}  (${err.storedDimensions} dims)`,
+              `  Currently configured:       ${err.activeModel}${err.activeDimensions ? `  (${err.activeDimensions} dims)` : ""}`,
+              "",
+              "To re-index with the configured model:",
+              "  engram embed reindex",
+              "",
+              "To keep the existing index, revert your embedding config to",
+              `  ${err.storedModel}.`,
+            ].join("\n"),
+          );
+        } else {
+          console.error(
+            `Search failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
         closeGraph(graph);
         process.exit(1);
         return;

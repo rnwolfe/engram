@@ -15,6 +15,10 @@
 import type { AIProvider } from "../ai/provider.js";
 import type { EngramGraph } from "../format/index.js";
 import { resolveEntity } from "../graph/aliases.js";
+import {
+  checkEmbeddingModelForRead,
+  EmbeddingModelMismatchError,
+} from "../graph/embedding-model.js";
 import { findSimilar } from "../graph/embeddings.js";
 import type { Entity } from "../graph/entities.js";
 import type { TraversedEntity } from "./graph-search.js";
@@ -572,6 +576,15 @@ export async function search(
   let effectiveMode = mode;
   if (opts.provider) {
     try {
+      const modelCheck = checkEmbeddingModelForRead(
+        graph,
+        opts.provider.modelName(),
+      );
+      if (modelCheck === "unrecorded") {
+        console.warn(
+          "[engram] Embedding model not recorded. Run `engram embed reindex` to enable semantic search.",
+        );
+      }
       const queryEmbeddings = await opts.provider.embed([query]);
       if (queryEmbeddings.length > 0 && queryEmbeddings[0].length > 0) {
         // Only enable hybrid mode when a real embedding was produced
@@ -584,8 +597,10 @@ export async function search(
         }
       }
       // If embed() returned [] or [[]] (empty vector), effectiveMode stays as-is (FTS-only)
-    } catch {
-      // Provider failure is non-fatal — fall back to FTS-only
+    } catch (err) {
+      // Re-throw embedding model mismatch so the CLI can surface a clear error message.
+      if (err instanceof EmbeddingModelMismatchError) throw err;
+      // Other provider failures are non-fatal — fall back to FTS-only
     }
   }
 

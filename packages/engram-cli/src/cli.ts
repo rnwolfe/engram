@@ -4,6 +4,7 @@ import { Command } from "commander";
 import { ENGINE_VERSION } from "engram-core";
 import { registerAdd } from "./commands/add.js";
 import { registerDecay } from "./commands/decay.js";
+import { registerEmbed } from "./commands/embed.js";
 import { registerExport } from "./commands/export.js";
 import { registerHistory } from "./commands/history.js";
 import { registerIngest } from "./commands/ingest.js";
@@ -27,6 +28,7 @@ const program = new Command()
 
 registerInit(program);
 registerAdd(program);
+registerEmbed(program);
 registerSearch(program);
 registerShow(program);
 registerHistory(program);

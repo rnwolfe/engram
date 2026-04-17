@@ -8,6 +8,7 @@
 
 import { ulid } from "ulid";
 import type { EngramGraph } from "../format/index.js";
+import { assertEmbeddingModelForWrite } from "./embedding-model.js";
 
 export type EmbeddingTargetType = "entity" | "episode";
 
@@ -93,6 +94,48 @@ export function cosineSimilarity(a: number[], b: number[]): number {
 }
 
 /**
+ * Internal: write an embedding row without the model-mismatch assertion.
+ * Used by reindexEmbeddings to stage new embeddings before the atomic swap.
+ */
+export function storeEmbeddingRaw(
+  graph: EngramGraph,
+  targetId: string,
+  targetType: EmbeddingTargetType,
+  model: string,
+  embedding: number[],
+  sourceText: string,
+): void {
+  const id = ulid();
+  const now = new Date().toISOString();
+  const vectorBlob = encodeVector(embedding);
+
+  graph.db
+    .prepare<
+      void,
+      [string, string, string, string, number, Buffer, string, string]
+    >(
+      `INSERT INTO embeddings (id, target_type, target_id, model, dimensions, vector, source_text, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(target_type, target_id, model) DO UPDATE SET
+         id = excluded.id,
+         dimensions = excluded.dimensions,
+         vector = excluded.vector,
+         source_text = excluded.source_text,
+         created_at = excluded.created_at`,
+    )
+    .run(
+      id,
+      targetType,
+      targetId,
+      model,
+      embedding.length,
+      vectorBlob,
+      sourceText,
+      now,
+    );
+}
+
+/**
  * Store an embedding for an entity or episode.
  * Upserts by (target_type, target_id, model) — one embedding per target per model.
  */
@@ -104,6 +147,8 @@ export function storeEmbedding(
   embedding: number[],
   sourceText: string,
 ): void {
+  assertEmbeddingModelForWrite(graph, model, embedding.length);
+
   const id = ulid();
   const now = new Date().toISOString();
   const vectorBlob = encodeVector(embedding);

@@ -6,13 +6,26 @@ export type { Alias, AliasInput } from "./aliases.js";
 export { addEntityAlias, resolveEntity } from "./aliases.js";
 export type { Edge, EdgeInput, FindEdgesQuery } from "./edges.js";
 export { addEdge, findEdges, getEdge } from "./edges.js";
+export type { EmbeddingModelConfig } from "./embedding-model.js";
+export {
+  assertEmbeddingModelForWrite,
+  checkEmbeddingModelForRead,
+  EmbeddingModelMismatchError,
+  getEmbeddingModel,
+  setEmbeddingModel,
+} from "./embedding-model.js";
 export type {
   EmbeddingTargetType,
   FindSimilarOpts,
   SimilarResult,
   StoredEmbedding,
 } from "./embeddings.js";
-export { cosineSimilarity, findSimilar, storeEmbedding } from "./embeddings.js";
+export {
+  cosineSimilarity,
+  findSimilar,
+  storeEmbedding,
+  storeEmbeddingRaw,
+} from "./embeddings.js";
 export type {
   Entity,
   EntityInput,
@@ -54,6 +67,7 @@ export {
 } from "./projections-list.js";
 export type {
   ReconcileOpts,
+  ReconcileProgressEvent,
   ReconciliationRunResult,
 } from "./reconcile.js";
 export {

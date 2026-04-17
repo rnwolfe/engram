@@ -7,7 +7,7 @@
     "engram": "dist/cli.js"
   },
   "scripts": {
-    "build": "bun build src/cli.ts --outdir dist --target bun",
+    "build": "bun build src/cli.ts --outdir dist --target bun && bun scripts/copy-assets.ts",
     "test": "bun test"
   },
   "dependencies": {

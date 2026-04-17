@@ -189,7 +189,13 @@ export function buildDiscoverPrompt(
     `  anchor: { type: string, id: string } | null\n` +
     `  inputs: Array<{ type: string, id: string }>\n` +
     `  rationale: string\n\n` +
-    `Use only entity/edge/episode IDs that appear in the substrate delta.\n` +
+    `ABSOLUTELY CRITICAL — ID handling:\n` +
+    `1. Every "id" field MUST be copied VERBATIM from the bracketed IDs shown in the "Substrate delta" section below. IDs look like [01JXYZABC...] (26-char ULIDs).\n` +
+    `2. NEVER invent, guess, pattern-match, or synthesize ULIDs. If an ID did not appear in the delta, you cannot use it.\n` +
+    `3. If you cannot find enough real IDs to support a proposal, return fewer proposals — do not pad the inputs array with fabricated IDs.\n` +
+    `4. Every input entry MUST include both "type" and "id".\n\n` +
+    `Example of a valid proposal:\n` +
+    `  { "kind": "${kinds[0]?.name ?? "entity_summary"}", "anchor": { "type": "entity", "id": "01JXYZ_REAL_ENTITY_ID_FROM_DELTA" }, "inputs": [{ "type": "episode", "id": "01JXYZ_REAL_EPISODE_ID_FROM_DELTA" }], "rationale": "..." }\n\n` +
     `Anchor type must be one of: entity, edge, episode, projection. Use null anchor for graph-wide projections.\n` +
     `Return [] if no new projections are warranted.\n` +
     `Output only the JSON array — no prose, no markdown fences.`;
@@ -241,9 +247,26 @@ export function parseDiscoverProposals(text: string): ProjectionProposal[] {
       .replace(/^```(?:json)?\n?/i, "")
       .replace(/\n?```$/, "");
     const proposals = JSON.parse(stripped);
-    if (!Array.isArray(proposals)) return [];
+    if (!Array.isArray(proposals)) {
+      if (process.env.ENGRAM_DEBUG) {
+        console.error(
+          `[engram] parseDiscoverProposals: parsed value is not an array (type=${typeof proposals})`,
+        );
+      }
+      return [];
+    }
+    if (process.env.ENGRAM_DEBUG) {
+      console.error(
+        `[engram] parseDiscoverProposals: parsed ${proposals.length} proposals`,
+      );
+    }
     return proposals as ProjectionProposal[];
-  } catch {
+  } catch (err) {
+    if (process.env.ENGRAM_DEBUG) {
+      console.error(
+        `[engram] parseDiscoverProposals: JSON parse failed — ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
     return [];
   }
 }

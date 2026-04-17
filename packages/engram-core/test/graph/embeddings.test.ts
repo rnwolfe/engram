@@ -223,16 +223,14 @@ describe("findSimilar", () => {
   });
 
   test("filters by model", () => {
-    storeEmbedding(
-      graph,
-      "entity-d",
-      "entity",
-      "other-model",
-      [1, 0, 0],
-      "text d",
-    );
-    const results = findSimilar(graph, [1, 0, 0], { model: "test-model" });
-    expect(results.every((r) => r.model === "test-model")).toBe(true);
+    // All embeddings in the fixture use "test-model". Querying with that model
+    // returns results; querying with an unknown model returns nothing.
+    const all = findSimilar(graph, [1, 0, 0], { model: "test-model" });
+    expect(all.length).toBeGreaterThan(0);
+    expect(all.every((r) => r.model === "test-model")).toBe(true);
+
+    const none = findSimilar(graph, [1, 0, 0], { model: "other-model" });
+    expect(none).toEqual([]);
   });
 
   test("all scores are between 0 and 1", () => {

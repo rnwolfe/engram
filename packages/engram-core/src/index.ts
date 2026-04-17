@@ -5,15 +5,23 @@
  */
 
 export { Budget } from "./ai/budget.js";
-export type { AIConfig, AIProvider, EntityHint } from "./ai/index.js";
+export type {
+  AIConfig,
+  AIProvider,
+  EntityHint,
+  ReindexProgress,
+} from "./ai/index.js";
 export {
+  countEmbeddings,
   createGenerator,
   createProvider,
   GeminiGenerator,
   GeminiProvider,
+  generateEpisodeEmbeddings,
   NullProvider,
   OllamaProvider,
   OpenAIGenerator,
+  reindexEmbeddings,
 } from "./ai/index.js";
 export type { AnchorTypeName, KindCatalog, KindEntry } from "./ai/kinds.js";
 export {
@@ -61,6 +69,7 @@ export type {
   AnchorType,
   Edge,
   EdgeInput,
+  EmbeddingModelConfig,
   EmbeddingTargetType,
   Entity,
   EntityInput,
@@ -79,6 +88,7 @@ export type {
   ProjectionInputType,
   ProjectionOpts,
   ReconcileOpts,
+  ReconcileProgressEvent,
   ReconciliationRunResult,
   SimilarResult,
   StoredEmbedding,
@@ -88,16 +98,20 @@ export {
   addEntity,
   addEntityAlias,
   addEpisode,
+  assertEmbeddingModelForWrite,
+  checkEmbeddingModelForRead,
   computeBatchedStaleness,
   cosineSimilarity,
   currentInputState,
   EdgeNotFoundError,
+  EmbeddingModelMismatchError,
   EntityNotFoundError,
   EvidenceRequiredError,
   findEdges,
   findEntities,
   findSimilar,
   getEdge,
+  getEmbeddingModel,
   getEntity,
   getEpisode,
   getEvidenceForEdge,
@@ -111,6 +125,7 @@ export {
   reconcile,
   resolveEntity,
   searchProjections,
+  setEmbeddingModel,
   softRefresh,
   storeEmbedding,
   supersedeProjection,
