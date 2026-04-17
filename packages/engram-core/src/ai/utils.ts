@@ -229,19 +229,23 @@ export async function reindexEmbeddings(
     onProgress?.({ total, done, errors });
   }
 
-  // Atomic swap: delete stale embeddings for targeted types and record the new model.
+  // Atomic swap: delete stale embeddings for targeted types.
+  // Only update the stored model metadata for full reindex — a partial reindex
+  // (entities or episodes only) leaves the other type's embeddings in place,
+  // so updating metadata would record a false "all embeddings use model X" state.
   graph.db.transaction(() => {
     if (target === "all") {
       graph.db.run("DELETE FROM embeddings WHERE model != ?", newModel);
+      if (newDimensions > 0) {
+        setEmbeddingModel(graph, newModel, newDimensions);
+      }
     } else {
       graph.db.run(
         "DELETE FROM embeddings WHERE target_type = ? AND model != ?",
         target === "episodes" ? "episode" : "entity",
         newModel,
       );
-    }
-    if (newDimensions > 0) {
-      setEmbeddingModel(graph, newModel, newDimensions);
+      // Do not update metadata — the other type may still use a different model.
     }
   })();
 

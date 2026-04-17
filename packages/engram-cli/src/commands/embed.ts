@@ -24,7 +24,6 @@ import {
   OllamaProvider,
   openGraph,
   reindexEmbeddings,
-  setEmbeddingModel,
 } from "engram-core";
 
 type ReindexTarget = "all" | "entities" | "episodes";
@@ -90,7 +89,7 @@ function buildProvider(model: string, providerHint?: string): AIProvider {
   }
 }
 
-function buildProviderFromEnv(): AIProvider {
+function buildProviderFromEnv(): AIProvider | null {
   const p = process.env.ENGRAM_AI_PROVIDER ?? "null";
   if (p === "ollama") {
     return new OllamaProvider({
@@ -102,7 +101,8 @@ function buildProviderFromEnv(): AIProvider {
       apiKey: process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY,
     });
   }
-  return new NullProvider();
+  // openai and other providers: not supported for embeddings in this CLI version
+  return null;
 }
 
 // ─── Coverage helpers ─────────────────────────────────────────────────────────
@@ -138,14 +138,15 @@ function queryCoverage(graph: ReturnType<typeof openGraph>): {
       .query<CountRow, []>(
         `SELECT COUNT(*) as count FROM embeddings em
          JOIN episodes ep ON ep.id = em.target_id
-         WHERE em.target_type = 'episode' AND ep.status = 'active'`,
+         WHERE em.target_type = 'episode' AND ep.status != 'redacted'`,
       )
       .get()?.count ?? 0;
 
+  // Match reindexEmbeddings filter: status != 'redacted'
   const episodeTotal =
     graph.db
       .query<CountRow, []>(
-        "SELECT COUNT(*) as count FROM episodes WHERE status = 'active'",
+        "SELECT COUNT(*) as count FROM episodes WHERE status != 'redacted'",
       )
       .get()?.count ?? 0;
 
@@ -157,21 +158,20 @@ function pct(num: number, den: number): string {
   return `${Math.round((num / den) * 100)}%`;
 }
 
-// ─── Modes ────────────────────────────────────────────────────────────────────
+// ─── Modes — each returns an exit code (0 = success) ────────────────────────
 
 async function runReindex(
   graph: ReturnType<typeof openGraph>,
   opts: EmbedOpts,
-): Promise<void> {
+): Promise<number> {
   const provider = buildProviderFromEnv();
-  if (provider instanceof NullProvider) {
+  if (!provider) {
     log.error(
       "No embedding provider configured.\n" +
         "Set ENGRAM_AI_PROVIDER=ollama (or gemini) before running --reindex.\n" +
         "Or use --enable --model <id> to configure a model first.",
     );
-    closeGraph(graph);
-    process.exit(1);
+    return 1;
   }
 
   const activeModel = provider.modelName();
@@ -199,8 +199,7 @@ async function runReindex(
     });
     if (!ok || typeof ok !== "boolean") {
       log.info("Aborted.");
-      closeGraph(graph);
-      process.exit(0);
+      return 0;
     }
   }
 
@@ -239,65 +238,68 @@ async function runReindex(
       `Embedding model recorded: ${newModel.model} (${newModel.dimensions} dims)`,
     );
   }
+  return 0;
 }
 
 async function runCheck(
   graph: ReturnType<typeof openGraph>,
   opts: EmbedOpts,
-): Promise<void> {
+): Promise<number> {
   const stored = getEmbeddingModel(graph);
 
   if (!stored || stored.model === "none") {
     log.warn("Embedding model not configured — semantic search is disabled.");
-    closeGraph(graph);
-    process.exit(1);
+    return 1;
   }
 
+  const aiProviderEnv = process.env.ENGRAM_AI_PROVIDER ?? "null";
   const provider = buildProviderFromEnv();
-  const activeModel =
-    provider instanceof NullProvider ? null : provider.modelName();
 
   const modelLine = `Embedding model (stored):      ${stored.model} (${stored.dimensions} dims)`;
-  const configLine = `Configured provider model:     ${activeModel ?? "(none — ENGRAM_AI_PROVIDER not set)"}`;
 
-  if (!activeModel) {
+  if (!provider) {
+    // Provider env is set to something we can't instantiate (e.g. openai)
+    const note =
+      aiProviderEnv !== "null" && aiProviderEnv !== "none"
+        ? `${aiProviderEnv} (not supported for embedding validation)`
+        : "(none — ENGRAM_AI_PROVIDER not set)";
     log.warn(
       [
         modelLine,
-        configLine,
-        "Status:  UNCONFIGURED — set ENGRAM_AI_PROVIDER",
+        `Configured provider:           ${note}`,
+        "Status:  UNCONFIGURED — set ENGRAM_AI_PROVIDER=ollama or =gemini",
       ].join("\n"),
     );
-    closeGraph(graph);
-    process.exit(1);
+    return 1;
   }
+
+  const activeModel = provider.modelName();
+  const configLine = `Configured provider model:     ${activeModel}`;
 
   if (stored.model !== activeModel) {
     log.warn(
       [
         modelLine,
         configLine,
-        `Status:  MISMATCH — run  engram embed --reindex  to rebuild`,
+        "Status:  MISMATCH — run  engram embed --reindex  to rebuild",
       ].join("\n"),
     );
-    closeGraph(graph);
-    process.exit(2);
+    return 2;
   }
 
   let reachLine = "";
   if (opts.verify) {
-    const aiProvider = process.env.ENGRAM_AI_PROVIDER ?? "null";
     const ollamaEndpoint =
       process.env.ENGRAM_OLLAMA_ENDPOINT ?? "http://localhost:11434";
 
     let reach: { ok: boolean; message: string } | null = null;
-    if (aiProvider === "ollama") {
+    if (aiProviderEnv === "ollama") {
       reach = await checkOllama(ollamaEndpoint, stored.model);
-    } else if (aiProvider === "gemini") {
+    } else if (aiProviderEnv === "gemini") {
       reach = await checkGoogle(
         process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY,
       );
-    } else if (aiProvider === "openai") {
+    } else if (aiProviderEnv === "openai") {
       reach = await checkOpenAI(process.env.OPENAI_API_KEY);
     }
 
@@ -313,20 +315,18 @@ async function runCheck(
       `Status:  OK — stored model matches configured model${reachLine}`,
     ].join("\n"),
   );
-  closeGraph(graph);
-  process.exit(0);
+  return 0;
 }
 
 async function runEnable(
   graph: ReturnType<typeof openGraph>,
   opts: EmbedOpts,
-): Promise<void> {
+): Promise<number> {
   if (!opts.model) {
     log.error(
       "--enable requires --model <id>.\nExample: engram embed --enable --model nomic-embed-text",
     );
-    closeGraph(graph);
-    process.exit(1);
+    return 1;
   }
 
   const stored = getEmbeddingModel(graph);
@@ -335,8 +335,7 @@ async function runEnable(
       `This database already uses ${stored.model} (${stored.dimensions} dims).\n` +
         "Use --reindex to rebuild the index with a different model.",
     );
-    closeGraph(graph);
-    process.exit(1);
+    return 1;
   }
 
   let provider: AIProvider;
@@ -344,25 +343,24 @@ async function runEnable(
     provider = buildProvider(opts.model, opts.provider);
   } catch (err) {
     log.error(err instanceof Error ? err.message : String(err));
-    closeGraph(graph);
-    process.exit(1);
+    return 1;
   }
 
   if (opts.verify) {
     const s = spinner();
     s.start("Checking provider reachability…");
-    const aiProvider = opts.provider ?? inferProviderName(opts.model);
+    const inferredProvider = opts.provider ?? inferProviderName(opts.model);
     const ollamaEndpoint =
       process.env.ENGRAM_OLLAMA_ENDPOINT ?? "http://localhost:11434";
 
     let reach: { ok: boolean; message: string; hint?: string } | null = null;
-    if (aiProvider === "ollama") {
+    if (inferredProvider === "ollama") {
       reach = await checkOllama(ollamaEndpoint, opts.model);
-    } else if (aiProvider === "gemini") {
+    } else if (inferredProvider === "gemini") {
       reach = await checkGoogle(
         process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY,
       );
-    } else if (aiProvider === "openai") {
+    } else if (inferredProvider === "openai") {
       reach = await checkOpenAI(process.env.OPENAI_API_KEY);
     }
 
@@ -379,8 +377,7 @@ async function runEnable(
           });
           if (!cont || typeof cont !== "boolean") {
             log.info("Aborted.");
-            closeGraph(graph);
-            process.exit(0);
+            return 0;
           }
         }
       }
@@ -402,8 +399,7 @@ async function runEnable(
     const ok = await confirm({ message: "Continue?", initialValue: false });
     if (!ok || typeof ok !== "boolean") {
       log.info("Aborted.");
-      closeGraph(graph);
-      process.exit(0);
+      return 0;
     }
   }
 
@@ -432,9 +428,13 @@ async function runEnable(
       `Semantic search enabled: ${newModel.model} (${newModel.dimensions} dims)`,
     );
   }
+  return 0;
 }
 
-function runStatus(graph: ReturnType<typeof openGraph>, dbPath: string): void {
+function runStatus(
+  graph: ReturnType<typeof openGraph>,
+  dbPath: string,
+): number {
   const stored = getEmbeddingModel(graph);
   const cov = queryCoverage(graph);
 
@@ -455,6 +455,7 @@ function runStatus(graph: ReturnType<typeof openGraph>, dbPath: string): void {
       `Episode coverage: ${cov.episodeEmbedded}/${cov.episodeTotal} (${episodePct})`,
     ].join("\n"),
   );
+  return 0;
 }
 
 // ─── Command registration ─────────────────────────────────────────────────────
@@ -551,21 +552,26 @@ Examples:
         process.exit(1);
       }
 
+      let exitCode = 0;
       try {
         if (opts.reindex) {
-          await runReindex(graph, opts);
+          exitCode = await runReindex(graph, opts);
         } else if (opts.check) {
-          await runCheck(graph, opts);
-          return; // runCheck exits
+          exitCode = await runCheck(graph, opts);
         } else if (opts.enable) {
-          await runEnable(graph, opts);
+          exitCode = await runEnable(graph, opts);
         } else if (opts.status) {
-          runStatus(graph, dbPath);
+          exitCode = runStatus(graph, dbPath);
         }
       } finally {
         closeGraph(graph);
       }
 
-      outro("Done");
+      if (exitCode === 0) {
+        outro("Done");
+      }
+      if (exitCode !== 0) {
+        process.exit(exitCode);
+      }
     });
 }
