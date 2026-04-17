@@ -570,7 +570,9 @@ function printQuietFailures(status: StatusOutput, exitCode: number): void {
 export function registerStatus(program: Command): void {
   program
     .command("status")
-    .description("Show health and configuration dashboard")
+    .description(
+      "Show a health and config dashboard (embedding model, graph counts, provider reachability). For raw graph counts only, see engram stats.",
+    )
     .option("--db <path>", "path to .engram file", ".engram")
     .option("--json", "emit JSON output", false)
     .option("--no-verify", "skip reachability checks")
@@ -578,6 +580,27 @@ export function registerStatus(program: Command): void {
       "--quiet",
       "print nothing on success; print only failing sections on error",
       false,
+    )
+    .addHelpText(
+      "after",
+      `
+Examples:
+  # Full health dashboard
+  engram status
+
+  # JSON output for scripting
+  engram status --json
+
+  # CI health check (quiet mode — exits non-zero on failure)
+  engram status --quiet
+
+When to use:
+  After setup to verify embedding model and provider are configured correctly.
+  Use engram stats for a quick raw count without reachability checks.
+
+See also:
+  engram stats     raw graph counts (entities, edges, episodes)
+  engram embed     manage embedding index`,
     )
     .action(async (opts: StatusOpts) => {
       const dbPath = path.resolve(opts.db);

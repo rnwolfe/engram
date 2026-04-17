@@ -31,6 +31,27 @@ export function registerSearch(program: Command): void {
     .option("--valid-at <iso>", "filter edges valid at this ISO8601 timestamp")
     .option("--format <fmt>", "output format: text or json", "text")
     .option("--db <path>", "path to .engram file", ".engram")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  # Text search across the knowledge graph
+  engram search "auth middleware"
+
+  # Limit results and output as JSON
+  engram search "database" --limit 5 --format json
+
+  # Filter edges valid at a point in time
+  engram search "api gateway" --valid-at 2024-06-01T00:00:00Z
+
+When to use:
+  Use search when you know a term to look for but not the entity ID.
+  Prefer engram context for open-ended questions that need ranked signals.
+
+See also:
+  engram context   retrieve a token-budgeted context pack by query
+  engram show      display full entity details by ID`,
+    )
     .action(async (query: string, opts: SearchOpts) => {
       const dbPath = path.resolve(opts.db);
       const limit = parseInt(opts.limit, 10);

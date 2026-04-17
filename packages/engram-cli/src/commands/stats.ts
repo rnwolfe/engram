@@ -20,8 +20,25 @@ interface CountRow {
 export function registerStats(program: Command): void {
   program
     .command("stats")
-    .description("Show graph statistics (entity, edge, episode counts)")
+    .description(
+      "Show graph counts (entities, edges, episodes). For a full health dashboard with provider reachability, see engram status.",
+    )
     .option("--db <path>", "path to .engram file", ".engram")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  # Show graph counts
+  engram stats
+
+When to use:
+  Quick count of graph contents. Use engram status for a full health report
+  including embedding model and provider reachability.
+
+See also:
+  engram status    health dashboard with provider reachability
+  engram search    find entities by keyword`,
+    )
     .action((opts: StatsOpts) => {
       const dbPath = path.resolve(opts.db);
 

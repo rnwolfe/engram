@@ -113,6 +113,27 @@ export function registerOwnership(program: Command): void {
       "0.1",
     )
     .option("--db <path>", "path to .engram file", ".engram")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  # Full ownership risk report
+  engram ownership
+
+  # Scoped to a path prefix
+  engram ownership --module src/api
+
+  # JSON output for scripting
+  engram ownership --format json
+
+When to use:
+  Understand who has historically worked on a module or feature, and surface
+  entities with decayed or missing ownership signals.
+
+See also:
+  engram show      display full entity details by ID
+  engram stats     quick count of graph contents`,
+    )
     .action((opts: OwnershipOpts) => {
       const dbPath = path.resolve(opts.db);
       const limit = parseInt(opts.limit, 10);

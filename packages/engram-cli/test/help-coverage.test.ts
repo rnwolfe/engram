@@ -67,3 +67,33 @@ describe("help-coverage: Phase 1 commands have Examples blocks", () => {
     }
   });
 });
+
+describe("help-coverage: Phase 2 commands have Examples blocks", () => {
+  it("engram search --help has Examples", () => {
+    expect(hasExamples(helpOutput(["search"]))).toBe(true);
+  });
+  it("engram show --help has Examples", () => {
+    expect(hasExamples(helpOutput(["show"]))).toBe(true);
+  });
+  it("engram history --help has Examples", () => {
+    expect(hasExamples(helpOutput(["history"]))).toBe(true);
+  });
+  it("engram ownership --help has Examples", () => {
+    expect(hasExamples(helpOutput(["ownership"]))).toBe(true);
+  });
+  it("engram stats --help has Examples", () => {
+    expect(hasExamples(helpOutput(["stats"]))).toBe(true);
+  });
+  it("engram status --help has Examples", () => {
+    expect(hasExamples(helpOutput(["status"]))).toBe(true);
+  });
+  it("engram visualize --help has Examples", () => {
+    expect(hasExamples(helpOutput(["visualize"]))).toBe(true);
+  });
+  it("engram stats description mentions engram status", () => {
+    expect(helpOutput(["stats"])).toContain("engram status");
+  });
+  it("engram status description mentions engram stats", () => {
+    expect(helpOutput(["status"])).toContain("engram stats");
+  });
+});

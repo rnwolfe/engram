@@ -25,6 +25,24 @@ export function registerVisualize(program: Command): void {
     .option("--port <n>", "HTTP port", "7878")
     .option("--host <addr>", "bind address", "127.0.0.1")
     .option("--read-only", "read-only mode (default; reserved for v1)", true)
+    .addHelpText(
+      "after",
+      `
+Examples:
+  # Start the visualizer (opens at http://127.0.0.1:7878)
+  engram visualize
+
+  # Serve on a custom port
+  engram visualize --port 8080
+
+When to use:
+  Explore the graph structure visually during debugging or onboarding.
+  Open in a browser to browse entities and edges interactively.
+
+See also:
+  engram show      display entity details in the terminal
+  engram search    find entities by keyword`,
+    )
     .action((opts: VisualizeOpts) => {
       const dbPath = path.resolve(opts.db);
       const port = Number.parseInt(opts.port, 10);

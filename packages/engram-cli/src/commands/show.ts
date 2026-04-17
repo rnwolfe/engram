@@ -25,6 +25,24 @@ export function registerShow(program: Command): void {
     .command("show <entity>")
     .description("Show entity details, edges, and evidence")
     .option("--db <path>", "path to .engram file", ".engram")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  # Show entity details by ID
+  engram show <entity-id>
+
+  # Show by canonical name or alias
+  engram show "auth middleware"
+
+When to use:
+  Use when you already have an entity ID from search results or want to
+  inspect a specific entity's edges and evidence chain.
+
+See also:
+  engram search    find entities by keyword
+  engram history   trace how facts about an entity changed over time`,
+    )
     .action((entityArg: string, opts: ShowOpts) => {
       const dbPath = path.resolve(opts.db);
 
