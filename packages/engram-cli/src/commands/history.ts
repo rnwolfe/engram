@@ -34,6 +34,24 @@ export function registerHistory(program: Command): void {
       "Show temporal fact evolution for an entity or between two entities",
     )
     .option("--db <path>", "path to .engram file", ".engram")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  # Show temporal fact history for a single entity
+  engram history <entity-id>
+
+  # Show history between two entities
+  engram history <entity-id-1> <entity-id-2>
+
+When to use:
+  Trace how a fact about an entity changed over time — superseded edges,
+  ownership changes, or structural shifts in the graph.
+
+See also:
+  engram show      display current entity details and active edges
+  engram search    find entities by keyword`,
+    )
     .action(
       (
         entity1Arg: string,
