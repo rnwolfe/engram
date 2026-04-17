@@ -17,6 +17,7 @@ export {
   createProvider,
   GeminiGenerator,
   GeminiProvider,
+  generateEntityEmbeddings,
   generateEpisodeEmbeddings,
   NullProvider,
   OllamaProvider,

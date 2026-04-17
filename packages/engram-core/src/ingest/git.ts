@@ -10,7 +10,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { ulid } from "ulid";
 import type { AIProvider } from "../ai/provider.js";
-import { generateEpisodeEmbeddings } from "../ai/utils.js";
+import {
+  generateEntityEmbeddings,
+  generateEpisodeEmbeddings,
+} from "../ai/utils.js";
 import type { EngramGraph } from "../format/index.js";
 import { ENGINE_VERSION } from "../format/version.js";
 import { resolveEntity } from "../graph/aliases.js";
@@ -724,11 +727,22 @@ export async function ingestGitRepo(
       edges: counts.edgesCreated,
     });
 
-    // Post-ingest: generate embeddings for new episodes (best-effort, never blocks)
-    if (opts.provider && counts.episodesCreated > 0) {
-      await generateEpisodeEmbeddings(graph, opts.provider, [
-        ...episodeIds.values(),
-      ]);
+    // Post-ingest: generate embeddings for new episodes and entities (best-effort, never blocks)
+    if (opts.provider) {
+      if (counts.episodesCreated > 0) {
+        await generateEpisodeEmbeddings(graph, opts.provider, [
+          ...episodeIds.values(),
+        ]);
+      }
+      if (counts.entitiesCreated > 0) {
+        const newEntityIds = [
+          ...new Set([
+            ...fileEntityCache.values(),
+            ...authorEntityCache.values(),
+          ]),
+        ];
+        await generateEntityEmbeddings(graph, opts.provider, newEntityIds);
+      }
     }
 
     return { ...counts, runId };

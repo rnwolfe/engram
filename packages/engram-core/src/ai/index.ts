@@ -20,6 +20,7 @@ export type { AIConfig, AIProvider, EntityHint } from "./provider.js";
 export type { ReindexProgress } from "./utils.js";
 export {
   countEmbeddings,
+  generateEntityEmbeddings,
   generateEpisodeEmbeddings,
   reindexEmbeddings,
 } from "./utils.js";

@@ -566,13 +566,12 @@ export async function search(
     episodeRows.map((r) => r.rank),
   );
 
-  // Build vector similarity map when provider is set and produces a valid embedding.
-  // episodeVectorScores maps episode IDs to cosine similarity scores.
-  // findSimilar returns episode IDs (embeddings are generated for episodes, not entities).
-  // Entity vector scores are derived via the evidence chain:
-  //   an entity's vector score = max cosine score of any linked episode in the similarity set.
-  // The same map is used directly for edge and episode lookups (they are also keyed by episode ID).
+  // Build vector similarity maps when provider is set and produces a valid embedding.
+  // episodeVectorScores: episode_id → cosine similarity (for episodes and edges via evidence chain)
+  // entityVectorScores: entity_id → cosine similarity (direct entity embeddings, issue #113)
+  // Entity vector_score = max(direct entity score, max episode score via evidence chain).
   const episodeVectorScores = new Map<string, number>();
+  const entityVectorScores = new Map<string, number>();
   let effectiveMode = mode;
   if (opts.provider) {
     try {
@@ -589,11 +588,20 @@ export async function search(
       if (queryEmbeddings.length > 0 && queryEmbeddings[0].length > 0) {
         // Only enable hybrid mode when a real embedding was produced
         effectiveMode = "hybrid";
-        // v0.1 limitation: brute-force scan is capped at 100 embeddings.
-        // Acceptable for small graphs (<50k embeddings); revisit if performance degrades.
-        const similar = findSimilar(graph, queryEmbeddings[0], { limit: 100 });
-        for (const result of similar) {
+        // v0.1 limitation: brute-force scan is capped at 100 embeddings per type.
+        const episodeSimilar = findSimilar(graph, queryEmbeddings[0], {
+          limit: 100,
+          target_type: "episode",
+        });
+        for (const result of episodeSimilar) {
           episodeVectorScores.set(result.target_id, result.score);
+        }
+        const entitySimilar = findSimilar(graph, queryEmbeddings[0], {
+          limit: 100,
+          target_type: "entity",
+        });
+        for (const result of entitySimilar) {
+          entityVectorScores.set(result.target_id, result.score);
         }
       }
       // If embed() returned [] or [[]] (empty vector), effectiveMode stays as-is (FTS-only)
@@ -629,9 +637,9 @@ export async function search(
     const edgeCount = getEntityEdgeCount(graph, row.id);
     const graphScore = normalizeGraphScore(edgeCount);
 
-    // Compute indirect vector score via evidence chain:
-    // max cosine score of any similar episode this entity is backed by.
-    let vectorScore = 0.0;
+    // Compute entity vector score: max of direct entity embedding score and
+    // indirect score via evidence chain (episodes backing this entity).
+    let vectorScore = entityVectorScores.get(row.id) ?? 0.0;
     for (const epId of provenance) {
       const s = episodeVectorScores.get(epId) ?? 0;
       if (s > vectorScore) vectorScore = s;
@@ -682,8 +690,8 @@ export async function search(
     const traversalDiscount = t.hops === 1 ? 0.85 : 0.55;
     const proxyFtsScore = t.seedFtsScore * traversalDiscount;
 
-    // Indirect vector score via evidence chain (same logic as direct FTS entities)
-    let vectorScore = 0.0;
+    // Entity vector score: max of direct entity embedding + indirect via evidence chain
+    let vectorScore = entityVectorScores.get(t.entityId) ?? 0.0;
     for (const epId of provenance) {
       const s = episodeVectorScores.get(epId) ?? 0;
       if (s > vectorScore) vectorScore = s;
