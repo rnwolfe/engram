@@ -20,7 +20,12 @@ export type {
   SimilarResult,
   StoredEmbedding,
 } from "./embeddings.js";
-export { cosineSimilarity, findSimilar, storeEmbedding } from "./embeddings.js";
+export {
+  cosineSimilarity,
+  findSimilar,
+  storeEmbedding,
+  storeEmbeddingRaw,
+} from "./embeddings.js";
 export type {
   Entity,
   EntityInput,

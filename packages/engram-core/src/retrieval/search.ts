@@ -15,11 +15,11 @@
 import type { AIProvider } from "../ai/provider.js";
 import type { EngramGraph } from "../format/index.js";
 import { resolveEntity } from "../graph/aliases.js";
-import { findSimilar } from "../graph/embeddings.js";
 import {
   checkEmbeddingModelForRead,
   EmbeddingModelMismatchError,
 } from "../graph/embedding-model.js";
+import { findSimilar } from "../graph/embeddings.js";
 import type { Entity } from "../graph/entities.js";
 import type { TraversedEntity } from "./graph-search.js";
 import { graphSearch } from "./graph-search.js";
@@ -582,7 +582,7 @@ export async function search(
       );
       if (modelCheck === "unrecorded") {
         console.warn(
-          "[engram] Embedding model not recorded. Run `engram embed --reindex` to enable semantic search.",
+          "[engram] Embedding model not recorded. Run `engram embed reindex` to enable semantic search.",
         );
       }
       const queryEmbeddings = await opts.provider.embed([query]);
