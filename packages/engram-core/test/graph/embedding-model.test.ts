@@ -108,14 +108,28 @@ describe("checkEmbeddingModelForRead", () => {
 describe("storeEmbedding integration", () => {
   test("populates embedding_model metadata on first storeEmbedding", () => {
     expect(getEmbeddingModel(graph)).toBeNull();
-    storeEmbedding(graph, "ep-1", "episode", "nomic-embed-text", [0.1, 0.2, 0.3], "text");
+    storeEmbedding(
+      graph,
+      "ep-1",
+      "episode",
+      "nomic-embed-text",
+      [0.1, 0.2, 0.3],
+      "text",
+    );
     const cfg = getEmbeddingModel(graph);
     expect(cfg?.model).toBe("nomic-embed-text");
     expect(cfg?.dimensions).toBe(3);
   });
 
   test("throws when storeEmbedding uses a different model than stored", () => {
-    storeEmbedding(graph, "ep-1", "episode", "nomic-embed-text", [0.1, 0.2, 0.3], "text");
+    storeEmbedding(
+      graph,
+      "ep-1",
+      "episode",
+      "nomic-embed-text",
+      [0.1, 0.2, 0.3],
+      "text",
+    );
     expect(() =>
       storeEmbedding(
         graph,

@@ -75,8 +75,11 @@ export class GeminiGenerator implements ProjectionGenerator {
     const text = response.text ?? "";
     if (process.env.ENGRAM_DEBUG) {
       const finishReason =
-        (response as unknown as { candidates?: Array<{ finishReason?: string }> })
-          .candidates?.[0]?.finishReason ?? "unknown";
+        (
+          response as unknown as {
+            candidates?: Array<{ finishReason?: string }>;
+          }
+        ).candidates?.[0]?.finishReason ?? "unknown";
       console.error(
         `[engram][gemini] response: ${text.length} chars, finishReason=${finishReason}`,
       );
