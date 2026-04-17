@@ -22,6 +22,26 @@ export function registerDecay(program: Command): void {
     .option("--stale-days <n>", "days without evidence to mark as stale", "180")
     .option("--dormant-days <n>", "days of owner inactivity to flag", "90")
     .option("--db <path>", "path to .engram file", ".engram")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  # Show decay report with default thresholds (180-day stale, 90-day dormant)
+  engram decay
+
+  # Tighten the stale threshold to 60 days
+  engram decay --stale-days 60
+
+  # Tighten both thresholds
+  engram decay --stale-days 60 --dormant-days 30
+
+When to use:
+  Run periodically to surface knowledge that has gone stale or owners who
+  have become inactive — before their absence causes incidents.
+
+See also:
+  engram verify   check graph evidence invariants`,
+    )
     .action((opts: DecayOpts) => {
       const dbPath = path.resolve(opts.db);
       const staleDays = parseInt(opts.staleDays, 10);

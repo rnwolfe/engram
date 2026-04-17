@@ -22,6 +22,24 @@ export function registerAdd(program: Command): void {
     .description("Add a manual note or file as evidence")
     .option("--file <path>", "read content from a file instead of the argument")
     .option("--db <path>", "path to .engram file", ".engram")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  # Add a short note inline
+  engram add "Decided to use ULIDs for all entity IDs"
+
+  # Add the contents of a file as an episode
+  engram add --file notes/decision.md
+
+When to use:
+  After a design decision, meeting, or observation that should be preserved
+  in the knowledge graph before it is lost to memory.
+
+See also:
+  engram ingest git   ingest git history as episodes
+  engram verify       check graph integrity after manual additions`,
+    )
     .action((content: string | undefined, opts: AddOpts) => {
       const dbPath = path.resolve(opts.db);
 

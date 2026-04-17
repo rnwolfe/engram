@@ -219,6 +219,26 @@ export function registerExport(program: Command): void {
     )
     .option("--format <fmt>", "output format: jsonl or md", "jsonl")
     .option("--db <path>", "path to .engram file", ".engram")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  # Export full graph as JSONL (default)
+  engram export
+
+  # Export as markdown summaries
+  engram export --format md
+
+  # Materialize projections to a wiki folder
+  engram export wiki --out ./wiki
+
+When to use:
+  When you need a portable snapshot of the graph for backup, diffing,
+  or loading into another tool.
+
+See also:
+  engram project    author projections on graph entities`,
+    )
     .action((opts: ExportOpts) => {
       const dbPath = path.resolve(opts.db);
 

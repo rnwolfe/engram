@@ -221,6 +221,27 @@ export function registerProject(program: Command): void {
       "validate and print what would be authored without writing",
     )
     .option("--db <path>", "path to .engram file", ".engram")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  # Author an entity_summary projection anchored to an entity
+  engram project --kind entity_summary --anchor entity:01HX...
+
+  # Author with explicit input episodes
+  engram project --kind entity_summary --anchor entity:01HX... --input episode:01HY... --input episode:01HZ...
+
+  # Preview what would be authored without writing
+  engram project --kind entity_summary --anchor entity:01HX... --dry-run
+
+When to use:
+  When you want to explicitly generate or refresh a projection for a specific
+  entity rather than waiting for reconcile to discover it.
+
+See also:
+  engram reconcile   run the full projection maintenance loop
+  engram export      export projections to a wiki folder`,
+    )
     .action(async (opts: ProjectOpts) => {
       intro("engram project");
 

@@ -18,8 +18,27 @@ export function registerMaintenance(program: Command): void {
   // rebuild-index
   program
     .command("rebuild-index")
-    .description("Rebuild FTS5 indexes for entities, edges, and episodes")
+    .description(
+      "Rebuild the FTS index. To rebuild the vector index, use engram embed --reindex.",
+    )
     .option("--db <path>", "path to .engram file", ".engram")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  # Rebuild FTS indexes for the default database
+  engram rebuild-index
+
+  # Rebuild FTS indexes for a specific database
+  engram rebuild-index --db path/to/project.engram
+
+When to use:
+  If full-text search returns stale or missing results after a large ingestion,
+  or after a database restore.
+
+See also:
+  engram embed --reindex   rebuild the vector (semantic) index`,
+    )
     .action((opts: MaintenanceOpts) => {
       const dbPath = path.resolve(opts.db);
 

@@ -463,7 +463,9 @@ function runStatus(
 export function registerEmbed(program: Command): void {
   program
     .command("embed")
-    .description("Manage embeddings for semantic search")
+    .description(
+      "Manage embeddings for semantic search. For FTS index rebuilding, see engram rebuild-index.",
+    )
     .option("--reindex", "clear and rebuild the vector index")
     .option("--check", "validate stored model matches configured provider")
     .option(

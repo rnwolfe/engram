@@ -24,6 +24,23 @@ export function registerVerify(program: Command): void {
     .command("verify")
     .description("Validate .engram integrity (evidence invariants)")
     .option("--db <path>", "path to .engram file", ".engram")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  # Verify the default .engram file
+  engram verify
+
+  # Verify a specific database file
+  engram verify --db path/to/project.engram
+
+When to use:
+  After manual graph edits, merges, or any operation that might leave evidence
+  invariants broken. Exit code 2 means violations were found.
+
+See also:
+  engram decay   surface stale or orphaned knowledge`,
+    )
     .action((opts: VerifyOpts) => {
       const dbPath = path.resolve(opts.db);
 

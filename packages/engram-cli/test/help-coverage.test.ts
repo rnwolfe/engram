@@ -19,6 +19,41 @@ function hasExamples(help: string): boolean {
   return /#\s+\S/.test(afterExamples);
 }
 
+describe("help-coverage: Phase 3 commands have Examples blocks", () => {
+  it("engram add --help has Examples", () => {
+    expect(hasExamples(helpOutput(["add"]))).toBe(true);
+  });
+  it("engram decay --help has Examples", () => {
+    expect(hasExamples(helpOutput(["decay"]))).toBe(true);
+  });
+  it("engram embed --help has Examples", () => {
+    expect(hasExamples(helpOutput(["embed"]))).toBe(true);
+  });
+  it("engram export --help has Examples", () => {
+    expect(hasExamples(helpOutput(["export"]))).toBe(true);
+  });
+  it("engram project --help has Examples", () => {
+    expect(hasExamples(helpOutput(["project"]))).toBe(true);
+  });
+  it("engram reconcile --help has Examples", () => {
+    expect(hasExamples(helpOutput(["reconcile"]))).toBe(true);
+  });
+  it("engram verify --help has Examples", () => {
+    expect(hasExamples(helpOutput(["verify"]))).toBe(true);
+  });
+  it("engram rebuild-index --help has Examples", () => {
+    expect(hasExamples(helpOutput(["rebuild-index"]))).toBe(true);
+  });
+  it("engram embed description mentions rebuild-index", () => {
+    expect(helpOutput(["embed"])).toContain("rebuild-index");
+  });
+  it("engram rebuild-index description mentions embed --reindex", () => {
+    const out = helpOutput(["rebuild-index"]);
+    expect(out).toContain("embed");
+    expect(out).toContain("--reindex");
+  });
+});
+
 describe("help-coverage: Phase 1 commands have Examples blocks", () => {
   it("engram --help shows Typical lifecycle", () => {
     const out = helpOutput([]);

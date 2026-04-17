@@ -64,6 +64,29 @@ export function registerReconcile(program: Command): void {
       false,
     )
     .option("--db <path>", "path to .engram file", ".engram")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  # Run both phases with a token budget
+  engram reconcile --max-cost 50000
+
+  # Run only the assess phase (refresh stale projections)
+  engram reconcile --phase assess --max-cost 50000
+
+  # Run only the discover phase (find uncovered substrate)
+  engram reconcile --phase discover --max-cost 50000
+
+  # Preview what would change without persisting
+  engram reconcile --dry-run
+
+When to use:
+  After ingesting new commits or enrichment data to keep projections current,
+  or on a scheduled basis to ensure the graph stays fresh.
+
+See also:
+  engram project   author a projection on a specific anchor manually`,
+    )
     .action(async (opts: ReconcileOpts) => {
       intro("engram reconcile");
 
