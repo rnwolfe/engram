@@ -13,7 +13,10 @@ function helpOutput(args: string[]): string {
 }
 
 function hasExamples(help: string): boolean {
-  return /Examples:/i.test(help) && /#\s+\S/.test(help);
+  const idx = help.search(/Examples:/i);
+  if (idx === -1) return false;
+  const afterExamples = help.slice(idx);
+  return /#\s+\S/.test(afterExamples);
 }
 
 describe("help-coverage: Phase 1 commands have Examples blocks", () => {

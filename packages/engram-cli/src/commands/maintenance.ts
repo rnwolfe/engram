@@ -59,7 +59,7 @@ export function registerMaintenance(program: Command): void {
     .description("Start the model context protocol server (stdio transport)")
     .option("--db <path>", "path to .engram file", ".engram")
     .action((_opts: MaintenanceOpts) => {
-      console.log("MCP server not yet implemented.");
-      console.log("Use the engram-mcp package when available.");
+      console.log("The serve command is not yet implemented.");
+      console.log("Use the engram-mcp package directly when available.");
     });
 }
