@@ -16,6 +16,7 @@ import { registerReconcile } from "./commands/reconcile.js";
 import { registerSearch } from "./commands/search.js";
 import { registerShow } from "./commands/show.js";
 import { registerStats } from "./commands/stats.js";
+import { registerStatus } from "./commands/status.js";
 import { registerVerify } from "./commands/verify.js";
 import { registerVisualize } from "./commands/visualize.js";
 
@@ -35,6 +36,7 @@ registerHistory(program);
 registerDecay(program);
 registerOwnership(program);
 registerStats(program);
+registerStatus(program);
 registerIngest(program);
 registerExport(program);
 registerProject(program);
