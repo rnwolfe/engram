@@ -5,7 +5,12 @@
  */
 
 export { Budget } from "./ai/budget.js";
-export type { AIConfig, AIProvider, EntityHint, ReindexProgress } from "./ai/index.js";
+export type {
+  AIConfig,
+  AIProvider,
+  EntityHint,
+  ReindexProgress,
+} from "./ai/index.js";
 export {
   countEmbeddings,
   createGenerator,
