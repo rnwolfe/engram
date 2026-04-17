@@ -339,15 +339,29 @@ interface EvidenceRow {
  * large commit can link 15+ files as entities at equal rank.
  */
 function isConfigNoise(canonicalName: string): boolean {
-  const base = canonicalName.split("/").pop() ?? canonicalName;
-  // Config/build/lock files
+  const base = (canonicalName.split("/").pop() ?? canonicalName).toLowerCase();
+  const NOISE_BASENAMES = new Set([
+    "package.json",
+    "package-lock.json",
+    "bun.lock",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "biome.json",
+    "eslint.json",
+    ".eslintrc.json",
+    "prettier.json",
+    ".prettierrc.json",
+    "tsconfig.json",
+    "tsconfig.build.json",
+    "tsconfig.base.json",
+  ]);
+  if (NOISE_BASENAMES.has(base)) return true;
+  if (base.endsWith(".lock")) return true;
   if (
-    /^(biome|tsconfig|package|bun\.lock|pnpm-lock|yarn\.lock|\.eslintrc|\.prettierrc|Makefile|Dockerfile)/.test(
-      base,
-    ) ||
-    (base.endsWith(".json") && !base.includes("test")) ||
-    base.endsWith(".lock") ||
-    (base.endsWith(".toml") && base !== "forge.toml")
+    base.endsWith(".toml") &&
+    base !== "forge.toml" &&
+    base !== "cargo.toml" &&
+    base !== "pyproject.toml"
   ) {
     return true;
   }
@@ -610,10 +624,10 @@ function searchEntitiesViaEpisodeFts(
         // Extract file stem (base name without extension).
         const base = r.canonical_name.split("/").pop() ?? "";
         const stem = base.replace(/\.[^.]+$/, "").toLowerCase();
-        if (stem.length >= 3 && epBodies.length > 0) {
+        if (stem.length >= 6 && epBodies.length > 0) {
+          const stemRe = new RegExp(`\\b${stem}`, "gi");
           const totalCount = epBodies.reduce((sum, body) => {
-            const matches = body.split(stem).length - 1;
-            return sum + matches;
+            return sum + (body.match(stemRe) ?? []).length;
           }, 0);
           if (totalCount >= 5) return { ...r, rank: -0.45 };
           if (totalCount >= 1) return { ...r, rank: -0.35 };
