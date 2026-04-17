@@ -15,6 +15,7 @@ import { addEdge } from "../../graph/edges.js";
 import { addEntity, type EvidenceInput } from "../../graph/entities.js";
 import { addEpisode } from "../../graph/episodes.js";
 import type { EnrichmentAdapter, EnrichOpts } from "../adapter.js";
+import { EnrichmentAdapterError } from "../adapter.js";
 import type { IngestResult } from "../git.js";
 
 // ---------------------------------------------------------------------------
@@ -161,9 +162,9 @@ function getLastCursor(graph: EngramGraph, sourceScope: string): number {
  * Thrown when the GitHub API returns 401 or 403.
  * Caught by the CLI to display a targeted help message.
  */
-export class GitHubAuthError extends Error {
+export class GitHubAuthError extends EnrichmentAdapterError {
   constructor(message: string) {
-    super(message);
+    super("auth_failure", message);
     this.name = "GitHubAuthError";
   }
 }
@@ -562,6 +563,10 @@ function ingestIssue(
 export class GitHubAdapter implements EnrichmentAdapter {
   name = "github";
   kind = "enrichment";
+  /** @experimental */
+  supportsAuth: string[] = ["token", "none"];
+  /** @experimental */
+  supportsCursor = true;
 
   /**
    * Optionally inject a custom fetch function (useful for testing).
