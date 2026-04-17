@@ -20,6 +20,7 @@ import type { Command } from "commander";
 import type { EngramGraph, SourceProgressEvent } from "engram-core";
 import {
   closeGraph,
+  EnrichmentAdapterError,
   GitHubAdapter,
   GitHubAuthError,
   ingestGitRepo,
@@ -339,6 +340,13 @@ export function registerIngest(program: Command): void {
           if (!token) {
             log.warn(
               "Tip: provide a token with --token <token> or by setting the GITHUB_TOKEN env var.",
+            );
+          }
+        } else if (err instanceof EnrichmentAdapterError) {
+          log.error(err.message);
+          if (err.code === "rate_limited") {
+            log.warn(
+              "Tip: provide a token with --token <token> or GITHUB_TOKEN to raise the rate limit.",
             );
           }
         } else {

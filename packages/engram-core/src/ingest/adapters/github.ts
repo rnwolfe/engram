@@ -15,6 +15,7 @@ import { addEdge } from "../../graph/edges.js";
 import { addEntity, type EvidenceInput } from "../../graph/entities.js";
 import { addEpisode } from "../../graph/episodes.js";
 import type { EnrichmentAdapter, EnrichOpts } from "../adapter.js";
+import { EnrichmentAdapterError } from "../adapter.js";
 import type { IngestResult } from "../git.js";
 
 // ---------------------------------------------------------------------------
@@ -73,7 +74,8 @@ const REPO_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 
 function validateRepo(repo: string): void {
   if (!REPO_RE.test(repo)) {
-    throw new Error(
+    throw new EnrichmentAdapterError(
+      "data_error",
       `GitHubAdapter: repo must be in 'owner/repo' format, got: ${repo}`,
     );
   }
@@ -161,9 +163,9 @@ function getLastCursor(graph: EngramGraph, sourceScope: string): number {
  * Thrown when the GitHub API returns 401 or 403.
  * Caught by the CLI to display a targeted help message.
  */
-export class GitHubAuthError extends Error {
+export class GitHubAuthError extends EnrichmentAdapterError {
   constructor(message: string) {
-    super(message);
+    super("auth_failure", message);
     this.name = "GitHubAuthError";
   }
 }
@@ -209,7 +211,8 @@ async function apiGet<T>(
       );
     }
     if (resp.status === 404) {
-      throw new Error(
+      throw new EnrichmentAdapterError(
+        "data_error",
         `GitHubAdapter: repository not found. Check the owner/repo format and ensure the repository exists. (${url})`,
       );
     }
@@ -218,12 +221,14 @@ async function apiGet<T>(
       const resetMsg = resetAt
         ? ` Rate limit resets at ${new Date(Number(resetAt) * 1000).toISOString()}.`
         : "";
-      throw new Error(
+      throw new EnrichmentAdapterError(
+        "rate_limited",
         `GitHubAdapter: rate limit exceeded.${resetMsg}${!token ? " Provide a GITHUB_TOKEN to raise the limit from 60 to 5,000 requests/hour." : ""}`,
       );
     }
 
-    throw new Error(
+    throw new EnrichmentAdapterError(
+      "server_error",
       `GitHubAdapter: GET ${url} returned HTTP ${resp.status}: ${body}`,
     );
   }
@@ -562,6 +567,10 @@ function ingestIssue(
 export class GitHubAdapter implements EnrichmentAdapter {
   name = "github";
   kind = "enrichment";
+  /** @experimental */
+  supportsAuth: string[] = ["token", "none"];
+  /** @experimental */
+  supportsCursor = true;
 
   /**
    * Optionally inject a custom fetch function (useful for testing).
