@@ -17,6 +17,12 @@ export {
   NullGenerator,
 } from "./projection-generator.js";
 export type { AIConfig, AIProvider, EntityHint } from "./provider.js";
+export type { ReindexProgress } from "./utils.js";
+export {
+  countEmbeddings,
+  generateEpisodeEmbeddings,
+  reindexEmbeddings,
+} from "./utils.js";
 
 import { GeminiProvider } from "./gemini.js";
 import { GeminiGenerator } from "./gemini-generator.js";

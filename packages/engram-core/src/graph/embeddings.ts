@@ -8,6 +8,7 @@
 
 import { ulid } from "ulid";
 import type { EngramGraph } from "../format/index.js";
+import { assertEmbeddingModelForWrite } from "./embedding-model.js";
 
 export type EmbeddingTargetType = "entity" | "episode";
 
@@ -104,6 +105,8 @@ export function storeEmbedding(
   embedding: number[],
   sourceText: string,
 ): void {
+  assertEmbeddingModelForWrite(graph, model, embedding.length);
+
   const id = ulid();
   const now = new Date().toISOString();
   const vectorBlob = encodeVector(embedding);
