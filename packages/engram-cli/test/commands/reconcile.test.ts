@@ -184,6 +184,17 @@ describe("reconcile usage errors", () => {
     expect(output).toContain("--max-cost");
   });
 
+  it("exits 2 for missing --max-cost before graph I/O (non-existent db)", async () => {
+    closeGraph(graph);
+    const { exitCode, output } = await runCommand([
+      "reconcile",
+      "--db",
+      "/tmp/does-not-exist-ever.engram",
+    ]);
+    expect(exitCode).toBe(2);
+    expect(output).toContain("--max-cost");
+  });
+
   it("exits with code 2 for invalid --phase value", async () => {
     closeGraph(graph);
     const { exitCode, output } = await runCommand([
