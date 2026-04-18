@@ -92,7 +92,9 @@ See also:
           if (entity2Arg) {
             const entity2 = resolveEntityByNameOrId(graph, entity2Arg);
             if (!entity2) {
-              console.error(`${c.red("Error:")} entity not found: ${entity2Arg}`);
+              console.error(
+                `${c.red("Error:")} entity not found: ${entity2Arg}`,
+              );
               closeGraph(graph);
               process.exit(1);
             }

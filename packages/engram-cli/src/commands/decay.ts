@@ -22,18 +22,24 @@ function colorCount(n: number): string {
 }
 
 function renderTable(report: DecayReport): void {
-  console.log(
-    `${c.bold("Decay Report")}${c.dim(` — ${report.generated_at}`)}`,
-  );
+  console.log(`${c.bold("Decay Report")}${c.dim(` — ${report.generated_at}`)}`);
   console.log(
     `Entities: ${report.total_entities}  Edges: ${report.total_edges}`,
   );
   console.log("");
   console.log("Summary:");
-  console.log(`  stale_evidence:     ${colorCount(report.summary.stale_evidence)}`);
-  console.log(`  contradicted:       ${colorCount(report.summary.contradicted)}`);
-  console.log(`  concentrated_risk:  ${colorCount(report.summary.concentrated_risk)}`);
-  console.log(`  dormant_owner:      ${colorCount(report.summary.dormant_owner)}`);
+  console.log(
+    `  stale_evidence:     ${colorCount(report.summary.stale_evidence)}`,
+  );
+  console.log(
+    `  contradicted:       ${colorCount(report.summary.contradicted)}`,
+  );
+  console.log(
+    `  concentrated_risk:  ${colorCount(report.summary.concentrated_risk)}`,
+  );
+  console.log(
+    `  dormant_owner:      ${colorCount(report.summary.dormant_owner)}`,
+  );
   console.log(`  orphaned:           ${colorCount(report.summary.orphaned)}`);
 
   if (report.decay_items.length === 0) {
@@ -93,11 +99,15 @@ See also:
       const format = opts.format;
 
       if (Number.isNaN(staleDays) || staleDays < 1) {
-        console.error(`${c.red("Error:")} --stale-days must be a positive integer`);
+        console.error(
+          `${c.red("Error:")} --stale-days must be a positive integer`,
+        );
         process.exit(1);
       }
       if (Number.isNaN(dormantDays) || dormantDays < 1) {
-        console.error(`${c.red("Error:")} --dormant-days must be a positive integer`);
+        console.error(
+          `${c.red("Error:")} --dormant-days must be a positive integer`,
+        );
         process.exit(1);
       }
       if (format !== "table" && format !== "json") {
