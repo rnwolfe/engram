@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {
+  confirm,
   intro,
   isCancel,
   log,
@@ -10,20 +11,26 @@ import {
   text,
 } from "@clack/prompts";
 import type { Command } from "commander";
+import type { AIProvider } from "engram-core";
 import {
   checkGoogle,
   checkOllama,
   checkOpenAI,
   closeGraph,
   createGraph,
+  GeminiProvider,
   ingestGitRepo,
+  ingestMarkdown,
+  ingestSource,
+  OllamaProvider,
+  reindexEmbeddings,
   setEmbeddingModel,
 } from "engram-core";
 
 const EMBEDDING_DIMENSIONS: Record<string, number> = {
-  "nomic-embed-text": 384,
+  "mxbai-embed-large": 1024,
   "text-embedding-3-small": 1536,
-  "text-embedding-004": 768,
+  "gemini-embedding-2-preview": 3072,
 };
 
 const KNOWN_EMBEDDING_MODELS = new Set(Object.keys(EMBEDDING_DIMENSIONS));
@@ -37,6 +44,9 @@ interface InitOpts {
   ollamaEndpoint: string;
   yes: boolean;
   verify: boolean;
+  ingestMd?: string;
+  ingestSource?: boolean;
+  embed?: boolean;
 }
 
 function cancelAndExit(): never {
@@ -47,6 +57,93 @@ function cancelAndExit(): never {
 function assertNotCancel<T>(val: T | symbol): T {
   if (isCancel(val)) cancelAndExit();
   return val as T;
+}
+
+function buildProvider(
+  embeddingModel: string,
+  ollamaEndpoint: string,
+): AIProvider | null {
+  if (embeddingModel === "none") return null;
+  if (
+    embeddingModel.startsWith("mxbai-") ||
+    embeddingModel.startsWith("nomic-") ||
+    embeddingModel.startsWith("all-minilm")
+  ) {
+    return new OllamaProvider({ embedModel: embeddingModel, baseUrl: ollamaEndpoint });
+  }
+  if (embeddingModel.startsWith("gemini-")) {
+    const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
+    if (!apiKey) return null;
+    return new GeminiProvider({ embedModel: embeddingModel, apiKey });
+  }
+  if (embeddingModel.startsWith("text-embedding-")) {
+    // OpenAI — not yet wired for embeddings in init
+    return null;
+  }
+  return null;
+}
+
+async function runMarkdownIngest(
+  graph: ReturnType<typeof createGraph>,
+  mdPath: string,
+): Promise<void> {
+  const s = spinner();
+  s.start(`Ingesting markdown: ${mdPath}`);
+  try {
+    const result = await ingestMarkdown(graph, mdPath);
+    s.stop(
+      `Markdown ingestion complete — ${result.episodesCreated} episodes created, ${result.episodesSkipped} skipped`,
+    );
+  } catch (err) {
+    s.stop(`Markdown ingestion failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+async function runSourceIngest(
+  graph: ReturnType<typeof createGraph>,
+  root: string,
+): Promise<void> {
+  const s = spinner();
+  s.start("Ingesting source code…");
+  try {
+    const result = await ingestSource(graph, { root });
+    s.stop(
+      [
+        "Source ingestion complete",
+        `  Files: ${result.parsed} parsed, ${result.skipped} skipped`,
+        `  Entities: ${result.entitiesCreated} created`,
+        `  Edges:    ${result.edgesCreated} created`,
+      ].join("\n"),
+    );
+  } catch (err) {
+    s.stop(`Source ingestion failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+async function runEmbed(
+  graph: ReturnType<typeof createGraph>,
+  provider: AIProvider,
+): Promise<void> {
+  const startMs = Date.now();
+  const s = spinner();
+  s.start("Generating embeddings…");
+  try {
+    const result = await reindexEmbeddings(graph, provider, (p) => {
+      const rate =
+        p.done > 0
+          ? `${(p.done / ((Date.now() - startMs) / 1000)).toFixed(0)}/s`
+          : "…";
+      s.message(`Generating embeddings… ${p.done}/${p.total} (${rate})`);
+    });
+    const elapsed = ((Date.now() - startMs) / 1000).toFixed(1);
+    s.stop(`Embeddings complete — ${result.done} items in ${elapsed}s`);
+    if (result.errors > 0) {
+      log.warn(`${result.errors} items failed — run  engram embed --reindex  to retry.`);
+    }
+  } catch (err) {
+    s.stop(`Embedding failed: ${err instanceof Error ? err.message : String(err)}`);
+    log.warn("Run  engram embed --reindex  to retry.");
+  }
 }
 
 async function runInteractive(opts: InitOpts): Promise<void> {
@@ -71,11 +168,11 @@ async function runInteractive(opts: InitOpts): Promise<void> {
 
   const ingestChoice = assertNotCancel(
     await select({
-      message: "Ingest source",
+      message: "Ingest git history",
       options: [
         { value: "git", label: "Current git repository (recommended)" },
         { value: "git-other", label: "A different path" },
-        { value: "skip", label: "Skip for now" },
+        { value: "skip", label: "Skip" },
       ],
     }),
   ) as string;
@@ -96,14 +193,17 @@ async function runInteractive(opts: InitOpts): Promise<void> {
       message: "Embedding model",
       options: [
         {
-          value: "nomic-embed-text",
-          label: "nomic-embed-text — Ollama (recommended, local)",
+          value: "mxbai-embed-large",
+          label: "mxbai-embed-large — Ollama (recommended, local, 1024 dims)",
         },
         {
           value: "text-embedding-3-small",
-          label: "text-embedding-3-small — OpenAI",
+          label: "text-embedding-3-small — OpenAI (1536 dims)",
         },
-        { value: "text-embedding-004", label: "text-embedding-004 — Google" },
+        {
+          value: "gemini-embedding-2-preview",
+          label: "gemini-embedding-2-preview — Google (3072 dims)",
+        },
         { value: "none", label: "none — BM25 full-text search only" },
       ],
     }),
@@ -111,7 +211,7 @@ async function runInteractive(opts: InitOpts): Promise<void> {
 
   let ollamaEndpoint = opts.ollamaEndpoint;
 
-  if (embeddingChoice === "nomic-embed-text") {
+  if (embeddingChoice === "mxbai-embed-large") {
     const rawEndpoint = assertNotCancel(
       await text({
         message: "Ollama endpoint",
@@ -128,7 +228,7 @@ async function runInteractive(opts: InitOpts): Promise<void> {
     if (opts.verify) {
       const s = spinner();
       s.start("Checking Ollama reachability…");
-      const reach = await checkOllama(ollamaEndpoint, "nomic-embed-text");
+      const reach = await checkOllama(ollamaEndpoint, "mxbai-embed-large");
       if (reach.ok) {
         s.stop(`Ollama: ${reach.message}`);
       } else {
@@ -148,11 +248,11 @@ async function runInteractive(opts: InitOpts): Promise<void> {
       if (reach.hint) log.warn(`Hint: ${reach.hint}`);
       log.warn("Continuing anyway — set the key before running embeddings.");
     }
-  } else if (embeddingChoice === "text-embedding-004" && opts.verify) {
+  } else if (embeddingChoice === "gemini-embedding-2-preview" && opts.verify) {
     const s = spinner();
     s.start("Checking Google API key…");
     const reach = await checkGoogle(
-      process.env.GOOGLE_API_KEY ?? process.env.GEMINI_API_KEY,
+      process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY,
     );
     if (reach.ok) {
       s.stop(`Google: ${reach.message}`);
@@ -169,17 +269,50 @@ async function runInteractive(opts: InitOpts): Promise<void> {
       options: [
         { value: "none", label: "none for now" },
         {
-          value: "gemini-2.0-flash",
-          label: "gemini-2.0-flash — Google (set GEMINI_API_KEY)",
+          value: "gemini-3-flash-preview",
+          label: "gemini-3-flash-preview — Google (set GEMINI_API_KEY)",
         },
         {
-          value: "claude-haiku-4-5",
+          value: "claude-haiku-4-5-20251001",
           label: "claude-haiku-4-5 — Anthropic (set ANTHROPIC_API_KEY)",
         },
         { value: "ollama", label: "ollama/<model> — local Ollama" },
       ],
     }),
   );
+
+  // Markdown docs
+  const mdRaw = assertNotCancel(
+    await text({
+      message: "Ingest markdown docs? (path to docs dir, or leave blank to skip)",
+      placeholder: "docs/",
+      defaultValue: "",
+    }),
+  ) as string;
+  const mdPath = mdRaw.trim();
+
+  // Source code
+  const doSource = assertNotCancel(
+    await confirm({
+      message: "Ingest source code?",
+      initialValue: true,
+    }),
+  ) as boolean;
+
+  // Embeddings — only offer if model was chosen and provider can be built
+  const provider = buildProvider(embeddingChoice, ollamaEndpoint);
+  const canEmbed = provider !== null;
+  let doEmbed = false;
+  if (canEmbed) {
+    doEmbed = assertNotCancel(
+      await confirm({
+        message: "Generate embeddings now? (recommended, takes a few minutes)",
+        initialValue: true,
+      }),
+    ) as boolean;
+  }
+
+  // ── Execute ──────────────────────────────────────────────────────────────
 
   const graph = createGraph(dbPath);
   log.success(`Created ${dbPath}`);
@@ -195,9 +328,7 @@ async function runInteractive(opts: InitOpts): Promise<void> {
   }
 
   if (ingestChoice === "git" || ingestChoice === "git-other") {
-    log.info(
-      `Ingesting git repository at ${ingestPath} — this may take a while…`,
-    );
+    log.info(`Ingesting git repository at ${ingestPath}…`);
     try {
       const result = await ingestGitRepo(graph, ingestPath);
       log.success(
@@ -217,16 +348,28 @@ async function runInteractive(opts: InitOpts): Promise<void> {
     }
   }
 
+  if (mdPath) {
+    await runMarkdownIngest(graph, mdPath);
+  }
+
+  if (doSource) {
+    await runSourceIngest(graph, path.resolve("."));
+  }
+
+  if (doEmbed && provider) {
+    await runEmbed(graph, provider);
+  }
+
   closeGraph(graph);
 
-  outro(
-    [
-      "Done! Next steps:",
-      `  engram context "your query here" --db ${dbPath}`,
-      `  engram companion >> CLAUDE.md`,
-      `  engram status --db ${dbPath}`,
-    ].join("\n"),
-  );
+  const nextSteps: string[] = [];
+  if (!doEmbed && canEmbed) {
+    nextSteps.push("  engram embed --reindex   # generate vector embeddings");
+  }
+  nextSteps.push(`  engram context "your query here" --db ${dbPath}`);
+  nextSteps.push("  engram companion >> CLAUDE.md");
+
+  outro(["Done!", ...nextSteps].join("\n"));
 }
 
 async function runNonInteractive(opts: InitOpts): Promise<void> {
@@ -239,7 +382,7 @@ async function runNonInteractive(opts: InitOpts): Promise<void> {
     process.exit(1);
   }
 
-  const embeddingModel = opts.embeddingModel ?? "nomic-embed-text";
+  const embeddingModel = opts.embeddingModel ?? "mxbai-embed-large";
 
   if (!KNOWN_EMBEDDING_MODELS.has(embeddingModel)) {
     log.error(
@@ -282,6 +425,28 @@ async function runNonInteractive(opts: InitOpts): Promise<void> {
     }
   }
 
+  if (opts.ingestMd) {
+    await runMarkdownIngest(graph, opts.ingestMd);
+  }
+
+  if (opts.ingestSource) {
+    await runSourceIngest(graph, path.resolve("."));
+  }
+
+  if (opts.embed) {
+    const ollamaEndpoint =
+      process.env.ENGRAM_OLLAMA_ENDPOINT ?? opts.ollamaEndpoint;
+    const provider = buildProvider(embeddingModel, ollamaEndpoint);
+    if (!provider) {
+      log.warn(
+        `Cannot embed: no provider available for model ${embeddingModel}. ` +
+          "Set GEMINI_API_KEY, OPENAI_API_KEY, or ensure Ollama is running.",
+      );
+    } else {
+      await runEmbed(graph, provider);
+    }
+  }
+
   log.success(`Created ${dbPath}`);
   closeGraph(graph);
 }
@@ -294,17 +459,27 @@ export function registerInit(program: Command): void {
       "after",
       `
 Examples:
-  # Interactive setup with local Ollama (recommended)
+  # Interactive full setup (recommended)
   engram init
 
-  # Non-interactive, BM25 only (no AI embedding), useful in CI
+  # Non-interactive, BM25 only, useful in CI
   engram init --yes --embedding-model none --db .engram
 
-  # Non-interactive with OpenAI embeddings and git ingest
-  engram init --yes --embedding-model text-embedding-3-small --from-git . --no-verify`,
+  # Non-interactive with full ingestion and embeddings
+  engram init --yes --from-git . --ingest-md docs/ --ingest-source --embed \\
+    --embedding-model gemini-embedding-2-preview
+
+See also:
+  engram ingest git     re-ingest or update git history
+  engram ingest md      ingest additional markdown files
+  engram ingest source  ingest source code symbols
+  engram embed          manage and rebuild vector embeddings`,
     )
     .option("--db <path>", "path for the .engram file", ".engram")
-    .option("--from-git <path>", "also ingest a git repository after creating")
+    .option("--from-git <path>", "ingest a git repository after creating")
+    .option("--ingest-md <path>", "ingest markdown docs from this directory/glob")
+    .option("--ingest-source", "ingest source code symbols", false)
+    .option("--embed", "generate vector embeddings after ingestion", false)
     .option("--embedding-model <id|none>", "embedding model to use")
     .option(
       "--embedding-provider <ollama|openai|google>",
