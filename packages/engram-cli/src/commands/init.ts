@@ -89,7 +89,7 @@ function buildProvider(
 async function runMarkdownIngest(
   graph: ReturnType<typeof createGraph>,
   mdPath: string,
-): Promise<void> {
+): Promise<{ episodesCreated: number; episodesSkipped: number } | null> {
   const s = spinner();
   s.start(`Ingesting markdown: ${mdPath}`);
   try {
@@ -97,17 +97,27 @@ async function runMarkdownIngest(
     s.stop(
       `Markdown ingestion complete — ${result.episodesCreated} episodes created, ${result.episodesSkipped} skipped`,
     );
+    return {
+      episodesCreated: result.episodesCreated,
+      episodesSkipped: result.episodesSkipped,
+    };
   } catch (err) {
     s.stop(
       `Markdown ingestion failed: ${err instanceof Error ? err.message : String(err)}`,
     );
+    return null;
   }
 }
 
 async function runSourceIngest(
   graph: ReturnType<typeof createGraph>,
   root: string,
-): Promise<void> {
+): Promise<{
+  filesParsed: number;
+  filesSkipped: number;
+  entitiesCreated: number;
+  edgesCreated: number;
+} | null> {
   const s = spinner();
   s.start("Ingesting source code…");
   try {
@@ -115,22 +125,29 @@ async function runSourceIngest(
     s.stop(
       [
         "Source ingestion complete",
-        `  Files: ${result.parsed} parsed, ${result.skipped} skipped`,
+        `  Files: ${result.filesParsed} parsed, ${result.filesSkipped} skipped`,
         `  Entities: ${result.entitiesCreated} created`,
         `  Edges:    ${result.edgesCreated} created`,
       ].join("\n"),
     );
+    return {
+      filesParsed: result.filesParsed,
+      filesSkipped: result.filesSkipped,
+      entitiesCreated: result.entitiesCreated,
+      edgesCreated: result.edgesCreated,
+    };
   } catch (err) {
     s.stop(
       `Source ingestion failed: ${err instanceof Error ? err.message : String(err)}`,
     );
+    return null;
   }
 }
 
 async function runEmbed(
   graph: ReturnType<typeof createGraph>,
   provider: AIProvider,
-): Promise<void> {
+): Promise<{ done: number; errors: number; elapsedS: string } | null> {
   const startMs = Date.now();
   const s = spinner();
   s.start("Generating embeddings…");
@@ -149,11 +166,13 @@ async function runEmbed(
         `${result.errors} items failed — run  engram embed --reindex  to retry.`,
       );
     }
+    return { done: result.done, errors: result.errors, elapsedS: elapsed };
   } catch (err) {
     s.stop(
       `Embedding failed: ${err instanceof Error ? err.message : String(err)}`,
     );
     log.warn("Run  engram embed --reindex  to retry.");
+    return null;
   }
 }
 
@@ -415,6 +434,26 @@ async function runNonInteractive(opts: InitOpts): Promise<void> {
     setEmbeddingModel(graph, embeddingModel, dims);
   }
 
+  type GitSummary = {
+    episodesCreated: number;
+    episodesSkipped: number;
+    entitiesCreated: number;
+    edgesCreated: number;
+  };
+  type MdSummary = { episodesCreated: number; episodesSkipped: number };
+  type SourceSummary = {
+    filesParsed: number;
+    filesSkipped: number;
+    entitiesCreated: number;
+    edgesCreated: number;
+  };
+  type EmbedSummary = { done: number; errors: number; elapsedS: string };
+
+  let gitSummary: GitSummary | null = null;
+  let mdSummary: MdSummary | null = null;
+  let sourceSummary: SourceSummary | null = null;
+  let embedSummary: EmbedSummary | null = null;
+
   if (opts.fromGit) {
     const repoPath = path.resolve(opts.fromGit);
     log.info(`Ingesting git repository at ${repoPath}…`);
@@ -428,6 +467,12 @@ async function runNonInteractive(opts: InitOpts): Promise<void> {
           `  Edges:    ${result.edgesCreated} created`,
         ].join("\n"),
       );
+      gitSummary = {
+        episodesCreated: result.episodesCreated,
+        episodesSkipped: result.episodesSkipped,
+        entitiesCreated: result.entitiesCreated,
+        edgesCreated: result.edgesCreated,
+      };
     } catch (err) {
       log.error(
         `Git ingestion failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -438,11 +483,11 @@ async function runNonInteractive(opts: InitOpts): Promise<void> {
   }
 
   if (opts.ingestMd) {
-    await runMarkdownIngest(graph, opts.ingestMd);
+    mdSummary = await runMarkdownIngest(graph, opts.ingestMd);
   }
 
   if (opts.ingestSource) {
-    await runSourceIngest(graph, path.resolve("."));
+    sourceSummary = await runSourceIngest(graph, path.resolve("."));
   }
 
   if (opts.embed) {
@@ -455,11 +500,52 @@ async function runNonInteractive(opts: InitOpts): Promise<void> {
           "Set GEMINI_API_KEY, OPENAI_API_KEY, or ensure Ollama is running.",
       );
     } else {
-      await runEmbed(graph, provider);
+      embedSummary = await runEmbed(graph, provider);
     }
   }
 
-  log.success(`Created ${dbPath}`);
+  const summaryLines: string[] = [`✓ Created ${dbPath}`, ""];
+  if (gitSummary) {
+    summaryLines.push(
+      `  Git ingestion:    ${gitSummary.episodesCreated} episodes, ` +
+        `${gitSummary.entitiesCreated} entities, ${gitSummary.edgesCreated} edges` +
+        (gitSummary.episodesSkipped > 0
+          ? ` (${gitSummary.episodesSkipped} skipped)`
+          : ""),
+    );
+  }
+  if (mdSummary) {
+    summaryLines.push(
+      `  Markdown:         ${mdSummary.episodesCreated} episodes created` +
+        (mdSummary.episodesSkipped > 0
+          ? `, ${mdSummary.episodesSkipped} skipped`
+          : ""),
+    );
+  }
+  if (sourceSummary) {
+    summaryLines.push(
+      `  Source ingestion: ${sourceSummary.entitiesCreated} entities, ` +
+        `${sourceSummary.edgesCreated} edges (${sourceSummary.filesParsed} files parsed)`,
+    );
+  }
+  if (embedSummary) {
+    summaryLines.push(
+      `  Embeddings:       ${embedSummary.done} items indexed in ${embedSummary.elapsedS}s`,
+    );
+  }
+
+  const hasStats =
+    gitSummary !== null ||
+    mdSummary !== null ||
+    sourceSummary !== null ||
+    embedSummary !== null;
+  if (hasStats) summaryLines.push("");
+
+  summaryLines.push("Next steps:");
+  summaryLines.push(`  engram context "your query" --db ${dbPath}`);
+  summaryLines.push("  engram companion >> CLAUDE.md");
+
+  log.success(summaryLines.join("\n"));
   closeGraph(graph);
 }
 
