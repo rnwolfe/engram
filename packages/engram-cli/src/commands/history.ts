@@ -130,7 +130,6 @@ See also:
             console.log(`${edges.length} fact(s)\n`);
 
             for (const edge of edges) {
-              const status = edge.invalidated_at ? "superseded" : "active";
               const from = edge.valid_from ?? "unknown";
               const until = edge.valid_until ?? "present";
               const statusLabel = edge.invalidated_at
