@@ -10,6 +10,7 @@ import {
   resolveDbPath,
   resolveEntity,
 } from "engram-core";
+import { c } from "../colors.js";
 
 interface HistoryOpts {
   db: string;
@@ -62,7 +63,7 @@ See also:
       ) => {
         if (opts.j) opts.format = "json";
         if (opts.format !== "text" && opts.format !== "json") {
-          console.error("Error: --format must be 'text' or 'json'");
+          console.error(`${c.red("Error:")} --format must be 'text' or 'json'`);
           process.exit(1);
         }
 
@@ -73,7 +74,7 @@ See also:
           graph = openGraph(dbPath);
         } catch (err) {
           console.error(
-            `Error opening graph: ${
+            `${c.red("Error:")} opening graph: ${
               err instanceof Error ? err.message : String(err)
             }`,
           );
@@ -83,7 +84,7 @@ See also:
         try {
           const entity1 = resolveEntityByNameOrId(graph, entity1Arg);
           if (!entity1) {
-            console.error(`Entity not found: ${entity1Arg}`);
+            console.error(`${c.red("Error:")} entity not found: ${entity1Arg}`);
             closeGraph(graph);
             process.exit(1);
           }
@@ -91,7 +92,9 @@ See also:
           if (entity2Arg) {
             const entity2 = resolveEntityByNameOrId(graph, entity2Arg);
             if (!entity2) {
-              console.error(`Entity not found: ${entity2Arg}`);
+              console.error(
+                `${c.red("Error:")} entity not found: ${entity2Arg}`,
+              );
               closeGraph(graph);
               process.exit(1);
             }
@@ -129,10 +132,12 @@ See also:
             console.log(`${edges.length} fact(s)\n`);
 
             for (const edge of edges) {
-              const status = edge.invalidated_at ? "superseded" : "active";
               const from = edge.valid_from ?? "unknown";
               const until = edge.valid_until ?? "present";
-              console.log(`[${status}] ${edge.fact}`);
+              const statusLabel = edge.invalidated_at
+                ? c.dim("[superseded]")
+                : c.green("[active]");
+              console.log(`${statusLabel} ${c.bold(edge.fact)}`);
               console.log(`  kind:  ${edge.edge_kind}`);
               console.log(`  valid: ${from} — ${until}`);
               console.log(`  id:    ${edge.id}`);
@@ -182,10 +187,12 @@ See also:
             console.log(`${allEdges.length} fact(s)\n`);
 
             for (const edge of allEdges) {
-              const status = edge.invalidated_at ? "superseded" : "active";
               const from = edge.valid_from ?? "unknown";
               const until = edge.valid_until ?? "present";
-              console.log(`[${status}] ${edge.fact}`);
+              const statusLabel = edge.invalidated_at
+                ? c.dim("[superseded]")
+                : c.green("[active]");
+              console.log(`${statusLabel} ${c.bold(edge.fact)}`);
               console.log(
                 `  kind:  ${edge.edge_kind}  relation: ${edge.relation_type}`,
               );
@@ -194,7 +201,7 @@ See also:
           }
         } catch (err) {
           console.error(
-            `Error: ${err instanceof Error ? err.message : String(err)}`,
+            `${c.red("Error:")} ${err instanceof Error ? err.message : String(err)}`,
           );
           closeGraph(graph);
           process.exit(1);

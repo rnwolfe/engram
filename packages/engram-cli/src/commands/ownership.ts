@@ -17,6 +17,7 @@ import {
   openGraph,
   resolveDbPath,
 } from "engram-core";
+import { c } from "../colors.js";
 
 interface OwnershipOpts {
   limit: string;
@@ -50,7 +51,7 @@ function renderTable(report: OwnershipReport): void {
   };
 
   if (byLevel.critical.length > 0) {
-    console.log(`CRITICAL (${byLevel.critical.length})`);
+    console.log(`${c.red(c.bold("CRITICAL"))} (${byLevel.critical.length})`);
     for (const entry of byLevel.critical) {
       renderEntry(entry);
     }
@@ -58,7 +59,7 @@ function renderTable(report: OwnershipReport): void {
   }
 
   if (byLevel.elevated.length > 0) {
-    console.log(`ELEVATED (${byLevel.elevated.length})`);
+    console.log(`${c.yellow(c.bold("ELEVATED"))} (${byLevel.elevated.length})`);
     for (const entry of byLevel.elevated) {
       renderEntry(entry);
     }
@@ -66,7 +67,7 @@ function renderTable(report: OwnershipReport): void {
   }
 
   if (byLevel.stable.length > 0) {
-    console.log(`STABLE (${byLevel.stable.length})`);
+    console.log(`${c.green("STABLE")} (${byLevel.stable.length})`);
     for (const entry of byLevel.stable) {
       renderEntry(entry);
     }
@@ -149,7 +150,7 @@ See also:
       const format = opts.format;
 
       if (Number.isNaN(limit) || limit < 1) {
-        console.error("Error: --limit must be a positive integer");
+        console.error(`${c.red("Error:")} --limit must be a positive integer`);
         process.exit(1);
       }
 
@@ -159,13 +160,13 @@ See also:
         minConfidence > 1
       ) {
         console.error(
-          "Error: --min-confidence must be a number between 0 and 1",
+          `${c.red("Error:")} --min-confidence must be a number between 0 and 1`,
         );
         process.exit(1);
       }
 
       if (format !== "table" && format !== "json") {
-        console.error("Error: --format must be 'table' or 'json'");
+        console.error(`${c.red("Error:")} --format must be 'table' or 'json'`);
         process.exit(1);
       }
 
@@ -174,7 +175,7 @@ See also:
         graph = openGraph(dbPath);
       } catch (err) {
         console.error(
-          `Error opening graph: ${err instanceof Error ? err.message : String(err)}`,
+          `${c.red("Error:")} opening graph: ${err instanceof Error ? err.message : String(err)}`,
         );
         process.exit(1);
       }
@@ -189,7 +190,7 @@ See also:
         closeGraph(graph);
       } catch (err) {
         console.error(
-          `Ownership report failed: ${err instanceof Error ? err.message : String(err)}`,
+          `${c.red("Error:")} ownership report failed: ${err instanceof Error ? err.message : String(err)}`,
         );
         closeGraph(graph);
         process.exit(1);

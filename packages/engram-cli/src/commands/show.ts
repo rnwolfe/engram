@@ -10,6 +10,7 @@ import {
   resolveDbPath,
   resolveEntity,
 } from "engram-core";
+import { c } from "../colors.js";
 
 interface ShowOpts {
   db: string;
@@ -48,7 +49,7 @@ See also:
     .action((entityArg: string, opts: ShowOpts) => {
       if (opts.j) opts.format = "json";
       if (opts.format !== "text" && opts.format !== "json") {
-        console.error("--format must be 'text' or 'json'");
+        console.error(`${c.red("Error:")} --format must be 'text' or 'json'`);
         process.exit(1);
       }
 
@@ -59,7 +60,7 @@ See also:
         graph = openGraph(dbPath);
       } catch (err) {
         console.error(
-          `Error opening graph: ${err instanceof Error ? err.message : String(err)}`,
+          `${c.red("Error:")} opening graph: ${err instanceof Error ? err.message : String(err)}`,
         );
         process.exit(1);
       }
@@ -71,7 +72,7 @@ See also:
         }
 
         if (!entity) {
-          console.error(`Entity not found: ${entityArg}`);
+          console.error(`${c.red("Error:")} entity not found: ${entityArg}`);
           closeGraph(graph);
           process.exit(1);
         }
@@ -111,10 +112,14 @@ See also:
           return;
         }
 
-        console.log(`${entity.canonical_name}`);
-        console.log(`  id:     ${entity.id}`);
-        console.log(`  type:   ${entity.entity_type}`);
-        console.log(`  status: ${entity.status}`);
+        console.log(c.bold(entity.canonical_name));
+        console.log(`${c.dim("  id:     ")}${entity.id}`);
+        console.log(`${c.dim("  type:   ")}${entity.entity_type}`);
+        const statusValue =
+          entity.status === "active"
+            ? c.green(entity.status)
+            : c.dim(entity.status);
+        console.log(`${c.dim("  status: ")}${statusValue}`);
         if (entity.summary) {
           console.log(`  summary: ${entity.summary}`);
         }
@@ -146,7 +151,7 @@ See also:
         }
       } catch (err) {
         console.error(
-          `Error: ${err instanceof Error ? err.message : String(err)}`,
+          `${c.red("Error:")} ${err instanceof Error ? err.message : String(err)}`,
         );
         closeGraph(graph);
         process.exit(1);
