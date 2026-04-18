@@ -58,7 +58,7 @@ See also:
         opts: HistoryOpts,
       ) => {
         if (opts.format !== "text" && opts.format !== "json") {
-          console.error("--format must be 'text' or 'json'");
+          console.error("Error: --format must be 'text' or 'json'");
           process.exit(1);
         }
 
