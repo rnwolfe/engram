@@ -98,31 +98,36 @@ See also:
       try {
         graph = openGraph(dbPath);
       } catch (err) {
-        log.error(
-          `Cannot open graph: ${err instanceof Error ? err.message : String(err)}`,
+        process.stderr.write(
+          `Cannot open graph: ${err instanceof Error ? err.message : String(err)}\n`,
         );
         process.exit(1);
       }
 
-      log.info(
-        `Ingesting git repo at ${resolvedRepo} — this may take a while...`,
-      );
+      const isTTY = process.stdout.isTTY;
+      if (isTTY) {
+        log.info(
+          `Ingesting git repo at ${resolvedRepo} — this may take a while...`,
+        );
+      }
       try {
         const result = await ingestGitRepo(graph, resolvedRepo, {
           since: opts.since,
           branch: opts.branch,
         });
-        log.success(
-          [
-            "Git ingestion complete",
-            `  Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
-            `  Entities: ${result.entitiesCreated} created`,
-            `  Edges:    ${result.edgesCreated} created, ${result.edgesSuperseded} superseded`,
-          ].join("\n"),
-        );
+        if (isTTY) {
+          log.success(
+            [
+              "Git ingestion complete",
+              `  Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
+              `  Entities: ${result.entitiesCreated} created`,
+              `  Edges:    ${result.edgesCreated} created, ${result.edgesSuperseded} superseded`,
+            ].join("\n"),
+          );
+        }
       } catch (err) {
-        log.error(
-          `Git ingestion failed: ${err instanceof Error ? err.message : String(err)}`,
+        process.stderr.write(
+          `Git ingestion failed: ${err instanceof Error ? err.message : String(err)}\n`,
         );
         closeGraph(graph);
         process.exit(1);
@@ -160,24 +165,27 @@ See also:
       try {
         graph = openGraph(dbPath);
       } catch (err) {
-        log.error(
-          `Cannot open graph: ${err instanceof Error ? err.message : String(err)}`,
+        process.stderr.write(
+          `Cannot open graph: ${err instanceof Error ? err.message : String(err)}\n`,
         );
         process.exit(1);
       }
 
-      log.info(`Ingesting markdown: ${glob}`);
+      const isTTY = process.stdout.isTTY;
+      if (isTTY) log.info(`Ingesting markdown: ${glob}`);
       try {
         const result = await ingestMarkdown(graph, glob);
-        log.success(
-          [
-            "Markdown ingestion complete",
-            `  Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
-          ].join("\n"),
-        );
+        if (isTTY) {
+          log.success(
+            [
+              "Markdown ingestion complete",
+              `  Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
+            ].join("\n"),
+          );
+        }
       } catch (err) {
-        log.error(
-          `Markdown ingestion failed: ${err instanceof Error ? err.message : String(err)}`,
+        process.stderr.write(
+          `Markdown ingestion failed: ${err instanceof Error ? err.message : String(err)}\n`,
         );
         closeGraph(graph);
         process.exit(1);
