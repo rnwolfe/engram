@@ -27,7 +27,7 @@ import { execSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-const MAESTRO_DIR = path.join(process.env.HOME!, "dev/Maestro");
+const MAESTRO_DIR = path.join(process.env.HOME ?? "", "dev/Maestro");
 const DB = path.join(MAESTRO_DIR, ".engram");
 const TOKEN_BUDGET = 6000;
 const OUT_DIR = path.join(import.meta.dir);
@@ -147,7 +147,7 @@ function askGemini(prompt: string, cwd: string): string {
       // Extract reset delay from error if available
       const retryMsMatch = msg.match(/"retryDelayMs":(\d+)/);
       const waitMs = retryMsMatch
-        ? parseInt(retryMsMatch[1]) + 5_000
+        ? parseInt(retryMsMatch[1], 10) + 5_000
         : 35 * 60 * 1000;
       if (isQuota && attempt < MAX_RETRIES - 1) {
         const waitMin = Math.ceil(waitMs / 60_000);
@@ -262,7 +262,7 @@ async function main() {
     );
   }
   const activeQuestions = questionFilter
-    ? QUESTIONS.filter((q) => questionFilter!.has(q.id))
+    ? QUESTIONS.filter((q) => questionFilter?.has(q.id))
     : QUESTIONS;
 
   if (activeQuestions.length === 0) {

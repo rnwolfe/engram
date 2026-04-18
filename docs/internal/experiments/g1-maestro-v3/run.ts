@@ -21,7 +21,7 @@ import { execSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-const MAESTRO_DIR = path.join(process.env.HOME!, "dev/Maestro");
+const MAESTRO_DIR = path.join(process.env.HOME ?? "", "dev/Maestro");
 const DB = path.join(MAESTRO_DIR, ".engram");
 const TOKEN_BUDGET = 6000;
 const OUT_DIR = path.join(import.meta.dir);

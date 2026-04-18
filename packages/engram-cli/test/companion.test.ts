@@ -72,11 +72,11 @@ describe("engram companion — harness overrides", () => {
   });
 
   it("cursor override references .cursor/rules/", () => {
-    expect(HARNESS_OVERRIDES["cursor"]).toContain(".cursor/rules/");
+    expect(HARNESS_OVERRIDES.cursor).toContain(".cursor/rules/");
   });
 
   it("gemini override references GEMINI.md", () => {
-    expect(HARNESS_OVERRIDES["gemini"]).toContain("GEMINI.md");
+    expect(HARNESS_OVERRIDES.gemini).toContain("GEMINI.md");
   });
 });
 
