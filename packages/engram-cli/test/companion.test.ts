@@ -7,8 +7,14 @@
  */
 
 import { describe, expect, it } from "bun:test";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Command } from "commander";
-import { registerCompanion } from "../src/commands/companion.js";
+import {
+  companionSentinel,
+  registerCompanion,
+} from "../src/commands/companion.js";
 import { BASE_COMPANION } from "../src/templates/companion/base.js";
 import { HARNESS_OVERRIDES } from "../src/templates/companion/overrides.js";
 
@@ -37,6 +43,15 @@ async function captureStdout(fn: () => Promise<void> | void): Promise<string> {
     process.stdout.write = orig;
   }
   return chunks.join("");
+}
+
+function tmpFile(content?: string): string {
+  const dir = mkdtempSync(join(tmpdir(), "engram-companion-"));
+  const path = join(dir, "CLAUDE.md");
+  if (content !== undefined) {
+    writeFileSync(path, content, "utf8");
+  }
+  return path;
 }
 
 describe("engram companion — base template", () => {
@@ -85,6 +100,20 @@ describe("engram companion — harness overrides", () => {
   });
 });
 
+describe("engram companion — sentinel", () => {
+  it("sentinel is harness-specific", () => {
+    expect(companionSentinel("claude-code")).toBe(
+      "<!-- engram-companion:claude-code -->",
+    );
+    expect(companionSentinel("cursor")).toBe(
+      "<!-- engram-companion:cursor -->",
+    );
+    expect(companionSentinel("generic")).toBe(
+      "<!-- engram-companion:generic -->",
+    );
+  });
+});
+
 describe("engram companion — CLI command output", () => {
   it("default (generic) output contains base content and invocation example", async () => {
     const program = makeProgram();
@@ -96,6 +125,21 @@ describe("engram companion — CLI command output", () => {
     expect(output).toContain("engram context");
     expect(output).toContain("Possibly relevant discussions");
     expect(output).toContain("Structural signals");
+  });
+
+  it("output includes harness-specific sentinel", async () => {
+    const program = makeProgram();
+    registerCompanion(program);
+    const output = await captureStdout(() =>
+      program.parseAsync([
+        "node",
+        "engram",
+        "companion",
+        "--harness",
+        "claude-code",
+      ]),
+    );
+    expect(output).toContain("<!-- engram-companion:claude-code -->");
   });
 
   it("--harness claude-code output references CLAUDE.md", async () => {
@@ -181,5 +225,214 @@ describe("engram companion — CLI command output", () => {
       program.parseAsync(["node", "engram", "companion"]),
     );
     expect(output.at(-1)).toBe("\n");
+  });
+});
+
+describe("engram companion — --check flag", () => {
+  it("--check without --file exits 1 with error message", async () => {
+    const program = makeProgram();
+    registerCompanion(program);
+    let exitCode: number | undefined;
+    const origExit = process.exit.bind(process);
+    process.exit = ((code?: number) => {
+      exitCode = code;
+      throw new Error("exit");
+    }) as typeof process.exit;
+    const errors: string[] = [];
+    const origError = console.error;
+    console.error = (...args: unknown[]) => errors.push(args.join(" "));
+    try {
+      await program.parseAsync(["node", "engram", "companion", "--check"]);
+    } catch {
+      // expected exit throw
+    } finally {
+      process.exit = origExit;
+      console.error = origError;
+    }
+    expect(exitCode).toBe(1);
+    expect(errors.join(" ")).toContain("--check requires --file");
+  });
+
+  it("--check exits 1 when file does not exist", async () => {
+    const program = makeProgram();
+    registerCompanion(program);
+    let exitCode: number | undefined;
+    const origExit = process.exit.bind(process);
+    process.exit = ((code?: number) => {
+      exitCode = code;
+      throw new Error("exit");
+    }) as typeof process.exit;
+    try {
+      await program.parseAsync([
+        "node",
+        "engram",
+        "companion",
+        "--check",
+        "--file",
+        "/nonexistent/path/CLAUDE.md",
+      ]);
+    } catch {
+      // expected exit throw
+    } finally {
+      process.exit = origExit;
+    }
+    expect(exitCode).toBe(1);
+  });
+
+  it("--check exits 1 when sentinel is absent from file", async () => {
+    const file = tmpFile("# Some content\nno sentinel here\n");
+    const program = makeProgram();
+    registerCompanion(program);
+    let exitCode: number | undefined;
+    const origExit = process.exit.bind(process);
+    process.exit = ((code?: number) => {
+      exitCode = code;
+      throw new Error("exit");
+    }) as typeof process.exit;
+    try {
+      await program.parseAsync([
+        "node",
+        "engram",
+        "companion",
+        "--check",
+        "--file",
+        file,
+      ]);
+    } catch {
+      // expected exit throw
+    } finally {
+      process.exit = origExit;
+    }
+    expect(exitCode).toBe(1);
+  });
+
+  it("--check exits 0 when sentinel is present in file", async () => {
+    const sentinel = companionSentinel("generic");
+    const file = tmpFile(`# CLAUDE.md\n${sentinel}\nsome content\n`);
+    const program = makeProgram();
+    registerCompanion(program);
+    let exitCode: number | undefined;
+    const origExit = process.exit.bind(process);
+    process.exit = ((code?: number) => {
+      exitCode = code;
+      throw new Error("exit");
+    }) as typeof process.exit;
+    try {
+      await program.parseAsync([
+        "node",
+        "engram",
+        "companion",
+        "--check",
+        "--file",
+        file,
+      ]);
+    } catch {
+      // expected exit throw
+    } finally {
+      process.exit = origExit;
+    }
+    expect(exitCode).toBe(0);
+  });
+
+  it("--check is harness-specific — cursor sentinel not detected as claude-code", async () => {
+    const cursorSentinel = companionSentinel("cursor");
+    const file = tmpFile(`# rules\n${cursorSentinel}\nsome content\n`);
+    const program = makeProgram();
+    registerCompanion(program);
+    let exitCode: number | undefined;
+    const origExit = process.exit.bind(process);
+    process.exit = ((code?: number) => {
+      exitCode = code;
+      throw new Error("exit");
+    }) as typeof process.exit;
+    try {
+      await program.parseAsync([
+        "node",
+        "engram",
+        "companion",
+        "--check",
+        "--harness",
+        "claude-code",
+        "--file",
+        file,
+      ]);
+    } catch {
+      // expected exit throw
+    } finally {
+      process.exit = origExit;
+    }
+    expect(exitCode).toBe(1);
+  });
+
+  it("--check produces no stdout output", async () => {
+    const sentinel = companionSentinel("claude-code");
+    const file = tmpFile(`${sentinel}\n`);
+    const program = makeProgram();
+    registerCompanion(program);
+    const origExit = process.exit.bind(process);
+    process.exit = ((code?: number) => {
+      throw new Error(`exit:${code}`);
+    }) as typeof process.exit;
+    let stdout = "";
+    try {
+      stdout = await captureStdout(() =>
+        program.parseAsync([
+          "node",
+          "engram",
+          "companion",
+          "--check",
+          "--harness",
+          "claude-code",
+          "--file",
+          file,
+        ]),
+      );
+    } catch {
+      // expected exit throw
+    } finally {
+      process.exit = origExit;
+    }
+    expect(stdout).toBe("");
+  });
+
+  it("appending twice then --check exits 0 (idempotent)", async () => {
+    const program1 = makeProgram();
+    registerCompanion(program1);
+    const output = await captureStdout(() =>
+      program1.parseAsync([
+        "node",
+        "engram",
+        "companion",
+        "--harness",
+        "claude-code",
+      ]),
+    );
+    const file = tmpFile(output + output);
+
+    const program2 = makeProgram();
+    registerCompanion(program2);
+    let exitCode: number | undefined;
+    const origExit = process.exit.bind(process);
+    process.exit = ((code?: number) => {
+      exitCode = code;
+      throw new Error("exit");
+    }) as typeof process.exit;
+    try {
+      await program2.parseAsync([
+        "node",
+        "engram",
+        "companion",
+        "--check",
+        "--harness",
+        "claude-code",
+        "--file",
+        file,
+      ]);
+    } catch {
+      // expected exit throw
+    } finally {
+      process.exit = origExit;
+    }
+    expect(exitCode).toBe(0);
   });
 });
