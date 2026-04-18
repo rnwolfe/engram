@@ -1,9 +1,3 @@
-/**
- * history.ts — `engram history` command.
- *
- * Shows the temporal evolution of facts for an entity or between two entities.
- */
-
 import * as path from "node:path";
 import type { Command } from "commander";
 import type { EngramGraph } from "engram-core";
@@ -18,6 +12,7 @@ import {
 
 interface HistoryOpts {
   db: string;
+  format: string;
 }
 
 function resolveEntityByNameOrId(
@@ -34,6 +29,7 @@ export function registerHistory(program: Command): void {
       "Show temporal fact evolution for an entity or between two entities",
     )
     .option("--db <path>", "path to .engram file", ".engram")
+    .option("--format <fmt>", "output format: text or json", "text")
     .addHelpText(
       "after",
       `
@@ -43,6 +39,9 @@ Examples:
 
   # Show history between two entities
   engram history <entity-id-1> <entity-id-2>
+
+  # Machine-readable JSON output
+  engram history <entity-id> --format json
 
 When to use:
   Trace how a fact about an entity changed over time — superseded edges,
@@ -58,6 +57,11 @@ See also:
         entity2Arg: string | undefined,
         opts: HistoryOpts,
       ) => {
+        if (opts.format !== "text" && opts.format !== "json") {
+          console.error("Error: --format must be 'text' or 'json'");
+          process.exit(1);
+        }
+
         const dbPath = path.resolve(opts.db);
 
         let graph: EngramGraph | undefined;
@@ -65,7 +69,9 @@ See also:
           graph = openGraph(dbPath);
         } catch (err) {
           console.error(
-            `Error opening graph: ${err instanceof Error ? err.message : String(err)}`,
+            `Error opening graph: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
           );
           process.exit(1);
         }
@@ -79,7 +85,6 @@ See also:
           }
 
           if (entity2Arg) {
-            // Show history between two entities
             const entity2 = resolveEntityByNameOrId(graph, entity2Arg);
             if (!entity2) {
               console.error(`Entity not found: ${entity2Arg}`);
@@ -88,6 +93,32 @@ See also:
             }
 
             const edges = getFactHistory(graph, entity1.id, entity2.id);
+
+            if (opts.format === "json") {
+              console.log(
+                JSON.stringify(
+                  {
+                    entity1: entity1.canonical_name,
+                    entity2: entity2.canonical_name,
+                    edges: edges.map((edge) => ({
+                      id: edge.id,
+                      fact: edge.fact,
+                      edge_kind: edge.edge_kind,
+                      relation_type: edge.relation_type,
+                      valid_from: edge.valid_from ?? null,
+                      valid_until: edge.valid_until ?? null,
+                      invalidated_at: edge.invalidated_at ?? null,
+                      superseded_by: edge.superseded_by ?? null,
+                    })),
+                  },
+                  null,
+                  2,
+                ),
+              );
+              closeGraph(graph);
+              return;
+            }
+
             console.log(
               `History: ${entity1.canonical_name} → ${entity2.canonical_name}`,
             );
@@ -106,7 +137,6 @@ See also:
               }
             }
           } else {
-            // Show all edges for entity1 with temporal info
             const outEdges = findEdges(graph, {
               source_id: entity1.id,
               include_invalidated: true,
@@ -118,6 +148,31 @@ See also:
             const allEdges = [...outEdges, ...inEdges].sort((a, b) =>
               a.created_at.localeCompare(b.created_at),
             );
+
+            if (opts.format === "json") {
+              console.log(
+                JSON.stringify(
+                  {
+                    entity1: entity1.canonical_name,
+                    entity2: null,
+                    edges: allEdges.map((edge) => ({
+                      id: edge.id,
+                      fact: edge.fact,
+                      edge_kind: edge.edge_kind,
+                      relation_type: edge.relation_type,
+                      valid_from: edge.valid_from ?? null,
+                      valid_until: edge.valid_until ?? null,
+                      invalidated_at: edge.invalidated_at ?? null,
+                      superseded_by: edge.superseded_by ?? null,
+                    })),
+                  },
+                  null,
+                  2,
+                ),
+              );
+              closeGraph(graph);
+              return;
+            }
 
             console.log(`History: ${entity1.canonical_name}`);
             console.log(`${allEdges.length} fact(s)\n`);
