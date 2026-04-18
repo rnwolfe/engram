@@ -166,6 +166,7 @@ interface ContextOpts {
   format: "md" | "json";
   /** Minimum normalized confidence (0.0–1.0) for a discussion hit to be included. */
   minConfidence: number;
+  verbose: boolean;
 }
 
 interface EnrichedEntity {
@@ -1210,10 +1211,15 @@ async function assembleContextPack(
   // Fix 3: Suggest enrichment when the pack is sparse and no discussions found.
   // A pack with fewer than 3 entities and no confident discussion hits is likely
   // the result of an under-populated knowledge base (no markdown or source ingestion).
-  if (entities.length < 3 && discussions.length === 0) {
+  // Gate on --verbose or TTY so CI pipelines are not spammed on every query.
+  if (
+    entities.length < 3 &&
+    discussions.length === 0 &&
+    (opts.verbose || process.stderr.isTTY)
+  ) {
     process.stderr.write(
-      "Note: fewer than 3 entities found. Run 'engram ingest md <docs-dir>' or\n" +
-        "'engram ingest source' to enrich the knowledge base.\n",
+      "Note: fewer than 3 entities found. Run 'engram ingest md <docs-dir>'" +
+        " or\n'engram ingest source' to enrich the knowledge base.\n",
     );
   }
 
@@ -1238,6 +1244,7 @@ interface ContextCommandOpts {
   format: string;
   db: string;
   minConfidence: string;
+  verbose: boolean;
 }
 
 export function registerContext(program: Command): void {
@@ -1253,6 +1260,11 @@ export function registerContext(program: Command): void {
       "--min-confidence <n>",
       "minimum confidence (0.0–1.0) for a discussion hit to be included; prefer silence to noise",
       "0.0",
+    )
+    .option(
+      "--verbose",
+      "emit diagnostic notes (e.g. sparse-results hint) to stderr",
+      false,
     )
     .addHelpText(
       "after",
@@ -1319,6 +1331,7 @@ See also:
           tokenBudget,
           format: opts.format as "md" | "json",
           minConfidence,
+          verbose: opts.verbose,
         });
 
         if (opts.format === "json") {
