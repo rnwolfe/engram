@@ -166,6 +166,20 @@ describe("engram context --max-entities", () => {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  it("rejects zero value", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      createGraph(dbPath).db.close();
+      const { exitCode } = await runContextCapture(dbPath, [
+        "--max-entities",
+        "0",
+      ]);
+      expect(exitCode).toBe(1);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("engram context --max-edges", () => {
@@ -190,6 +204,20 @@ describe("engram context --max-edges", () => {
       const { exitCode } = await runContextCapture(dbPath, [
         "--max-edges",
         "-1",
+      ]);
+      expect(exitCode).toBe(1);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects zero value", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      createGraph(dbPath).db.close();
+      const { exitCode } = await runContextCapture(dbPath, [
+        "--max-edges",
+        "0",
       ]);
       expect(exitCode).toBe(1);
     } finally {

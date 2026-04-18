@@ -1354,8 +1354,10 @@ See also:
       let maxEntities: number | undefined;
       if (opts.maxEntities !== undefined) {
         maxEntities = parseInt(opts.maxEntities, 10);
-        if (Number.isNaN(maxEntities) || maxEntities < 0) {
-          console.error("Error: --max-entities must be a non-negative integer");
+        if (Number.isNaN(maxEntities) || maxEntities < 1) {
+          console.error(
+            "Error: --max-entities must be a positive integer",
+          );
           process.exit(1);
         }
       }
@@ -1363,8 +1365,8 @@ See also:
       let maxEdges: number | undefined;
       if (opts.maxEdges !== undefined) {
         maxEdges = parseInt(opts.maxEdges, 10);
-        if (Number.isNaN(maxEdges) || maxEdges < 0) {
-          console.error("Error: --max-edges must be a non-negative integer");
+        if (Number.isNaN(maxEdges) || maxEdges < 1) {
+          console.error("Error: --max-edges must be a positive integer");
           process.exit(1);
         }
       }
