@@ -174,7 +174,9 @@ export async function reindexEmbeddings(
          ORDER BY id`
       : "SELECT id, content FROM episodes WHERE status != 'redacted' ORDER BY id";
     const rows = gapOnly
-      ? graph.db.query<{ id: string; content: string }, [string]>(sql).all(newModel)
+      ? graph.db
+          .query<{ id: string; content: string }, [string]>(sql)
+          .all(newModel)
       : graph.db.query<{ id: string; content: string }, []>(sql).all();
     for (const r of rows) {
       workItems.push({ kind: "episode", id: r.id, text: r.content });
@@ -246,7 +248,9 @@ export async function reindexEmbeddings(
   if (gapOnly) {
     if (newDimensions > 0) {
       const existing = graph.db
-        .query<{ model: string }, []>("SELECT model FROM embedding_model LIMIT 1")
+        .query<{ model: string }, []>(
+          "SELECT model FROM embedding_model LIMIT 1",
+        )
         .get();
       if (!existing) {
         setEmbeddingModel(graph, newModel, newDimensions);

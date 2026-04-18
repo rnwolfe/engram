@@ -20,7 +20,6 @@ import {
   countEmbeddings,
   GeminiProvider,
   getEmbeddingModel,
-  NullProvider,
   OllamaProvider,
   openGraph,
   reindexEmbeddings,
@@ -510,7 +509,10 @@ export function registerEmbed(program: Command): void {
       "Manage embeddings for semantic search. For FTS index rebuilding, see engram rebuild-index.",
     )
     .option("--reindex", "clear and rebuild the vector index")
-    .option("--fill", "embed only items missing an embedding (preserves existing index)")
+    .option(
+      "--fill",
+      "embed only items missing an embedding (preserves existing index)",
+    )
     .option("--check", "validate stored model matches configured provider")
     .option(
       "--enable",

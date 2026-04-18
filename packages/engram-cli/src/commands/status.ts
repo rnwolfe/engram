@@ -229,11 +229,17 @@ function collectEmbedding(graph: EngramGraph): EmbeddingSection {
   } else {
     // ENGRAM_AI_PROVIDER not set ("null") or unrecognised — auto-detect from stored model + available API keys
     const modelName = stored?.model ?? "";
-    if (modelName.startsWith("nomic") || modelName.startsWith("mxbai") || modelName.startsWith("all-minilm")) {
+    if (
+      modelName.startsWith("nomic") ||
+      modelName.startsWith("mxbai") ||
+      modelName.startsWith("all-minilm")
+    ) {
       provider = "ollama";
       providerEndpoint = ollamaEndpoint;
     } else if (
-      (modelName.startsWith("gemini-") || modelName === "text-embedding-004" || modelName.startsWith("models/")) &&
+      (modelName.startsWith("gemini-") ||
+        modelName === "text-embedding-004" ||
+        modelName.startsWith("models/")) &&
       (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY)
     ) {
       provider = "google";

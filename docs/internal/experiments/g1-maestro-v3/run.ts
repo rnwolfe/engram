@@ -21,7 +21,7 @@ import { execSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-const MAESTRO_DIR = path.join(process.env.HOME!, "dev/Maestro");
+const MAESTRO_DIR = path.join(process.env.HOME ?? "", "dev/Maestro");
 const DB = path.join(MAESTRO_DIR, ".engram");
 const TOKEN_BUDGET = 6000;
 const OUT_DIR = path.join(import.meta.dir);
@@ -123,7 +123,9 @@ function askGemini(prompt: string, cwd: string): string {
     fs.unlinkSync(tmpFile);
     return result.trim();
   } catch (err) {
-    try { fs.unlinkSync(tmpFile); } catch {}
+    try {
+      fs.unlinkSync(tmpFile);
+    } catch {}
     return `[gemini failed: ${err instanceof Error ? err.message : String(err)}]`;
   }
 }
@@ -146,7 +148,9 @@ async function main() {
   try {
     execSync("gemini --version", { encoding: "utf8" });
   } catch {
-    console.error("Error: gemini CLI not found. Install and authenticate first.");
+    console.error(
+      "Error: gemini CLI not found. Install and authenticate first.",
+    );
     process.exit(1);
   }
 
@@ -161,7 +165,9 @@ async function main() {
     process.exit(1);
   }
 
-  console.log("Gate G1 Maestro v3 — same questions as v2, updated pack with direct episode track");
+  console.log(
+    "Gate G1 Maestro v3 — same questions as v2, updated pack with direct episode track",
+  );
   console.log(`Maestro dir: ${MAESTRO_DIR}`);
   console.log(`DB: ${DB}`);
   console.log(`Token budget: ${TOKEN_BUDGET}`);
@@ -176,8 +182,11 @@ async function main() {
     process.stdout.write("  → context pack… ");
     const contextPack = getContextPack(q.question);
     const packLines = contextPack.split("\n").length;
-    const discussionCount = (contextPack.match(/### Discussions/g) || []).length;
-    console.log(`${packLines} lines${discussionCount > 0 ? " (includes Discussions section)" : ""}`);
+    const discussionCount = (contextPack.match(/### Discussions/g) || [])
+      .length;
+    console.log(
+      `${packLines} lines${discussionCount > 0 ? " (includes Discussions section)" : ""}`,
+    );
 
     // Build prompts
     const promptBare = q.question;
@@ -221,7 +230,9 @@ async function main() {
   const lines: string[] = [];
   lines.push("# G1 Maestro v3 — Raw Results");
   lines.push("");
-  lines.push("> Updated pack with direct episode search track — PR/issue discussions");
+  lines.push(
+    "> Updated pack with direct episode search track — PR/issue discussions",
+  );
   lines.push("> surfaced as first-class content alongside code entities.");
   lines.push("> Same 9 questions as v2 for direct comparison.");
   lines.push(`> Both conditions run from cwd=${MAESTRO_DIR}.`);
@@ -235,7 +246,9 @@ async function main() {
 
     // Show whether discussions section appeared in pack
     const hasDiscussions = r.context_pack.includes("### Discussions");
-    lines.push(`**Context pack:** ${r.context_pack.split("\n").length} lines${hasDiscussions ? " — includes Discussions section" : ""}`);
+    lines.push(
+      `**Context pack:** ${r.context_pack.split("\n").length} lines${hasDiscussions ? " — includes Discussions section" : ""}`,
+    );
     lines.push("");
     lines.push("<details><summary>Full context pack</summary>");
     lines.push("");
