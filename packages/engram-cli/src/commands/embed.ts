@@ -20,7 +20,6 @@ import {
   countEmbeddings,
   GeminiProvider,
   getEmbeddingModel,
-  NullProvider,
   OllamaProvider,
   openGraph,
   reindexEmbeddings,

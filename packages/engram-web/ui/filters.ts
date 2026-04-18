@@ -37,7 +37,7 @@ const activeFilters = {
 };
 
 let cytoscapeInstance: Core | null = null;
-let reLayoutCallback: (() => void) | null = null;
+let _reLayoutCallback: (() => void) | null = null;
 
 export function applyFilters(): void {
   const cy = cytoscapeInstance;
@@ -147,7 +147,7 @@ function buildCheckboxSection(
 
 export function initFilters(cy: Core, data: GraphData, onReLayout: () => void): void {
   cytoscapeInstance = cy;
-  reLayoutCallback = onReLayout;
+  _reLayoutCallback = onReLayout;
 
   // Reset state (handles time-slider re-inits)
   activeFilters.entityTypes.clear();

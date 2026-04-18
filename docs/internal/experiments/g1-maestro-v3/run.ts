@@ -123,7 +123,9 @@ function askGemini(prompt: string, cwd: string): string {
     fs.unlinkSync(tmpFile);
     return result.trim();
   } catch (err) {
-    try { fs.unlinkSync(tmpFile); } catch {}
+    try {
+      fs.unlinkSync(tmpFile);
+    } catch {}
     return `[gemini failed: ${err instanceof Error ? err.message : String(err)}]`;
   }
 }
