@@ -14,6 +14,7 @@ import {
 interface ShowOpts {
   db: string;
   format: string;
+  j?: boolean;
 }
 
 export function registerShow(program: Command): void {
@@ -22,6 +23,7 @@ export function registerShow(program: Command): void {
     .description("Show entity details, edges, and evidence")
     .option("--db <path>", "path to .engram file", ".engram")
     .option("--format <fmt>", "output format: text or json", "text")
+    .option("-j", "shorthand for --format json")
     .addHelpText(
       "after",
       `
@@ -44,6 +46,7 @@ See also:
   engram history   trace how facts about an entity changed over time`,
     )
     .action((entityArg: string, opts: ShowOpts) => {
+      if (opts.j) opts.format = "json";
       if (opts.format !== "text" && opts.format !== "json") {
         console.error("--format must be 'text' or 'json'");
         process.exit(1);

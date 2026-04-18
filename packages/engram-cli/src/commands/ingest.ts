@@ -233,7 +233,7 @@ See also:
       "skip .gitignore application (denylist still applies)",
     )
     .option("--dry-run", "walk and report counts without writing")
-    .option("--verbose", "emit per-file progress output")
+    .option("-v, --verbose", "emit per-file progress output")
     .option("--db <path>", "path to .engram file", ".engram")
     .action(async (sourcePath: string | undefined, opts: IngestSourceOpts) => {
       if (process.stdout.isTTY) intro("engram ingest source");
@@ -380,7 +380,7 @@ See also:
     )
     .option("--repo <owner/repo>", "repository in owner/repo format")
     .option(
-      "--verbose",
+      "-v, --verbose",
       "print extra details (auth mode, rate limit info)",
       false,
     )

@@ -24,6 +24,7 @@ interface OwnershipOpts {
   format: string;
   minConfidence: string;
   db: string;
+  j?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -112,6 +113,7 @@ export function registerOwnership(program: Command): void {
     .option("--limit <n>", "maximum number of entries to show", "20")
     .option("--module <path>", "scope to entities under this path prefix")
     .option("--format <fmt>", "output format: table or json", "table")
+    .option("-j", "shorthand for --format json")
     .option(
       "--min-confidence <f>",
       "minimum likely_owner_of edge confidence (0.0-1.0)",
@@ -140,6 +142,7 @@ See also:
   engram stats     quick count of graph contents`,
     )
     .action((opts: OwnershipOpts) => {
+      if (opts.j) opts.format = "json";
       const dbPath = resolveDbPath(path.resolve(opts.db));
       const limit = parseInt(opts.limit, 10);
       const minConfidence = parseFloat(opts.minConfidence);

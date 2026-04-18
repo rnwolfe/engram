@@ -22,6 +22,7 @@ interface SearchOpts {
   validAt?: string;
   format: string;
   db: string;
+  j?: boolean;
 }
 
 export function registerSearch(program: Command): void {
@@ -31,6 +32,7 @@ export function registerSearch(program: Command): void {
     .option("--limit <n>", "maximum results to return", "20")
     .option("--valid-at <iso>", "filter edges valid at this ISO8601 timestamp")
     .option("--format <fmt>", "output format: text or json", "text")
+    .option("-j", "shorthand for --format json")
     .option("--db <path>", "path to .engram file", ".engram")
     .addHelpText(
       "after",
@@ -54,6 +56,7 @@ See also:
   engram show      display full entity details by ID`,
     )
     .action(async (query: string, opts: SearchOpts) => {
+      if (opts.j) opts.format = "json";
       const dbPath = resolveDbPath(path.resolve(opts.db));
       const limit = parseInt(opts.limit, 10);
 

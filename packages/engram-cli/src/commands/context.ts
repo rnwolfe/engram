@@ -1264,6 +1264,7 @@ interface ContextCommandOpts {
   verbose: boolean;
   maxEntities?: string;
   maxEdges?: string;
+  j?: boolean;
 }
 
 export function registerContext(program: Command): void {
@@ -1274,6 +1275,7 @@ export function registerContext(program: Command): void {
     )
     .option("--token-budget <n>", "max tokens in the assembled pack", "8000")
     .option("--format <fmt>", "output format: md or json", "md")
+    .option("-j", "shorthand for --format json")
     .option("--db <path>", "path to .engram file", ".engram")
     .option(
       "--min-confidence <n>",
@@ -1281,7 +1283,7 @@ export function registerContext(program: Command): void {
       "0.0",
     )
     .option(
-      "--verbose",
+      "-v, --verbose",
       "emit diagnostic notes (e.g. sparse-results hint) to stderr",
       false,
     )
@@ -1325,6 +1327,7 @@ See also:
   engram ingest git  Populate the knowledge graph from git history`,
     )
     .action(async (query: string, opts: ContextCommandOpts) => {
+      if (opts.j) opts.format = "json";
       const dbPath = resolveDbPath(path.resolve(opts.db));
       const tokenBudget = parseInt(opts.tokenBudget, 10);
       const minConfidence = parseFloat(opts.minConfidence);

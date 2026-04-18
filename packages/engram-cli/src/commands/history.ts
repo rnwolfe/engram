@@ -14,6 +14,7 @@ import {
 interface HistoryOpts {
   db: string;
   format: string;
+  j?: boolean;
 }
 
 function resolveEntityByNameOrId(
@@ -31,6 +32,7 @@ export function registerHistory(program: Command): void {
     )
     .option("--db <path>", "path to .engram file", ".engram")
     .option("--format <fmt>", "output format: text or json", "text")
+    .option("-j", "shorthand for --format json")
     .addHelpText(
       "after",
       `
@@ -58,6 +60,7 @@ See also:
         entity2Arg: string | undefined,
         opts: HistoryOpts,
       ) => {
+        if (opts.j) opts.format = "json";
         if (opts.format !== "text" && opts.format !== "json") {
           console.error("Error: --format must be 'text' or 'json'");
           process.exit(1);
