@@ -7,7 +7,7 @@
  * Exit codes:
  *   0 — all OK
  *   1 — DB cannot be opened
- *   2 — embedding model not recorded
+ *   2 — embedding model not recorded (absent from metadata; "none" is valid)
  *   3 — embedding provider reachability failed
  *   4 — generation provider reachability failed (only if configured)
  */
@@ -482,18 +482,27 @@ function printHuman(status: StatusOutput, noVerify: boolean): void {
 
   // Embedding
   console.log("Embedding");
-  const modelStr = embedding.model
-    ? `${embedding.model}${embedding.dimensions ? ` (${embedding.dimensions} dims)` : ""}`
-    : "(not recorded)";
+  let modelStr: string;
+  if (embedding.model === "none") {
+    modelStr = "BM25 only (no vector search)";
+  } else if (embedding.model) {
+    modelStr = `${embedding.model}${embedding.dimensions ? ` (${embedding.dimensions} dims)` : ""}`;
+  } else {
+    modelStr = "(not recorded)";
+  }
   console.log(`  Model:           ${modelStr}`);
 
   let providerLine: string;
   if (embedding.provider === "ollama") {
     providerLine = `ollama @ ${embedding.providerEndpoint}${reachIcon(embedding.reachability)}`;
   } else if (embedding.provider === "none") {
-    providerLine = embedding.model
-      ? "none (set ENGRAM_AI_PROVIDER or the matching API key)"
-      : "none (set ENGRAM_AI_PROVIDER)";
+    if (embedding.model === "none") {
+      providerLine = "none (BM25-only mode)";
+    } else if (embedding.model) {
+      providerLine = "none (set ENGRAM_AI_PROVIDER or the matching API key)";
+    } else {
+      providerLine = "none (set ENGRAM_AI_PROVIDER)";
+    }
   } else {
     providerLine = `${embedding.provider}${reachIcon(embedding.reachability)}`;
   }
@@ -706,7 +715,7 @@ See also:
         // Determine exit code
         let exitCode = 0;
 
-        if (!embeddingSection.model) {
+        if (embeddingSection.model === null) {
           exitCode = 2;
         } else if (
           embeddingSection.reachability &&
