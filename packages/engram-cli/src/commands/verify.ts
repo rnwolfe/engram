@@ -142,7 +142,9 @@ See also:
         return;
       }
 
-      console.error(c.red(`Found ${violations.length} integrity violation(s):`));
+      console.error(
+        c.red(`Found ${violations.length} integrity violation(s):`),
+      );
       for (const v of violations) {
         console.error(c.red(`  - ${v}`));
       }
