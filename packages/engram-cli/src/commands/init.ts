@@ -27,6 +27,19 @@ import {
   resolveDbPath,
   setEmbeddingModel,
 } from "engram-core";
+import {
+  appendCompanionToFiles,
+  type CompanionSummary,
+  detectGitHubRemote,
+  detectHarnessFiles,
+  type GitHubEnrichSummary,
+  type HarnessFile,
+  runGitHubEnrich,
+} from "./init-pipeline.js";
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
 const EMBEDDING_DIMENSIONS: Record<string, number> = {
   "mxbai-embed-large": 1024,
@@ -36,6 +49,10 @@ const EMBEDDING_DIMENSIONS: Record<string, number> = {
 
 const KNOWN_EMBEDDING_MODELS = new Set(Object.keys(EMBEDDING_DIMENSIONS));
 KNOWN_EMBEDDING_MODELS.add("none");
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface InitOpts {
   fromGit?: string;
@@ -48,18 +65,29 @@ interface InitOpts {
   ingestMd?: string;
   ingestSource?: boolean;
   embed?: boolean;
+  format?: string;
+  githubRepo?: string;
 }
+
+// ---------------------------------------------------------------------------
+// Utility helpers
+// ---------------------------------------------------------------------------
 
 function cancelAndExit(): never {
   log.error("Cancelled.");
   process.exit(1);
 }
 
+function assertNotCancel<T>(val: T | symbol): T {
+  if (isCancel(val)) cancelAndExit();
+  return val as T;
+}
+
 /**
- * Prepares the directory for a new engram database:
+ * Prepare the directory for a new engram database:
  *  - Creates the directory at `dbDir` if it doesn't already exist.
- *  - Appends `<dirName>/` to the nearest `.gitignore` (if one exists in cwd)
- *    when that pattern isn't already present, and only when dbDir is inside cwd.
+ *  - Appends `<dirName>/` to the nearest `.gitignore` when that pattern isn't
+ *    already present, and only when dbDir is inside cwd.
  */
 function prepareDbDirectory(dbDir: string): void {
   if (!fs.existsSync(dbDir)) {
@@ -67,11 +95,7 @@ function prepareDbDirectory(dbDir: string): void {
   }
 
   const cwd = process.cwd();
-  // Only update .gitignore when the db directory lives inside the current working directory.
-  // This avoids polluting gitignore files when the db is in /tmp or another unrelated location.
-  if (!dbDir.startsWith(cwd + path.sep) && dbDir !== cwd) {
-    return;
-  }
+  if (!dbDir.startsWith(cwd + path.sep) && dbDir !== cwd) return;
 
   const gitignorePath = path.join(cwd, ".gitignore");
   const dirName = path.basename(dbDir);
@@ -87,11 +111,6 @@ function prepareDbDirectory(dbDir: string): void {
       fs.appendFileSync(gitignorePath, `${suffix}${gitignoreEntry}\n`);
     }
   }
-}
-
-function assertNotCancel<T>(val: T | symbol): T {
-  if (isCancel(val)) cancelAndExit();
-  return val as T;
 }
 
 function buildProvider(
@@ -114,12 +133,12 @@ function buildProvider(
     if (!apiKey) return null;
     return new GeminiProvider({ embedModel: embeddingModel, apiKey });
   }
-  if (embeddingModel.startsWith("text-embedding-")) {
-    // OpenAI — not yet wired for embeddings in init
-    return null;
-  }
   return null;
 }
+
+// ---------------------------------------------------------------------------
+// Step runners (shared between interactive and non-interactive)
+// ---------------------------------------------------------------------------
 
 async function runMarkdownIngest(
   graph: ReturnType<typeof createGraph>,
@@ -211,6 +230,10 @@ async function runEmbed(
   }
 }
 
+// ---------------------------------------------------------------------------
+// Interactive mode
+// ---------------------------------------------------------------------------
+
 async function runInteractive(opts: InitOpts): Promise<void> {
   intro("engram init");
 
@@ -232,9 +255,9 @@ async function runInteractive(opts: InitOpts): Promise<void> {
     process.exit(1);
   }
 
-  // Ensure the parent directory exists and .gitignore is updated
   prepareDbDirectory(path.dirname(dbPath));
 
+  // Step 1 — Git ingest
   const ingestChoice = assertNotCancel(
     await select({
       message: "Ingest git history",
@@ -249,14 +272,34 @@ async function runInteractive(opts: InitOpts): Promise<void> {
   let ingestPath: string = path.resolve(".");
   if (ingestChoice === "git-other") {
     const rawPath = assertNotCancel(
-      await text({
-        message: "Repository path",
-        placeholder: "/path/to/repo",
-      }),
+      await text({ message: "Repository path", placeholder: "/path/to/repo" }),
     );
     ingestPath = path.resolve(rawPath as string);
   }
 
+  // Step 2 — Enrichment selection
+  const repoPath = ingestChoice !== "skip" ? ingestPath : path.resolve(".");
+  const { repo: detectedRepo, hint: remoteHint } = detectGitHubRemote(repoPath);
+  const githubToken = process.env.GITHUB_TOKEN;
+  let githubRepo: string | null = null;
+
+  if (githubToken && detectedRepo) {
+    const doEnrich = assertNotCancel(
+      await confirm({
+        message: `Enrich with GitHub PRs/issues from ${detectedRepo}?`,
+        initialValue: true,
+      }),
+    ) as boolean;
+    if (doEnrich) githubRepo = detectedRepo;
+  } else if (!githubToken) {
+    log.info(
+      "GitHub enrichment: GITHUB_TOKEN not set — skipping. Set it to enable PR/issue enrichment.",
+    );
+  } else if (remoteHint) {
+    log.info(`GitHub enrichment: ${remoteHint}`);
+  }
+
+  // Embedding model
   const embeddingChoice = assertNotCancel(
     await select({
       message: "Embedding model",
@@ -293,7 +336,6 @@ async function runInteractive(opts: InitOpts): Promise<void> {
       }),
     );
     ollamaEndpoint = rawEndpoint as string;
-
     if (opts.verify) {
       const s = spinner();
       s.start("Checking Ollama reachability…");
@@ -310,10 +352,10 @@ async function runInteractive(opts: InitOpts): Promise<void> {
     const s = spinner();
     s.start("Checking OpenAI API key…");
     const reach = await checkOpenAI(process.env.OPENAI_API_KEY);
-    if (reach.ok) {
-      s.stop(`OpenAI: ${reach.message}`);
-    } else {
-      s.stop(`OpenAI key check failed: ${reach.message}`);
+    reach.ok
+      ? s.stop(`OpenAI: ${reach.message}`)
+      : s.stop(`OpenAI key check failed: ${reach.message}`);
+    if (!reach.ok) {
       if (reach.hint) log.warn(`Hint: ${reach.hint}`);
       log.warn("Continuing anyway — set the key before running embeddings.");
     }
@@ -323,10 +365,10 @@ async function runInteractive(opts: InitOpts): Promise<void> {
     const reach = await checkGoogle(
       process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY,
     );
-    if (reach.ok) {
-      s.stop(`Google: ${reach.message}`);
-    } else {
-      s.stop(`Google key check failed: ${reach.message}`);
+    reach.ok
+      ? s.stop(`Google: ${reach.message}`)
+      : s.stop(`Google key check failed: ${reach.message}`);
+    if (!reach.ok) {
       if (reach.hint) log.warn(`Hint: ${reach.hint}`);
       log.warn("Continuing anyway — set the key before running embeddings.");
     }
@@ -361,15 +403,34 @@ async function runInteractive(opts: InitOpts): Promise<void> {
   ) as string;
   const mdPath = mdRaw.trim();
 
-  // Source code
+  // Step 3 — Source ingest (always offered)
   const doSource = assertNotCancel(
-    await confirm({
-      message: "Ingest source code?",
-      initialValue: true,
-    }),
+    await confirm({ message: "Ingest source code?", initialValue: true }),
   ) as boolean;
 
-  // Embeddings — only offer if model was chosen and provider can be built
+  // Step 4 — Companion setup
+  const cwd = process.cwd();
+  const detectedHarnesses = detectHarnessFiles(cwd);
+  let companionFiles: HarnessFile[] = [];
+  if (detectedHarnesses.length > 0) {
+    const fileList = detectedHarnesses.map((h) => h.file).join(", ");
+    const doCompanion = assertNotCancel(
+      await confirm({
+        message: `Append engram context guide to: ${fileList}?`,
+        initialValue: true,
+      }),
+    ) as boolean;
+    if (doCompanion) companionFiles = detectedHarnesses;
+  } else {
+    log.info(
+      "No agent harness files found (CLAUDE.md, AGENTS.md, GEMINI.md, .cursor/rules).",
+    );
+    log.info(
+      "Run  engram companion --harness <name> >> <file>  to add one later.",
+    );
+  }
+
+  // Step 5 — Embeddings
   const provider = buildProvider(embeddingChoice, ollamaEndpoint);
   const canEmbed = provider !== null;
   let doEmbed = false;
@@ -388,15 +449,17 @@ async function runInteractive(opts: InitOpts): Promise<void> {
   log.success(`Created ${dbPath}`);
 
   if (embeddingChoice === "none") {
-    const upsert = graph.db.prepare(
-      "INSERT INTO metadata (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-    );
-    upsert.run("embedding_model", "none");
+    graph.db
+      .prepare(
+        "INSERT INTO metadata (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      )
+      .run("embedding_model", "none");
   } else {
     const dims = EMBEDDING_DIMENSIONS[embeddingChoice] ?? 0;
     setEmbeddingModel(graph, embeddingChoice, dims);
   }
 
+  // Step 1 execute
   if (ingestChoice === "git" || ingestChoice === "git-other") {
     log.info(`Ingesting git repository at ${ingestPath}…`);
     try {
@@ -418,29 +481,44 @@ async function runInteractive(opts: InitOpts): Promise<void> {
     }
   }
 
-  if (mdPath) {
-    await runMarkdownIngest(graph, mdPath);
+  // Step 2 execute — enrichment
+  if (githubRepo && githubToken) {
+    await runGitHubEnrich(graph, githubRepo, githubToken);
   }
 
-  if (doSource) {
-    await runSourceIngest(graph, path.resolve("."));
+  if (mdPath) await runMarkdownIngest(graph, mdPath);
+
+  // Step 3 execute — source
+  if (doSource) await runSourceIngest(graph, cwd);
+
+  // Step 4 execute — companion
+  if (companionFiles.length > 0) {
+    const summary = appendCompanionToFiles(cwd, companionFiles);
+    const appended = summary.appended.concat(summary.created);
+    if (appended.length > 0)
+      log.success(`Companion guide appended to: ${appended.join(", ")}`);
+    if (summary.skipped.length > 0)
+      log.info(`Companion already present in: ${summary.skipped.join(", ")}`);
   }
 
-  if (doEmbed && provider) {
-    await runEmbed(graph, provider);
-  }
+  // Step 5 execute — embed
+  if (doEmbed && provider) await runEmbed(graph, provider);
 
   closeGraph(graph);
 
   const nextSteps: string[] = [];
-  if (!doEmbed && canEmbed) {
+  if (!doEmbed && canEmbed)
     nextSteps.push("  engram embed --reindex   # generate vector embeddings");
-  }
   nextSteps.push(`  engram context "your query here" --db ${dbPath}`);
-  nextSteps.push("  engram companion >> CLAUDE.md");
+  if (detectedHarnesses.length === 0)
+    nextSteps.push("  engram companion >> CLAUDE.md");
 
   outro(["Done!", ...nextSteps].join("\n"));
 }
+
+// ---------------------------------------------------------------------------
+// Non-interactive (--yes) mode
+// ---------------------------------------------------------------------------
 
 async function runNonInteractive(opts: InitOpts): Promise<void> {
   const rawDbPath = path.resolve(opts.db);
@@ -453,11 +531,9 @@ async function runNonInteractive(opts: InitOpts): Promise<void> {
     process.exit(1);
   }
 
-  // Ensure the parent directory exists and .gitignore is updated
   prepareDbDirectory(path.dirname(dbPath));
 
   const embeddingModel = opts.embeddingModel ?? "mxbai-embed-large";
-
   if (!KNOWN_EMBEDDING_MODELS.has(embeddingModel)) {
     log.error(
       `Unknown embedding model: ${embeddingModel}\nValid values: ${[...KNOWN_EMBEDDING_MODELS].join(", ")}`,
@@ -468,13 +544,17 @@ async function runNonInteractive(opts: InitOpts): Promise<void> {
   const graph = createGraph(dbPath);
 
   if (embeddingModel === "none") {
-    const upsert = graph.db.prepare(
-      "INSERT INTO metadata (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-    );
-    upsert.run("embedding_model", "none");
+    graph.db
+      .prepare(
+        "INSERT INTO metadata (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      )
+      .run("embedding_model", "none");
   } else {
-    const dims = EMBEDDING_DIMENSIONS[embeddingModel];
-    setEmbeddingModel(graph, embeddingModel, dims);
+    setEmbeddingModel(
+      graph,
+      embeddingModel,
+      EMBEDDING_DIMENSIONS[embeddingModel],
+    );
   }
 
   type GitSummary = {
@@ -495,8 +575,13 @@ async function runNonInteractive(opts: InitOpts): Promise<void> {
   let gitSummary: GitSummary | null = null;
   let mdSummary: MdSummary | null = null;
   let sourceSummary: SourceSummary | null = null;
+  let githubSummary: GitHubEnrichSummary | null = null;
+  let companionSummary: CompanionSummary | null = null;
   let embedSummary: EmbedSummary | null = null;
 
+  const cwd = process.cwd();
+
+  // Step 1 — Git ingest (always runs when --from-git provided)
   if (opts.fromGit) {
     const repoPath = path.resolve(opts.fromGit);
     log.info(`Ingesting git repository at ${repoPath}…`);
@@ -525,14 +610,57 @@ async function runNonInteractive(opts: InitOpts): Promise<void> {
     }
   }
 
+  // Step 2 — GitHub enrichment (auto-detect when GITHUB_TOKEN is set)
+  const githubToken = process.env.GITHUB_TOKEN;
+  if (githubToken) {
+    const repoPath = opts.fromGit ? path.resolve(opts.fromGit) : cwd;
+    const explicitRepo = opts.githubRepo ?? null;
+    let targetRepo = explicitRepo;
+
+    if (!targetRepo) {
+      const { repo: detected, hint } = detectGitHubRemote(repoPath);
+      if (detected) {
+        targetRepo = detected;
+      } else {
+        log.info(`GitHub enrichment skipped: ${hint}`);
+      }
+    }
+
+    if (targetRepo) {
+      githubSummary = await runGitHubEnrich(graph, targetRepo, githubToken);
+    }
+  } else {
+    log.info(
+      "GitHub enrichment skipped: GITHUB_TOKEN not set. Set it to enable PR/issue enrichment.",
+    );
+  }
+
   if (opts.ingestMd) {
     mdSummary = await runMarkdownIngest(graph, opts.ingestMd);
   }
 
-  if (opts.ingestSource) {
-    sourceSummary = await runSourceIngest(graph, path.resolve("."));
+  // Step 3 — Source ingest (always runs)
+  sourceSummary = await runSourceIngest(graph, cwd);
+
+  // Step 4 — Companion setup (append to detected harness files)
+  const detectedHarnesses = detectHarnessFiles(cwd);
+  if (detectedHarnesses.length > 0) {
+    companionSummary = appendCompanionToFiles(cwd, detectedHarnesses);
+    const appended = companionSummary.appended.concat(companionSummary.created);
+    if (appended.length > 0)
+      log.success(`Companion guide appended to: ${appended.join(", ")}`);
+    if (companionSummary.skipped.length > 0) {
+      log.info(
+        `Companion already present in: ${companionSummary.skipped.join(", ")}`,
+      );
+    }
+  } else {
+    log.info(
+      "No harness files found (CLAUDE.md, AGENTS.md, GEMINI.md, .cursor/rules) — companion setup skipped.",
+    );
   }
 
+  // Step 5 — Embed
   if (opts.embed) {
     const ollamaEndpoint =
       process.env.ENGRAM_OLLAMA_ENDPOINT ?? opts.ollamaEndpoint;
@@ -547,6 +675,34 @@ async function runNonInteractive(opts: InitOpts): Promise<void> {
     }
   }
 
+  closeGraph(graph);
+
+  const isJsonMode = opts.format === "json";
+
+  if (isJsonMode) {
+    const jsonOut = {
+      git: gitSummary
+        ? { episodes: gitSummary.episodesCreated }
+        : { skipped: true },
+      enrichment: githubSummary
+        ? {
+            github: { prs: githubSummary.prs, issues: githubSummary.issues },
+            skipped: [],
+          }
+        : { skipped: ["github"] },
+      source: sourceSummary
+        ? {
+            files: sourceSummary.filesParsed,
+            symbols: sourceSummary.entitiesCreated,
+          }
+        : { skipped: true },
+      companion: companionSummary ?? { appended: [], created: [], skipped: [] },
+      embed: embedSummary ? { embedded: embedSummary.done } : { skipped: true },
+    };
+    process.stdout.write(JSON.stringify(jsonOut, null, 2) + "\n");
+    return;
+  }
+
   const summaryLines: string[] = [`✓ Created ${dbPath}`, ""];
   if (gitSummary) {
     summaryLines.push(
@@ -555,6 +711,11 @@ async function runNonInteractive(opts: InitOpts): Promise<void> {
         (gitSummary.episodesSkipped > 0
           ? ` (${gitSummary.episodesSkipped} skipped)`
           : ""),
+    );
+  }
+  if (githubSummary) {
+    summaryLines.push(
+      `  GitHub enrichment: ${githubSummary.prs} PRs, ${githubSummary.issues} issues`,
     );
   }
   if (mdSummary) {
@@ -571,6 +732,14 @@ async function runNonInteractive(opts: InitOpts): Promise<void> {
         `${sourceSummary.edgesCreated} edges (${sourceSummary.filesParsed} files parsed)`,
     );
   }
+  if (companionSummary) {
+    const appended = companionSummary.appended.concat(companionSummary.created);
+    if (appended.length > 0) {
+      summaryLines.push(
+        `  Companion:        appended to ${appended.join(", ")}`,
+      );
+    }
+  }
   if (embedSummary) {
     summaryLines.push(
       `  Embeddings:       ${embedSummary.done} items indexed in ${embedSummary.elapsedS}s`,
@@ -586,11 +755,20 @@ async function runNonInteractive(opts: InitOpts): Promise<void> {
 
   summaryLines.push("Next steps:");
   summaryLines.push(`  engram context "your query" --db ${dbPath}`);
-  summaryLines.push("  engram companion >> CLAUDE.md");
+  if (
+    !companionSummary ||
+    (companionSummary.appended.length === 0 &&
+      companionSummary.created.length === 0)
+  ) {
+    summaryLines.push("  engram companion >> CLAUDE.md");
+  }
 
   log.success(summaryLines.join("\n"));
-  closeGraph(graph);
 }
+
+// ---------------------------------------------------------------------------
+// Command registration
+// ---------------------------------------------------------------------------
 
 export function registerInit(program: Command): void {
   program
@@ -607,14 +785,18 @@ Examples:
   engram init --yes --embedding-model none --db .engram
 
   # Non-interactive with full ingestion and embeddings
-  engram init --yes --from-git . --ingest-md docs/ --ingest-source --embed \\
+  engram init --yes --from-git . --ingest-md docs/ --embed \\
     --embedding-model gemini-embedding-2-preview
+
+  # Non-interactive with JSON output (for CI/scripting)
+  engram init --yes --from-git . --format json
 
 See also:
   engram ingest git     re-ingest or update git history
   engram ingest md      ingest additional markdown files
   engram ingest source  ingest source code symbols
-  engram embed          manage and rebuild vector embeddings`,
+  engram embed          manage and rebuild vector embeddings
+  engram companion      write agent harness companion prompt`,
     )
     .option("--db <path>", "path for the .engram file", ".engram")
     .option("--from-git <path>", "ingest a git repository after creating")
@@ -622,7 +804,11 @@ See also:
       "--ingest-md <path>",
       "ingest markdown docs from this directory/glob",
     )
-    .option("--ingest-source", "ingest source code symbols", false)
+    .option(
+      "--ingest-source",
+      "ingest source code symbols (deprecated: now always runs in --yes)",
+      false,
+    )
     .option("--embed", "generate vector embeddings after ingestion", false)
     .option("--embedding-model <id|none>", "embedding model to use")
     .option(
@@ -634,8 +820,13 @@ See also:
       "Ollama endpoint URL",
       "http://localhost:11434",
     )
+    .option(
+      "--github-repo <owner/repo>",
+      "GitHub repo for enrichment (auto-detected from git remote when GITHUB_TOKEN is set)",
+    )
     .option("--yes", "skip all prompts (non-interactive)", false)
     .option("--no-verify", "skip reachability check")
+    .option("-j, --format <format>", "output format (json)")
     .action(async (opts: InitOpts) => {
       if (opts.yes) {
         await runNonInteractive(opts);
