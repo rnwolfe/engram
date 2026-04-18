@@ -17,6 +17,12 @@ export function companionSentinel(harness: HarnessName): string {
   return `<!-- engram-companion:${harness} -->`;
 }
 
+export function buildCompanionFragment(harness: HarnessName): string {
+  const sentinel = companionSentinel(harness);
+  const override = HARNESS_OVERRIDES[harness];
+  return [sentinel, BASE_COMPANION, override].filter(Boolean).join("\n");
+}
+
 interface CompanionCommandOpts {
   harness: string;
   check: boolean;
