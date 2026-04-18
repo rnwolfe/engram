@@ -506,7 +506,7 @@ export function registerEmbed(program: Command): void {
   program
     .command("embed")
     .description(
-      "Manage embeddings for semantic search. For FTS index rebuilding, see engram rebuild-index.",
+      "Manage embeddings for semantic search. With no flags, shows coverage status. For FTS index rebuilding, see engram rebuild-index.",
     )
     .option("--reindex", "clear and rebuild the vector index")
     .option(
@@ -570,11 +570,7 @@ Examples:
         opts.status,
       ].filter(Boolean).length;
       if (modeCount === 0) {
-        log.error(
-          "Specify a mode: --reindex, --check, --enable, or --status\n" +
-            "Run  engram embed --help  for usage.",
-        );
-        process.exit(1);
+        opts.status = true;
       }
       if (modeCount > 1) {
         log.error(
