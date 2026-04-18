@@ -105,6 +105,106 @@ describe("engram stats", () => {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  it("outputs text format unchanged with --format text", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      createGraph(dbPath).db.close();
+      const program = makeProgram();
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => logs.push(args.join(" "));
+      try {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "stats",
+          "--format",
+          "text",
+          "--db",
+          dbPath,
+        ]);
+      } finally {
+        console.log = origLog;
+      }
+      const output = logs.join("\n");
+      expect(output).toContain("Entities");
+      expect(output).toContain("Edges");
+      expect(output).toContain("Episodes");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("outputs valid JSON with --format json", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      createGraph(dbPath).db.close();
+      const program = makeProgram();
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => logs.push(args.join(" "));
+      try {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "stats",
+          "--format",
+          "json",
+          "--db",
+          dbPath,
+        ]);
+      } finally {
+        console.log = origLog;
+      }
+      const parsed = JSON.parse(logs.join("\n"));
+      expect(typeof parsed.entities).toBe("number");
+      expect(typeof parsed.edges).toBe("number");
+      expect(typeof parsed.edgesInvalidated).toBe("number");
+      expect(typeof parsed.episodes).toBe("number");
+      expect(typeof parsed.aliases).toBe("number");
+      expect(typeof parsed.db).toBe("string");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("exits 1 on invalid --format value", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      createGraph(dbPath).db.close();
+      const program = makeProgram();
+      const errors: string[] = [];
+      const origErr = console.error;
+      console.error = (...args: unknown[]) => errors.push(args.join(" "));
+      let exitCode: number | undefined;
+      const origExit = process.exit;
+      process.exit = (code?: number) => {
+        exitCode = code;
+        throw new Error(`process.exit(${code})`);
+      };
+      try {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "stats",
+          "--format",
+          "invalid",
+          "--db",
+          dbPath,
+        ]);
+      } catch {
+        // expected — process.exit throws
+      } finally {
+        console.error = origErr;
+        process.exit = origExit;
+      }
+      expect(exitCode).toBe(1);
+      expect(errors.join("\n")).toContain("--format must be 'text' or 'json'");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("engram search", () => {

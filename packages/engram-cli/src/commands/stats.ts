@@ -11,6 +11,7 @@ import { closeGraph, openGraph } from "engram-core";
 
 interface StatsOpts {
   db: string;
+  format: string;
 }
 
 interface CountRow {
@@ -24,12 +25,16 @@ export function registerStats(program: Command): void {
       "Show graph counts (entities, edges, episodes). For a full health dashboard with provider reachability, see engram status.",
     )
     .option("--db <path>", "path to .engram file", ".engram")
+    .option("--format <fmt>", "output format: text or json", "text")
     .addHelpText(
       "after",
       `
 Examples:
   # Show graph counts
   engram stats
+
+  # Machine-readable output
+  engram stats --format json
 
 When to use:
   Quick count of graph contents. Use engram status for a full health report
@@ -40,6 +45,11 @@ See also:
   engram search    find entities by keyword`,
     )
     .action((opts: StatsOpts) => {
+      if (opts.format !== "text" && opts.format !== "json") {
+        console.error("Error: --format must be 'text' or 'json'");
+        process.exit(1);
+      }
+
       const dbPath = path.resolve(opts.db);
 
       let graph: EngramGraph | undefined;
@@ -86,12 +96,25 @@ See also:
             )
             .get()?.count ?? 0;
 
-        console.log(`Graph: ${dbPath}`);
-        console.log(`  Entities (active):   ${entities}`);
-        console.log(`  Edges (active):      ${edges}`);
-        console.log(`  Edges (invalidated): ${invalidatedEdges}`);
-        console.log(`  Episodes (active):   ${episodes}`);
-        console.log(`  Aliases:             ${aliases}`);
+        if (opts.format === "json") {
+          console.log(
+            JSON.stringify({
+              entities,
+              edges,
+              edgesInvalidated: invalidatedEdges,
+              episodes,
+              aliases,
+              db: dbPath,
+            }),
+          );
+        } else {
+          console.log(`Graph: ${dbPath}`);
+          console.log(`  Entities (active):   ${entities}`);
+          console.log(`  Edges (active):      ${edges}`);
+          console.log(`  Edges (invalidated): ${invalidatedEdges}`);
+          console.log(`  Episodes (active):   ${episodes}`);
+          console.log(`  Aliases:             ${aliases}`);
+        }
       } catch (err) {
         console.error(
           `Error reading stats: ${err instanceof Error ? err.message : String(err)}`,
