@@ -202,7 +202,10 @@ export function registerProject(program: Command): void {
   program
     .command("project")
     .description("Author a projection on an anchor with explicit inputs")
-    .requiredOption("--kind <kind>", "projection kind (e.g. entity_summary)")
+    .requiredOption(
+      "--kind <kind>",
+      "projection kind — lowercase letters, digits, underscores only (e.g. entity_summary)",
+    )
     .requiredOption(
       "--anchor <type:id>",
       'anchor for the projection (e.g. "entity:01HX..." or "none")',
