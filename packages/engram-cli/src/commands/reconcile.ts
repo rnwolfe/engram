@@ -239,20 +239,20 @@ See also:
       ).toFixed(1);
 
       const summaryLines = [
-        `Status:   ${result.status}${opts.dryRun ? " (dry-run)" : ""}`,
-        `Elapsed:  ${elapsed}s`,
+        `Status:       ${result.status}${opts.dryRun ? " (dry-run)" : ""}`,
+        `Elapsed:      ${elapsed}s`,
       ];
       if (phases.includes("assess")) {
         summaryLines.push(
-          `Assessed: ${result.assessed}`,
-          `Refreshed:   ${result.soft_refreshed}`,
-          `Superseded:  ${result.superseded}`,
+          `Assessed:     ${result.assessed}`,
+          `Refreshed:    ${result.soft_refreshed}`,
+          `Superseded:   ${result.superseded}`,
         );
       }
       if (phases.includes("discover")) {
-        summaryLines.push(`Discovered:  ${result.discovered}`);
+        summaryLines.push(`Discovered:   ${result.discovered}`);
       }
-      summaryLines.push(`Run ID:   ${result.run_id}`);
+      summaryLines.push(`Run ID:       ${result.run_id}`);
       log.info(summaryLines.join("\n"));
 
       if (result.status === "partial") {
