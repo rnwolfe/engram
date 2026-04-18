@@ -36,11 +36,15 @@ export function resolveDbPath(input: string): string {
     }
     // Exists as a flat file — legacy layout. Emit deprecation warning.
     process.stderr.write(
-      `warning: ${input} is a flat file — run 'engram doctor --fix' to migrate to ${input}/engram.db\n`,
+      `warning: ${input} is a flat file — see docs/format-spec.md for migration instructions\n`,
     );
     return input;
   } catch {
     // Path doesn't exist — new database; resolve to directory layout.
+    // If the caller passed an explicit .db file path (e.g. --db graph.db), honour it as-is.
+    if (nodePath.extname(input) === ".db") {
+      return input;
+    }
     return nodePath.join(input, "engram.db");
   }
 }

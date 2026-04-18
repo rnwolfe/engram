@@ -72,7 +72,7 @@ describe("engram init --yes summary", () => {
     });
 
     expect(out).toContain("Created");
-    expect(out).toContain(dbPath);
+    expect(out).toContain(path.join(dir, "test.engram", "engram.db"));
     expect(out).toContain("Next steps:");
     expect(out).toContain("engram context");
     expect(out).toContain("engram companion");
