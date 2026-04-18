@@ -1355,9 +1355,7 @@ See also:
       if (opts.maxEntities !== undefined) {
         maxEntities = parseInt(opts.maxEntities, 10);
         if (Number.isNaN(maxEntities) || maxEntities < 1) {
-          console.error(
-            "Error: --max-entities must be a positive integer",
-          );
+          console.error("Error: --max-entities must be a positive integer");
           process.exit(1);
         }
       }
