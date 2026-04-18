@@ -4,7 +4,7 @@
  * Extracted from init.ts to keep each file under 500 lines.
  *
  * Covers:
- *  - GitHub remote detection (SSH + HTTPS)
+ *  - GitHub remote detection (SSH + HTTPS + credentialed HTTPS + ssh://)
  *  - Harness file detection (CLAUDE.md, AGENTS.md, GEMINI.md, .cursor/rules)
  *  - Companion append logic
  *  - GitHub enrichment runner
@@ -16,6 +16,12 @@ import * as path from "node:path";
 import { log, spinner } from "@clack/prompts";
 import type { EngramGraph } from "engram-core";
 import { GitHubAdapter } from "engram-core";
+// HarnessName is defined in overrides.ts; import locally and re-export for
+// consumers who previously imported it from this module.
+import type { HarnessName } from "../templates/companion/overrides.js";
+import { buildCompanionFragment, companionSentinel } from "./companion.js";
+
+export type { HarnessName } from "../templates/companion/overrides.js";
 
 // ---------------------------------------------------------------------------
 // Remote detection
@@ -28,14 +34,23 @@ export interface DetectedRemote {
   hint: string | null;
 }
 
-const SSH_RE =
+// Standard SSH shorthand: git@github.com:org/repo.git
+const SSH_SCP_RE =
   /^git@github\.com:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:\.git)?$/;
+
+// ssh:// protocol: ssh://git@github.com/org/repo.git
+const SSH_URL_RE =
+  /^ssh:\/\/(?:[^@]+@)?github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:\.git)?(?:\/.*)?$/;
+
+// HTTPS with optional credentials: https://user:token@github.com/org/repo.git
 const HTTPS_RE =
-  /^https?:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:\.git)?(?:\/.*)?$/;
+  /^https?:\/\/(?:[^@/]+@)?github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:\.git)?(?:\/.*)?$/;
 
 function parseGitHubUrl(url: string): string | null {
-  const ssh = SSH_RE.exec(url);
-  if (ssh) return ssh[1];
+  const sshScp = SSH_SCP_RE.exec(url);
+  if (sshScp) return sshScp[1];
+  const sshUrl = SSH_URL_RE.exec(url);
+  if (sshUrl) return sshUrl[1];
   const https = HTTPS_RE.exec(url);
   if (https) return https[1];
   return null;
@@ -43,8 +58,9 @@ function parseGitHubUrl(url: string): string | null {
 
 /**
  * Detect a GitHub remote from the git repository at `repoPath`.
- * Handles SSH and HTTPS remotes. When multiple remotes are found and they
- * point to different repos, emits a hint and returns null.
+ * Handles SSH shorthand, ssh://, and HTTPS (including credentialed) remotes.
+ * When multiple remotes are found pointing to different repos, emits a hint
+ * and returns null.
  */
 export function detectGitHubRemote(repoPath: string): DetectedRemote {
   let raw: string;
@@ -89,8 +105,6 @@ export function detectGitHubRemote(repoPath: string): DetectedRemote {
 // Harness file detection
 // ---------------------------------------------------------------------------
 
-export type HarnessName = "claude-code" | "generic" | "gemini" | "cursor";
-
 export interface HarnessFile {
   file: string;
   harness: HarnessName;
@@ -109,21 +123,8 @@ export function detectHarnessFiles(dir: string): HarnessFile[] {
 }
 
 // ---------------------------------------------------------------------------
-// Companion fragment builder (mirrors companion.ts logic)
+// Companion append logic
 // ---------------------------------------------------------------------------
-
-import { BASE_COMPANION } from "../templates/companion/base.js";
-import { HARNESS_OVERRIDES } from "../templates/companion/overrides.js";
-
-function companionSentinel(harness: HarnessName): string {
-  return `<!-- engram-companion:${harness} -->`;
-}
-
-function buildCompanionFragment(harness: HarnessName): string {
-  const sentinel = companionSentinel(harness);
-  const override = HARNESS_OVERRIDES[harness];
-  return [sentinel, BASE_COMPANION, override].filter(Boolean).join("\n");
-}
 
 export interface CompanionSummary {
   appended: string[];

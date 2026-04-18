@@ -213,10 +213,13 @@ describe("engram init --yes enhanced pipeline", () => {
   it("runs source ingest unconditionally in --yes mode", {
     timeout: 120000,
   }, async () => {
+    // Run from a temp dir with a minimal .ts file so source ingest has
+    // something to parse — never touches the real repo root.
+    fs.writeFileSync(path.join(dir, "hello.ts"), "export const x = 1;\n");
+
     const out = await captureStdout(async () => {
-      // Run from actual repo root so there's source to ingest
       const origCwd = process.cwd();
-      process.chdir(path.resolve(__dirname, "../../../.."));
+      process.chdir(dir);
       try {
         await makeProgram().parseAsync([
           "node",
@@ -239,11 +242,13 @@ describe("engram init --yes enhanced pipeline", () => {
   it("--format json emits structured JSON output", {
     timeout: 120000,
   }, async () => {
-    let jsonText = "";
-    const origCwd = process.cwd();
-    process.chdir(path.resolve(__dirname, "../../../.."));
-    try {
-      jsonText = await captureStdout(async () => {
+    // Run from an isolated temp dir — no harness files, no real repo root.
+    fs.writeFileSync(path.join(dir, "hello.ts"), "export const x = 1;\n");
+
+    const jsonText = await captureStdout(async () => {
+      const origCwd = process.cwd();
+      process.chdir(dir);
+      try {
         await makeProgram().parseAsync([
           "node",
           "engram",
@@ -256,15 +261,20 @@ describe("engram init --yes enhanced pipeline", () => {
           "--format",
           "json",
         ]);
-      });
-    } finally {
-      process.chdir(origCwd);
-    }
+      } finally {
+        process.chdir(origCwd);
+      }
+    });
 
-    // Find the JSON block in the output
-    const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
-    expect(jsonMatch).not.toBeNull();
-    const parsed = JSON.parse(jsonMatch?.[0]);
+    // The JSON object is the last thing written to stdout by --format json.
+    // Extract it by finding the last occurrence of a closing "}\n" (the root
+    // object end), then balancing braces backwards to find the opening "{".
+    const lastClose = jsonText.lastIndexOf("}\n");
+    expect(lastClose).toBeGreaterThanOrEqual(0);
+    const candidate = jsonText.slice(0, lastClose + 1); // up to and including "}"
+    const openBrace = candidate.lastIndexOf("\n{");
+    expect(openBrace).toBeGreaterThanOrEqual(0);
+    const parsed = JSON.parse(candidate.slice(openBrace + 1)); // skip the "\n"
     expect(parsed).toHaveProperty("git");
     expect(parsed).toHaveProperty("enrichment");
     expect(parsed).toHaveProperty("source");

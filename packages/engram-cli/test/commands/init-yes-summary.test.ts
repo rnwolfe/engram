@@ -98,18 +98,26 @@ describe("engram init --yes summary", () => {
     const repoPath = path.resolve(__dirname, "../../../..");
 
     const out = await captureStdout(async () => {
-      await makeProgram().parseAsync([
-        "node",
-        "engram",
-        "init",
-        "--yes",
-        "--embedding-model",
-        "none",
-        "--from-git",
-        repoPath,
-        "--db",
-        dbPath,
-      ]);
+      // chdir to isolated temp dir so companion/source ingest never touch
+      // the real repo root or any real harness files.
+      const origCwd = process.cwd();
+      process.chdir(dir);
+      try {
+        await makeProgram().parseAsync([
+          "node",
+          "engram",
+          "init",
+          "--yes",
+          "--embedding-model",
+          "none",
+          "--from-git",
+          repoPath,
+          "--db",
+          dbPath,
+        ]);
+      } finally {
+        process.chdir(origCwd);
+      }
     });
 
     expect(out).toContain("Created");
@@ -132,18 +140,26 @@ describe("engram init --yes summary", () => {
     const repoPath = path.resolve(__dirname, "../../../..");
 
     const out = await captureStdout(async () => {
-      await makeProgram().parseAsync([
-        "node",
-        "engram",
-        "init",
-        "--yes",
-        "--embedding-model",
-        "none",
-        "--from-git",
-        repoPath,
-        "--db",
-        dbPath,
-      ]);
+      // chdir to isolated temp dir so companion/source ingest never touch
+      // the real repo root or any real harness files.
+      const origCwd = process.cwd();
+      process.chdir(dir);
+      try {
+        await makeProgram().parseAsync([
+          "node",
+          "engram",
+          "init",
+          "--yes",
+          "--embedding-model",
+          "none",
+          "--from-git",
+          repoPath,
+          "--db",
+          dbPath,
+        ]);
+      } finally {
+        process.chdir(origCwd);
+      }
     });
 
     expect(out).toContain("Git ingestion:");
