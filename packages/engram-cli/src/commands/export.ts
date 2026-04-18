@@ -153,7 +153,9 @@ function registerWiki(exportCmd: Command): void {
           fs.mkdirSync(kindDir, { recursive: true });
 
           if (fs.existsSync(absPath)) {
-            console.warn(`warn: overwriting existing file ${relPath}`);
+            process.stderr.write(
+              `warn: overwriting existing file ${relPath}\n`,
+            );
           }
 
           // Write body verbatim (round-trip property)
@@ -189,7 +191,7 @@ function registerWiki(exportCmd: Command): void {
 
         const indexPath = path.join(outDir, "index.md");
         if (fs.existsSync(indexPath)) {
-          console.warn("warn: overwriting existing file index.md");
+          process.stderr.write("warn: overwriting existing file index.md\n");
         }
         fs.writeFileSync(indexPath, indexLines.join("\n"), {
           encoding: "utf8",
