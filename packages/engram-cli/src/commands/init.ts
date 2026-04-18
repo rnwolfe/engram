@@ -69,7 +69,10 @@ function buildProvider(
     embeddingModel.startsWith("nomic-") ||
     embeddingModel.startsWith("all-minilm")
   ) {
-    return new OllamaProvider({ embedModel: embeddingModel, baseUrl: ollamaEndpoint });
+    return new OllamaProvider({
+      embedModel: embeddingModel,
+      baseUrl: ollamaEndpoint,
+    });
   }
   if (embeddingModel.startsWith("gemini-")) {
     const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
@@ -95,7 +98,9 @@ async function runMarkdownIngest(
       `Markdown ingestion complete — ${result.episodesCreated} episodes created, ${result.episodesSkipped} skipped`,
     );
   } catch (err) {
-    s.stop(`Markdown ingestion failed: ${err instanceof Error ? err.message : String(err)}`);
+    s.stop(
+      `Markdown ingestion failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 }
 
@@ -116,7 +121,9 @@ async function runSourceIngest(
       ].join("\n"),
     );
   } catch (err) {
-    s.stop(`Source ingestion failed: ${err instanceof Error ? err.message : String(err)}`);
+    s.stop(
+      `Source ingestion failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 }
 
@@ -138,10 +145,14 @@ async function runEmbed(
     const elapsed = ((Date.now() - startMs) / 1000).toFixed(1);
     s.stop(`Embeddings complete — ${result.done} items in ${elapsed}s`);
     if (result.errors > 0) {
-      log.warn(`${result.errors} items failed — run  engram embed --reindex  to retry.`);
+      log.warn(
+        `${result.errors} items failed — run  engram embed --reindex  to retry.`,
+      );
     }
   } catch (err) {
-    s.stop(`Embedding failed: ${err instanceof Error ? err.message : String(err)}`);
+    s.stop(
+      `Embedding failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
     log.warn("Run  engram embed --reindex  to retry.");
   }
 }
@@ -284,7 +295,8 @@ async function runInteractive(opts: InitOpts): Promise<void> {
   // Markdown docs
   const mdRaw = assertNotCancel(
     await text({
-      message: "Ingest markdown docs? (path to docs dir, or leave blank to skip)",
+      message:
+        "Ingest markdown docs? (path to docs dir, or leave blank to skip)",
       placeholder: "docs/",
       defaultValue: "",
     }),
@@ -477,7 +489,10 @@ See also:
     )
     .option("--db <path>", "path for the .engram file", ".engram")
     .option("--from-git <path>", "ingest a git repository after creating")
-    .option("--ingest-md <path>", "ingest markdown docs from this directory/glob")
+    .option(
+      "--ingest-md <path>",
+      "ingest markdown docs from this directory/glob",
+    )
     .option("--ingest-source", "ingest source code symbols", false)
     .option("--embed", "generate vector embeddings after ingestion", false)
     .option("--embedding-model <id|none>", "embedding model to use")

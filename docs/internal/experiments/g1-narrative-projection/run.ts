@@ -153,7 +153,9 @@ async function main() {
   try {
     execSync("gemini --version", { encoding: "utf8" });
   } catch {
-    console.error("Error: gemini CLI not found. Install and authenticate first.");
+    console.error(
+      "Error: gemini CLI not found. Install and authenticate first.",
+    );
     process.exit(1);
   }
 
@@ -172,7 +174,9 @@ async function main() {
   );
   console.log(`Model: gemini (via gemini -p)`);
   console.log(`DB: ${DB}`);
-  console.log(`Each of 18 invocations is a fresh subprocess (no shared context)\n`);
+  console.log(
+    `Each of 18 invocations is a fresh subprocess (no shared context)\n`,
+  );
 
   for (let i = 0; i < QUESTIONS.length; i++) {
     const q = QUESTIONS[i];

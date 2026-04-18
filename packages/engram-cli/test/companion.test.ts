@@ -23,8 +23,13 @@ async function captureStdout(fn: () => Promise<void> | void): Promise<string> {
   const chunks: string[] = [];
   const orig = process.stdout.write.bind(process.stdout);
   process.stdout.write = (chunk: string | Uint8Array, ...args: unknown[]) => {
-    chunks.push(typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk));
-    return orig(chunk, ...(args as Parameters<typeof process.stdout.write>).slice(1));
+    chunks.push(
+      typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk),
+    );
+    return orig(
+      chunk,
+      ...(args as Parameters<typeof process.stdout.write>).slice(1),
+    );
   };
   try {
     await fn();
@@ -144,7 +149,10 @@ describe("engram companion — CLI command output", () => {
     registerCompanion(program);
     let exitCode: number | undefined;
     const origExit = process.exit.bind(process);
-    process.exit = ((code?: number) => { exitCode = code; throw new Error("exit"); }) as typeof process.exit;
+    process.exit = ((code?: number) => {
+      exitCode = code;
+      throw new Error("exit");
+    }) as typeof process.exit;
     const errors: string[] = [];
     const origError = console.error;
     console.error = (...args: unknown[]) => errors.push(args.join(" "));

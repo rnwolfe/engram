@@ -54,14 +54,19 @@ export function applyFilters(): void {
 
   // Hide edges by relation type
   cy.edges().forEach((edge) => {
-    if (!activeFilters.relationTypes.has(edge.data("relation_type") as string)) {
+    if (
+      !activeFilters.relationTypes.has(edge.data("relation_type") as string)
+    ) {
       edge.hide();
     }
   });
 
   // Hide edges by edge kind
   cy.edges().forEach((edge) => {
-    if (!edge.hidden() && !activeFilters.edgeKinds.has(edge.data("edge_kind") as string)) {
+    if (
+      !edge.hidden() &&
+      !activeFilters.edgeKinds.has(edge.data("edge_kind") as string)
+    ) {
       edge.hide();
     }
   });
@@ -77,7 +82,9 @@ export function applyFilters(): void {
   if (activeFilters.minDegree > 0) {
     cy.nodes().forEach((node) => {
       if (!node.hidden()) {
-        const visibleDegree = node.connectedEdges().filter((e) => !e.hidden()).length;
+        const visibleDegree = node
+          .connectedEdges()
+          .filter((e) => !e.hidden()).length;
         if (visibleDegree < activeFilters.minDegree) {
           node.hide();
         }
@@ -85,7 +92,10 @@ export function applyFilters(): void {
     });
     // Cascade again after degree filter
     cy.edges().forEach((edge) => {
-      if (!edge.hidden() && (edge.source().hidden() || edge.target().hidden())) {
+      if (
+        !edge.hidden() &&
+        (edge.source().hidden() || edge.target().hidden())
+      ) {
         edge.hide();
       }
     });
@@ -94,7 +104,10 @@ export function applyFilters(): void {
   // Hide orphans (nodes with no visible edges)
   if (activeFilters.hideOrphans) {
     cy.nodes().forEach((node) => {
-      if (!node.hidden() && node.connectedEdges().filter((e) => !e.hidden()).length === 0) {
+      if (
+        !node.hidden() &&
+        node.connectedEdges().filter((e) => !e.hidden()).length === 0
+      ) {
         node.hide();
       }
     });
@@ -145,7 +158,11 @@ function buildCheckboxSection(
   container.appendChild(section);
 }
 
-export function initFilters(cy: Core, data: GraphData, onReLayout: () => void): void {
+export function initFilters(
+  cy: Core,
+  data: GraphData,
+  onReLayout: () => void,
+): void {
   cytoscapeInstance = cy;
   _reLayoutCallback = onReLayout;
 
@@ -160,7 +177,9 @@ export function initFilters(cy: Core, data: GraphData, onReLayout: () => void): 
   if (!sidebar) return;
 
   const entityTypes = [...new Set(data.nodes.map((n) => n.entity_type))].sort();
-  const relationTypes = [...new Set(data.edges.map((e) => e.relation_type))].sort();
+  const relationTypes = [
+    ...new Set(data.edges.map((e) => e.relation_type)),
+  ].sort();
   const edgeKinds = [...new Set(data.edges.map((e) => e.edge_kind))].sort();
 
   sidebar.innerHTML = "";
@@ -170,15 +189,36 @@ export function initFilters(cy: Core, data: GraphData, onReLayout: () => void): 
   sidebar.appendChild(title);
 
   if (entityTypes.length > 0) {
-    buildCheckboxSection(sidebar, "Entity type", entityTypes, activeFilters.entityTypes, DEFAULT_HIDDEN_ENTITY_TYPES, applyFilters);
+    buildCheckboxSection(
+      sidebar,
+      "Entity type",
+      entityTypes,
+      activeFilters.entityTypes,
+      DEFAULT_HIDDEN_ENTITY_TYPES,
+      applyFilters,
+    );
   }
 
   if (relationTypes.length > 0) {
-    buildCheckboxSection(sidebar, "Relation type", relationTypes, activeFilters.relationTypes, DEFAULT_HIDDEN_RELATION_TYPES, applyFilters);
+    buildCheckboxSection(
+      sidebar,
+      "Relation type",
+      relationTypes,
+      activeFilters.relationTypes,
+      DEFAULT_HIDDEN_RELATION_TYPES,
+      applyFilters,
+    );
   }
 
   if (edgeKinds.length > 0) {
-    buildCheckboxSection(sidebar, "Edge kind", edgeKinds, activeFilters.edgeKinds, new Set(), applyFilters);
+    buildCheckboxSection(
+      sidebar,
+      "Edge kind",
+      edgeKinds,
+      activeFilters.edgeKinds,
+      new Set(),
+      applyFilters,
+    );
   }
 
   // Min degree slider

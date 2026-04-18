@@ -138,12 +138,18 @@ function askGemini(prompt: string, cwd: string): string {
         shell: "/bin/bash",
         timeout: 180_000,
       });
-      try { fs.unlinkSync(tmpFile); } catch {}
+      try {
+        fs.unlinkSync(tmpFile);
+      } catch {}
       return result.trim();
     } catch (err) {
-      try { fs.unlinkSync(tmpFile); } catch {}
+      try {
+        fs.unlinkSync(tmpFile);
+      } catch {}
       const msg = err instanceof Error ? err.message : String(err);
-      const isQuota = msg.includes("QUOTA_EXHAUSTED") || msg.includes("exhausted your capacity");
+      const isQuota =
+        msg.includes("QUOTA_EXHAUSTED") ||
+        msg.includes("exhausted your capacity");
       // Extract reset delay from error if available
       const retryMsMatch = msg.match(/"retryDelayMs":(\d+)/);
       const waitMs = retryMsMatch
@@ -151,7 +157,9 @@ function askGemini(prompt: string, cwd: string): string {
         : 35 * 60 * 1000;
       if (isQuota && attempt < MAX_RETRIES - 1) {
         const waitMin = Math.ceil(waitMs / 60_000);
-        console.log(`\n  ⏳ Quota exhausted — waiting ${waitMin}m then retrying…`);
+        console.log(
+          `\n  ⏳ Quota exhausted — waiting ${waitMin}m then retrying…`,
+        );
         execSync(`sleep ${Math.ceil(waitMs / 1000)}`, { shell: "/bin/bash" });
         continue;
       }
@@ -203,7 +211,11 @@ function buildPromptB(pack: string, question: string): string {
   );
 }
 
-function buildPromptC(companion: string, pack: string, question: string): string {
+function buildPromptC(
+  companion: string,
+  pack: string,
+  question: string,
+): string {
   return (
     `${companion}\n\n` +
     `---\n\n` +
@@ -233,8 +245,8 @@ interface PackMetrics {
 }
 
 interface TokenCost {
-  prompt_tokens: number;   // estimated input tokens sent to Gemini
-  answer_tokens: number;   // estimated output tokens
+  prompt_tokens: number; // estimated input tokens sent to Gemini
+  answer_tokens: number; // estimated output tokens
   total_tokens: number;
 }
 
@@ -256,9 +268,12 @@ async function main() {
   let questionFilter: Set<string> | null = null;
   if (questionsFlag !== -1 && process.argv[questionsFlag + 1]) {
     questionFilter = new Set(
-      process.argv[questionsFlag + 1]
-        .split(",")
-        .map((s) => s.trim().toUpperCase().replace(/^(\d+)$/, "Q$1")),
+      process.argv[questionsFlag + 1].split(",").map((s) =>
+        s
+          .trim()
+          .toUpperCase()
+          .replace(/^(\d+)$/, "Q$1"),
+      ),
     );
   }
   const activeQuestions = questionFilter
@@ -266,7 +281,9 @@ async function main() {
     : QUESTIONS;
 
   if (activeQuestions.length === 0) {
-    console.error(`No questions matched filter: ${process.argv[questionsFlag + 1]}`);
+    console.error(
+      `No questions matched filter: ${process.argv[questionsFlag + 1]}`,
+    );
     process.exit(1);
   }
 
@@ -274,7 +291,9 @@ async function main() {
   try {
     execSync("gemini --version", { encoding: "utf8" });
   } catch {
-    console.error("Error: gemini CLI not found. Install and authenticate first.");
+    console.error(
+      "Error: gemini CLI not found. Install and authenticate first.",
+    );
     process.exit(1);
   }
 
@@ -295,12 +314,18 @@ async function main() {
   console.log(`${companionLines} lines`);
 
   const qLabel = activeQuestions.map((q) => q.id).join(", ");
-  console.log("\nG2 Pack + Companion — conditions B and C against v3 A baseline");
+  console.log(
+    "\nG2 Pack + Companion — conditions B and C against v3 A baseline",
+  );
   console.log(`Questions: ${qLabel}`);
   console.log(`Maestro dir: ${MAESTRO_DIR}`);
-  console.log(`DB: ${DB} (${(fs.statSync(DB).size / 1024 / 1024).toFixed(1)} MB)`);
+  console.log(
+    `DB: ${DB} (${(fs.statSync(DB).size / 1024 / 1024).toFixed(1)} MB)`,
+  );
   console.log(`Token budget: ${TOKEN_BUDGET}`);
-  console.log(`Pack version: Phase 1 (vector track, confidence scoring, structural edges, hypothesis framing)`);
+  console.log(
+    `Pack version: Phase 1 (vector track, confidence scoring, structural edges, hypothesis framing)`,
+  );
   console.log(`Companion: ${companionLines} lines (--harness gemini)`);
   console.log();
 
@@ -320,13 +345,16 @@ async function main() {
       discussionCount: metrics.count,
       confidenceScores: metrics.confidenceScores,
     };
-    const confidenceSummary = metrics.confidenceScores.length > 0
-      ? ` | confidences: [${metrics.confidenceScores.map((s) => s.toFixed(2)).join(", ")}]`
-      : "";
+    const confidenceSummary =
+      metrics.confidenceScores.length > 0
+        ? ` | confidences: [${metrics.confidenceScores.map((s) => s.toFixed(2)).join(", ")}]`
+        : "";
     const sectionFlags = [
       metrics.hasDiscussions ? "discussions" : "",
       metrics.hasStructuralSignals ? "structural" : "",
-    ].filter(Boolean).join("+");
+    ]
+      .filter(Boolean)
+      .join("+");
     console.log(
       `${packMetrics.lines} lines${sectionFlags ? ` [${sectionFlags}]` : ""}${confidenceSummary}`,
     );
@@ -340,7 +368,9 @@ async function main() {
       answer_tokens: estimateTokens(answerB),
       total_tokens: estimateTokens(promptB) + estimateTokens(answerB),
     };
-    console.log(`${answerB.split(" ").length} words | ~${costB.total_tokens} tok`);
+    console.log(
+      `${answerB.split(" ").length} words | ~${costB.total_tokens} tok`,
+    );
 
     // Condition C — new pack + companion
     process.stdout.write("  → C (pack + companion)… ");
@@ -351,7 +381,9 @@ async function main() {
       answer_tokens: estimateTokens(answerC),
       total_tokens: estimateTokens(promptC) + estimateTokens(answerC),
     };
-    console.log(`${answerC.split(" ").length} words | ~${costC.total_tokens} tok`);
+    console.log(
+      `${answerC.split(" ").length} words | ~${costC.total_tokens} tok`,
+    );
 
     results.push({
       id: q.id,
@@ -380,12 +412,24 @@ async function main() {
   const lines: string[] = [];
   lines.push("# G2 Pack + Companion — Raw Results");
   lines.push("");
-  lines.push("> **Conditions:** B = new pack (Phase 1 improvements), C = new pack + companion prompt.");
-  lines.push("> **Baseline:** v3 Condition A (bare Gemini, cwd=Maestro) — see g1-maestro-v3/grades.md.");
-  lines.push("> **Pack version:** Phase 1 — vector episode track, confidence scoring, structural edge");
-  lines.push(">   augmentation, hypothesis framing (\"Possibly relevant discussions\", \"Structural signals\").");
-  lines.push("> **Key questions to watch:** Q2 (should still surface PR #543), Q3 and Q5 (regressed");
-  lines.push(">   in v3 — check if new framing reduces hallucination-from-retrieval).");
+  lines.push(
+    "> **Conditions:** B = new pack (Phase 1 improvements), C = new pack + companion prompt.",
+  );
+  lines.push(
+    "> **Baseline:** v3 Condition A (bare Gemini, cwd=Maestro) — see g1-maestro-v3/grades.md.",
+  );
+  lines.push(
+    "> **Pack version:** Phase 1 — vector episode track, confidence scoring, structural edge",
+  );
+  lines.push(
+    '>   augmentation, hypothesis framing ("Possibly relevant discussions", "Structural signals").',
+  );
+  lines.push(
+    "> **Key questions to watch:** Q2 (should still surface PR #543), Q3 and Q5 (regressed",
+  );
+  lines.push(
+    ">   in v3 — check if new framing reduces hallucination-from-retrieval).",
+  );
   lines.push("");
 
   // Pack metrics summary table
@@ -395,23 +439,34 @@ async function main() {
   lines.push("|---|-------|----------|-------------|-------------------|");
   for (const r of results) {
     const m = r.pack_metrics;
-    const sections = [
-      m.hasDiscussions ? "discussions" : "",
-      m.hasStructuralSignals ? "structural" : "",
-    ].filter(Boolean).join(", ") || "entities/edges only";
-    const scores = m.confidenceScores.length > 0
-      ? m.confidenceScores.map((s) => s.toFixed(2)).join(", ")
-      : "—";
-    lines.push(`| ${r.id} | ${m.lines} | ${sections} | ${m.discussionCount} | ${scores} |`);
+    const sections =
+      [
+        m.hasDiscussions ? "discussions" : "",
+        m.hasStructuralSignals ? "structural" : "",
+      ]
+        .filter(Boolean)
+        .join(", ") || "entities/edges only";
+    const scores =
+      m.confidenceScores.length > 0
+        ? m.confidenceScores.map((s) => s.toFixed(2)).join(", ")
+        : "—";
+    lines.push(
+      `| ${r.id} | ${m.lines} | ${sections} | ${m.discussionCount} | ${scores} |`,
+    );
   }
   lines.push("");
 
   // Token cost summary table
   lines.push("## Token cost (estimated, chars÷4)");
   lines.push("");
-  lines.push("| Q | B prompt | B answer | B total | C prompt | C answer | C total | C overhead vs B |");
-  lines.push("|---|----------|----------|---------|----------|----------|---------|-----------------|");
-  let totalB = 0, totalC = 0;
+  lines.push(
+    "| Q | B prompt | B answer | B total | C prompt | C answer | C total | C overhead vs B |",
+  );
+  lines.push(
+    "|---|----------|----------|---------|----------|----------|---------|-----------------|",
+  );
+  let totalB = 0,
+    totalC = 0;
   for (const r of results) {
     const overhead = r.cost_c.total_tokens - r.cost_b.total_tokens;
     const overheadPct = ((overhead / r.cost_b.total_tokens) * 100).toFixed(0);
@@ -423,7 +478,9 @@ async function main() {
   }
   const totalOverhead = totalC - totalB;
   const totalOverheadPct = ((totalOverhead / totalB) * 100).toFixed(0);
-  lines.push(`| **Total** | | | **${totalB}** | | | **${totalC}** | **+${totalOverhead} (+${totalOverheadPct}%)** |`);
+  lines.push(
+    `| **Total** | | | **${totalB}** | | | **${totalC}** | **+${totalOverhead} (+${totalOverheadPct}%)** |`,
+  );
   lines.push("");
 
   for (const r of results) {
@@ -433,11 +490,20 @@ async function main() {
     lines.push("");
 
     const m = r.pack_metrics;
-    const sectionNote = [
-      m.hasDiscussions ? `Possibly relevant discussions (${m.discussionCount} hit(s)` +
-        (m.confidenceScores.length > 0 ? `, confidence: [${m.confidenceScores.map((s) => s.toFixed(2)).join(", ")}]` : "") + ")" : "",
-      m.hasStructuralSignals ? "Structural signals" : "",
-    ].filter(Boolean).join("; ") || "entities/edges only (no discussion hits above threshold)";
+    const sectionNote =
+      [
+        m.hasDiscussions
+          ? `Possibly relevant discussions (${m.discussionCount} hit(s)` +
+            (m.confidenceScores.length > 0
+              ? `, confidence: [${m.confidenceScores.map((s) => s.toFixed(2)).join(", ")}]`
+              : "") +
+            ")"
+          : "",
+        m.hasStructuralSignals ? "Structural signals" : "",
+      ]
+        .filter(Boolean)
+        .join("; ") ||
+      "entities/edges only (no discussion hits above threshold)";
     lines.push(`**Pack:** ${m.lines} lines — ${sectionNote}`);
     lines.push("");
     lines.push("<details><summary>Full context pack</summary>");
@@ -449,12 +515,16 @@ async function main() {
     lines.push("</details>");
     lines.push("");
 
-    lines.push(`**Condition B (pack, no companion):** ~${r.cost_b.total_tokens} tok (${r.cost_b.prompt_tokens} prompt + ${r.cost_b.answer_tokens} answer)`);
+    lines.push(
+      `**Condition B (pack, no companion):** ~${r.cost_b.total_tokens} tok (${r.cost_b.prompt_tokens} prompt + ${r.cost_b.answer_tokens} answer)`,
+    );
     lines.push("");
     lines.push(r.answer_b);
     lines.push("");
 
-    lines.push(`**Condition C (pack + companion):** ~${r.cost_c.total_tokens} tok (${r.cost_c.prompt_tokens} prompt + ${r.cost_c.answer_tokens} answer)`);
+    lines.push(
+      `**Condition C (pack + companion):** ~${r.cost_c.total_tokens} tok (${r.cost_c.prompt_tokens} prompt + ${r.cost_c.answer_tokens} answer)`,
+    );
     lines.push("");
     lines.push(r.answer_c);
     lines.push("");
@@ -465,7 +535,9 @@ async function main() {
   console.log(`Wrote ${mdPath}`);
 
   console.log("\nNext: grade results.md against v3 grades.md");
-  console.log("  bun run engram-grade docs/internal/experiments/g2-pack-companion/results.md");
+  console.log(
+    "  bun run engram-grade docs/internal/experiments/g2-pack-companion/results.md",
+  );
   console.log("  (or open results.md and grade manually / via subagent)");
 }
 
