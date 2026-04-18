@@ -358,6 +358,104 @@ describe("engram decay", () => {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  it("outputs unchanged table format with --format table", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      createGraph(dbPath).db.close();
+      const program = makeProgram();
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => logs.push(args.join(" "));
+      try {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "decay",
+          "--format",
+          "table",
+          "--db",
+          dbPath,
+        ]);
+      } finally {
+        console.log = origLog;
+      }
+      const output = logs.join("\n");
+      expect(output).toContain("Decay Report");
+      expect(output).toContain("Summary");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("outputs valid JSON with --format json", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      createGraph(dbPath).db.close();
+      const program = makeProgram();
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => logs.push(args.join(" "));
+      try {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "decay",
+          "--format",
+          "json",
+          "--db",
+          dbPath,
+        ]);
+      } finally {
+        console.log = origLog;
+      }
+      const parsed = JSON.parse(logs.join("\n"));
+      expect(typeof parsed.generated_at).toBe("string");
+      expect(typeof parsed.total_entities).toBe("number");
+      expect(typeof parsed.total_edges).toBe("number");
+      expect(typeof parsed.summary).toBe("object");
+      expect(Array.isArray(parsed.decay_items)).toBe(true);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("exits 1 on invalid --format value", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      createGraph(dbPath).db.close();
+      const program = makeProgram();
+      const errors: string[] = [];
+      const origErr = console.error;
+      console.error = (...args: unknown[]) => errors.push(args.join(" "));
+      let exitCode: number | undefined;
+      const origExit = process.exit;
+      process.exit = (code?: number) => {
+        exitCode = code;
+        throw new Error(`process.exit(${code})`);
+      };
+      try {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "decay",
+          "--format",
+          "invalid",
+          "--db",
+          dbPath,
+        ]);
+      } catch {
+        // expected — process.exit throws
+      } finally {
+        console.error = origErr;
+        process.exit = origExit;
+      }
+      expect(exitCode).toBe(1);
+      expect(errors.join("\n")).toContain("--format must be 'table' or 'json'");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("engram error handling", () => {
