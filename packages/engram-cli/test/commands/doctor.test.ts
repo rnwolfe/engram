@@ -5,7 +5,7 @@
  * on-disk state and exercises the check logic through the registered command.
  */
 
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -81,16 +81,25 @@ async function captureOutput(fn: () => Promise<void> | void): Promise<string> {
 // ─── Test suites ──────────────────────────────────────────────────────────────
 
 describe("engram doctor — layout check", () => {
+  let tmpDir: string | undefined;
+
+  afterEach(() => {
+    if (tmpDir && fs.existsSync(tmpDir)) {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      tmpDir = undefined;
+    }
+  });
+
   it("passes when .engram/ directory contains engram.db", async () => {
-    const dir = makeTmpDir();
-    const dbDir = makeGoodDb(dir);
+    tmpDir = makeTmpDir();
+    const dbDir = makeGoodDb(tmpDir);
     const program = makeProgram();
 
     const origCwd = process.cwd();
-    process.chdir(dir);
+    const origExit = process.exit.bind(process);
+    process.chdir(tmpDir);
     try {
       let exited = false;
-      const origExit = process.exit.bind(process);
       process.exit = (() => {
         exited = true;
       }) as never;
@@ -99,29 +108,30 @@ describe("engram doctor — layout check", () => {
         await program.parseAsync(["node", "engram", "doctor", "--db", dbDir]);
       });
 
-      process.exit = origExit;
       expect(exited).toBe(false);
       expect(output).toContain("layout");
       expect(output).toContain("✓");
     } finally {
+      process.exit = origExit;
       process.chdir(origCwd);
     }
   });
 
   it("fails when .engram is a flat file", async () => {
-    const dir = makeTmpDir();
-    const flatPath = makeFlatDb(dir);
+    tmpDir = makeTmpDir();
+    const flatPath = makeFlatDb(tmpDir);
     const program = makeProgram();
 
     const origCwd = process.cwd();
-    process.chdir(dir);
-    let exitCode = 0;
     const origExit = process.exit.bind(process);
-    process.exit = ((code: number) => {
-      exitCode = code ?? 1;
-    }) as never;
+    process.chdir(tmpDir);
+    let exitCode = 0;
 
     try {
+      process.exit = ((code: number) => {
+        exitCode = code ?? 1;
+      }) as never;
+
       await captureOutput(async () => {
         await program.parseAsync([
           "node",
@@ -141,19 +151,27 @@ describe("engram doctor — layout check", () => {
 });
 
 describe("engram doctor — gitignore check", () => {
+  let tmpDir: string | undefined;
+
+  afterEach(() => {
+    if (tmpDir && fs.existsSync(tmpDir)) {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      tmpDir = undefined;
+    }
+  });
+
   it("passes when .gitignore contains .engram/ (directory entry)", async () => {
-    const dir = makeTmpDir();
-    makeGoodDb(dir);
-    fs.writeFileSync(path.join(dir, ".gitignore"), ".engram/\n", "utf8");
+    tmpDir = makeTmpDir();
+    makeGoodDb(tmpDir);
+    fs.writeFileSync(path.join(tmpDir, ".gitignore"), ".engram/\n", "utf8");
     const program = makeProgram();
 
     const origCwd = process.cwd();
-    process.chdir(dir);
+    const origExit = process.exit.bind(process);
+    process.chdir(tmpDir);
     try {
-      let _exited = false;
-      const origExit = process.exit.bind(process);
       process.exit = (() => {
-        _exited = true;
+        // no-op capture
       }) as never;
 
       const output = await captureOutput(async () => {
@@ -162,134 +180,172 @@ describe("engram doctor — gitignore check", () => {
           "engram",
           "doctor",
           "--db",
-          path.join(dir, ".engram"),
+          path.join(tmpDir, ".engram"),
         ]);
       });
 
-      process.exit = origExit;
       expect(output).toContain("gitignore");
     } finally {
+      process.exit = origExit;
       process.chdir(origCwd);
     }
   });
 
-  it("warns when .gitignore contains .engram (flat-file entry)", async () => {
-    const dir = makeTmpDir();
-    makeGoodDb(dir);
-    fs.writeFileSync(path.join(dir, ".gitignore"), ".engram\n", "utf8");
+  it("fails when .gitignore contains .engram (flat-file entry)", async () => {
+    tmpDir = makeTmpDir();
+    makeGoodDb(tmpDir);
+    fs.writeFileSync(path.join(tmpDir, ".gitignore"), ".engram\n", "utf8");
     const program = makeProgram();
 
     const origCwd = process.cwd();
-    process.chdir(dir);
-
-    let exitCode = 0;
     const origExit = process.exit.bind(process);
-    process.exit = ((code: number) => {
-      exitCode = code ?? 1;
-    }) as never;
+    process.chdir(tmpDir);
+    let exitCode = 0;
 
-    const output = await captureOutput(async () => {
-      await program.parseAsync([
-        "node",
-        "engram",
-        "doctor",
-        "--db",
-        path.join(dir, ".engram"),
-      ]);
-    });
+    try {
+      process.exit = ((code: number) => {
+        exitCode = code ?? 1;
+      }) as never;
 
-    process.exit = origExit;
-    process.chdir(origCwd);
+      const output = await captureOutput(async () => {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "doctor",
+          "--db",
+          path.join(tmpDir, ".engram"),
+        ]);
+      });
 
-    expect(output).toContain("gitignore");
-    expect(output).toContain("✗"); // fail because flat entry
-    expect(exitCode).toBe(1);
+      expect(output).toContain("gitignore");
+      expect(output).toContain("✗"); // fail because flat entry
+      expect(exitCode).toBe(1);
+    } finally {
+      process.exit = origExit;
+      process.chdir(origCwd);
+    }
   });
 });
 
 describe("engram doctor — schema check", () => {
+  let tmpDir: string | undefined;
+
+  afterEach(() => {
+    if (tmpDir && fs.existsSync(tmpDir)) {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      tmpDir = undefined;
+    }
+  });
+
   it("passes for a freshly created database at current FORMAT_VERSION", async () => {
-    const dir = makeTmpDir();
-    const dbDir = makeGoodDb(dir);
+    tmpDir = makeTmpDir();
+    const dbDir = makeGoodDb(tmpDir);
     const program = makeProgram();
 
     const origCwd = process.cwd();
-    process.chdir(dir);
-    let _exitCode = 0;
     const origExit = process.exit.bind(process);
-    process.exit = ((code: number) => {
-      _exitCode = code ?? 1;
-    }) as never;
+    process.chdir(tmpDir);
+    let _exitCode = 0;
 
-    const output = await captureOutput(async () => {
-      await program.parseAsync(["node", "engram", "doctor", "--db", dbDir]);
-    });
+    try {
+      process.exit = ((code: number) => {
+        _exitCode = code ?? 1;
+      }) as never;
 
-    process.exit = origExit;
-    process.chdir(origCwd);
+      const output = await captureOutput(async () => {
+        await program.parseAsync(["node", "engram", "doctor", "--db", dbDir]);
+      });
 
-    expect(output).toContain("schema");
-    // schema pass means no schema fail
-    const lines = output.split("\n").filter((l) => l.includes("schema"));
-    const schemaLine = lines[0] ?? "";
-    expect(schemaLine).toContain("✓");
+      expect(output).toContain("schema");
+      // schema pass means no schema fail
+      const lines = output.split("\n").filter((l) => l.includes("schema"));
+      const schemaLine = lines[0] ?? "";
+      expect(schemaLine).toContain("✓");
+    } finally {
+      process.exit = origExit;
+      process.chdir(origCwd);
+    }
   });
 });
 
 describe("engram doctor — fts_index check", () => {
+  let tmpDir: string | undefined;
+
+  afterEach(() => {
+    if (tmpDir && fs.existsSync(tmpDir)) {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      tmpDir = undefined;
+    }
+  });
+
   it("passes for a normal database", async () => {
-    const dir = makeTmpDir();
-    const dbDir = makeGoodDb(dir);
+    tmpDir = makeTmpDir();
+    const dbDir = makeGoodDb(tmpDir);
     const program = makeProgram();
 
     const origCwd = process.cwd();
-    process.chdir(dir);
-    let _exitCode = 0;
     const origExit = process.exit.bind(process);
-    process.exit = ((code: number) => {
-      _exitCode = code ?? 1;
-    }) as never;
+    process.chdir(tmpDir);
+    let _exitCode = 0;
 
-    const output = await captureOutput(async () => {
-      await program.parseAsync(["node", "engram", "doctor", "--db", dbDir]);
-    });
+    try {
+      process.exit = ((code: number) => {
+        _exitCode = code ?? 1;
+      }) as never;
 
-    process.exit = origExit;
-    process.chdir(origCwd);
+      const output = await captureOutput(async () => {
+        await program.parseAsync(["node", "engram", "doctor", "--db", dbDir]);
+      });
 
-    expect(output).toContain("fts_index");
-    const lines = output.split("\n").filter((l) => l.includes("fts_index"));
-    expect(lines[0]).toContain("✓");
+      expect(output).toContain("fts_index");
+      const lines = output.split("\n").filter((l) => l.includes("fts_index"));
+      expect(lines[0]).toContain("✓");
+    } finally {
+      process.exit = origExit;
+      process.chdir(origCwd);
+    }
   });
 });
 
 describe("engram doctor — embedding_index check", () => {
+  let tmpDir: string | undefined;
+
+  afterEach(() => {
+    if (tmpDir && fs.existsSync(tmpDir)) {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      tmpDir = undefined;
+    }
+  });
+
   it("passes when no embedding model configured", async () => {
-    const dir = makeTmpDir();
-    const dbDir = makeGoodDb(dir);
+    tmpDir = makeTmpDir();
+    const dbDir = makeGoodDb(tmpDir);
     const program = makeProgram();
 
     const origCwd = process.cwd();
-    process.chdir(dir);
-    let _exitCode = 0;
     const origExit = process.exit.bind(process);
-    process.exit = ((code: number) => {
-      _exitCode = code ?? 1;
-    }) as never;
+    process.chdir(tmpDir);
+    let _exitCode = 0;
 
-    const output = await captureOutput(async () => {
-      await program.parseAsync(["node", "engram", "doctor", "--db", dbDir]);
-    });
+    try {
+      process.exit = ((code: number) => {
+        _exitCode = code ?? 1;
+      }) as never;
 
-    process.exit = origExit;
-    process.chdir(origCwd);
+      const output = await captureOutput(async () => {
+        await program.parseAsync(["node", "engram", "doctor", "--db", dbDir]);
+      });
 
-    expect(output).toContain("embedding_index");
+      expect(output).toContain("embedding_index");
+    } finally {
+      process.exit = origExit;
+      process.chdir(origCwd);
+    }
   });
 
   it("passes when embedding model is recorded with valid dimensions", async () => {
-    const dir = makeTmpDir();
-    const engramDir = path.join(dir, ".engram");
+    tmpDir = makeTmpDir();
+    const engramDir = path.join(tmpDir, ".engram");
     fs.mkdirSync(engramDir, { recursive: true });
     const dbPath = path.join(engramDir, "engram.db");
     const graph = createGraph(dbPath);
@@ -298,85 +354,118 @@ describe("engram doctor — embedding_index check", () => {
 
     const program = makeProgram();
     const origCwd = process.cwd();
-    process.chdir(dir);
-    let _exitCode = 0;
     const origExit = process.exit.bind(process);
-    process.exit = ((code: number) => {
-      _exitCode = code ?? 1;
-    }) as never;
+    process.chdir(tmpDir);
+    let _exitCode = 0;
 
-    const output = await captureOutput(async () => {
-      await program.parseAsync(["node", "engram", "doctor", "--db", engramDir]);
-    });
+    try {
+      process.exit = ((code: number) => {
+        _exitCode = code ?? 1;
+      }) as never;
 
-    process.exit = origExit;
-    process.chdir(origCwd);
+      const output = await captureOutput(async () => {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "doctor",
+          "--db",
+          engramDir,
+        ]);
+      });
 
-    expect(output).toContain("embedding_index");
-    const lines = output
-      .split("\n")
-      .filter((l) => l.includes("embedding_index"));
-    expect(lines[0]).toContain("✓");
+      expect(output).toContain("embedding_index");
+      const lines = output
+        .split("\n")
+        .filter((l) => l.includes("embedding_index"));
+      expect(lines[0]).toContain("✓");
+    } finally {
+      process.exit = origExit;
+      process.chdir(origCwd);
+    }
   });
 });
 
 describe("engram doctor — wal check", () => {
+  let tmpDir: string | undefined;
+
+  afterEach(() => {
+    if (tmpDir && fs.existsSync(tmpDir)) {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      tmpDir = undefined;
+    }
+  });
+
   it("passes when no stale WAL files exist", async () => {
-    const dir = makeTmpDir();
-    const dbDir = makeGoodDb(dir);
+    tmpDir = makeTmpDir();
+    const dbDir = makeGoodDb(tmpDir);
     const program = makeProgram();
 
     const origCwd = process.cwd();
-    process.chdir(dir);
-    let _exitCode = 0;
     const origExit = process.exit.bind(process);
-    process.exit = ((code: number) => {
-      _exitCode = code ?? 1;
-    }) as never;
+    process.chdir(tmpDir);
+    let _exitCode = 0;
 
-    const output = await captureOutput(async () => {
-      await program.parseAsync(["node", "engram", "doctor", "--db", dbDir]);
-    });
+    try {
+      process.exit = ((code: number) => {
+        _exitCode = code ?? 1;
+      }) as never;
 
-    process.exit = origExit;
-    process.chdir(origCwd);
+      const output = await captureOutput(async () => {
+        await program.parseAsync(["node", "engram", "doctor", "--db", dbDir]);
+      });
 
-    expect(output).toContain("wal");
-    const lines = output.split("\n").filter((l) => l.includes("  wal"));
-    expect(lines[0]).toContain("✓");
+      expect(output).toContain("wal");
+      const lines = output.split("\n").filter((l) => l.includes("  wal"));
+      expect(lines[0]).toContain("✓");
+    } finally {
+      process.exit = origExit;
+      process.chdir(origCwd);
+    }
   });
 
   it("fails when stale .engram-wal file exists", async () => {
-    const dir = makeTmpDir();
-    const dbDir = makeGoodDb(dir);
-    // Create a stale WAL file
-    fs.writeFileSync(path.join(dir, ".engram-wal"), "", "utf8");
+    tmpDir = makeTmpDir();
+    const dbDir = makeGoodDb(tmpDir);
+    // Create a stale WAL file (derived from the db path)
+    fs.writeFileSync(path.join(tmpDir, ".engram-wal"), "", "utf8");
     const program = makeProgram();
 
     const origCwd = process.cwd();
-    process.chdir(dir);
-    let exitCode = 0;
     const origExit = process.exit.bind(process);
-    process.exit = ((code: number) => {
-      exitCode = code ?? 1;
-    }) as never;
+    process.chdir(tmpDir);
+    let exitCode = 0;
 
-    const output = await captureOutput(async () => {
-      await program.parseAsync(["node", "engram", "doctor", "--db", dbDir]);
-    });
+    try {
+      process.exit = ((code: number) => {
+        exitCode = code ?? 1;
+      }) as never;
 
-    process.exit = origExit;
-    process.chdir(origCwd);
+      const output = await captureOutput(async () => {
+        await program.parseAsync(["node", "engram", "doctor", "--db", dbDir]);
+      });
 
-    expect(output).toContain("wal");
-    expect(exitCode).toBe(1);
+      expect(output).toContain("wal");
+      expect(exitCode).toBe(1);
+    } finally {
+      process.exit = origExit;
+      process.chdir(origCwd);
+    }
   });
 });
 
 describe("engram doctor — evidence_integrity check", () => {
+  let tmpDir: string | undefined;
+
+  afterEach(() => {
+    if (tmpDir && fs.existsSync(tmpDir)) {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      tmpDir = undefined;
+    }
+  });
+
   it("passes when all entities and edges have evidence", async () => {
-    const dir = makeTmpDir();
-    const engramDir = path.join(dir, ".engram");
+    tmpDir = makeTmpDir();
+    const engramDir = path.join(tmpDir, ".engram");
     fs.mkdirSync(engramDir, { recursive: true });
     const dbPath = path.join(engramDir, "engram.db");
 
@@ -402,110 +491,143 @@ describe("engram doctor — evidence_integrity check", () => {
 
     const program = makeProgram();
     const origCwd = process.cwd();
-    process.chdir(dir);
-    let _exitCode = 0;
     const origExit = process.exit.bind(process);
-    process.exit = ((code: number) => {
-      _exitCode = code ?? 1;
-    }) as never;
+    process.chdir(tmpDir);
+    let _exitCode = 0;
 
-    const output = await captureOutput(async () => {
-      await program.parseAsync(["node", "engram", "doctor", "--db", engramDir]);
-    });
+    try {
+      process.exit = ((code: number) => {
+        _exitCode = code ?? 1;
+      }) as never;
 
-    process.exit = origExit;
-    process.chdir(origCwd);
+      const output = await captureOutput(async () => {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "doctor",
+          "--db",
+          engramDir,
+        ]);
+      });
 
-    expect(output).toContain("evidence_integrity");
-    const lines = output
-      .split("\n")
-      .filter((l) => l.includes("evidence_integrity"));
-    expect(lines[0]).toContain("✓");
+      expect(output).toContain("evidence_integrity");
+      const lines = output
+        .split("\n")
+        .filter((l) => l.includes("evidence_integrity"));
+      expect(lines[0]).toContain("✓");
+    } finally {
+      process.exit = origExit;
+      process.chdir(origCwd);
+    }
   });
 });
 
 describe("engram doctor — JSON output", () => {
+  let tmpDir: string | undefined;
+
+  afterEach(() => {
+    if (tmpDir && fs.existsSync(tmpDir)) {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      tmpDir = undefined;
+    }
+  });
+
   it("--format json emits valid JSON with correct shape", async () => {
-    const dir = makeTmpDir();
-    const dbDir = makeGoodDb(dir);
+    tmpDir = makeTmpDir();
+    const dbDir = makeGoodDb(tmpDir);
     const program = makeProgram();
 
     const origCwd = process.cwd();
-    process.chdir(dir);
-    let _exitCode = 0;
     const origExit = process.exit.bind(process);
-    process.exit = ((code: number) => {
-      _exitCode = code ?? 1;
-    }) as never;
+    process.chdir(tmpDir);
+    let _exitCode = 0;
 
-    const output = await captureOutput(async () => {
-      await program.parseAsync([
-        "node",
-        "engram",
-        "doctor",
-        "--db",
-        dbDir,
-        "--format",
-        "json",
-      ]);
-    });
+    try {
+      process.exit = ((code: number) => {
+        _exitCode = code ?? 1;
+      }) as never;
 
-    process.exit = origExit;
-    process.chdir(origCwd);
+      const output = await captureOutput(async () => {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "doctor",
+          "--db",
+          dbDir,
+          "--format",
+          "json",
+        ]);
+      });
 
-    // output should be parseable JSON
-    const parsed = JSON.parse(output);
-    expect(parsed).toHaveProperty("db");
-    expect(parsed).toHaveProperty("checks");
-    expect(parsed).toHaveProperty("fixes_applied");
-    expect(Array.isArray(parsed.checks)).toBe(true);
-    expect(Array.isArray(parsed.fixes_applied)).toBe(true);
+      // output should be parseable JSON
+      const parsed = JSON.parse(output);
+      expect(parsed).toHaveProperty("db");
+      expect(parsed).toHaveProperty("checks");
+      expect(parsed).toHaveProperty("fixes_applied");
+      expect(Array.isArray(parsed.checks)).toBe(true);
+      expect(Array.isArray(parsed.fixes_applied)).toBe(true);
 
-    // Each check has required fields
-    for (const check of parsed.checks) {
-      expect(check).toHaveProperty("name");
-      expect(check).toHaveProperty("status");
-      expect(check).toHaveProperty("message");
-      expect(["pass", "fail", "warn", "skip"]).toContain(check.status);
+      // Each check has required fields
+      for (const check of parsed.checks) {
+        expect(check).toHaveProperty("name");
+        expect(check).toHaveProperty("status");
+        expect(check).toHaveProperty("message");
+        expect(["pass", "fail", "warn", "skip"]).toContain(check.status);
+      }
+    } finally {
+      process.exit = origExit;
+      process.chdir(origCwd);
     }
   });
 
   it("-j shorthand emits JSON", async () => {
-    const dir = makeTmpDir();
-    const dbDir = makeGoodDb(dir);
+    tmpDir = makeTmpDir();
+    const dbDir = makeGoodDb(tmpDir);
     const program = makeProgram();
 
     const origCwd = process.cwd();
-    process.chdir(dir);
-    let _exitCode = 0;
     const origExit = process.exit.bind(process);
-    process.exit = ((code: number) => {
-      _exitCode = code ?? 1;
-    }) as never;
+    process.chdir(tmpDir);
+    let _exitCode = 0;
 
-    const output = await captureOutput(async () => {
-      await program.parseAsync([
-        "node",
-        "engram",
-        "doctor",
-        "--db",
-        dbDir,
-        "-j",
-      ]);
-    });
+    try {
+      process.exit = ((code: number) => {
+        _exitCode = code ?? 1;
+      }) as never;
 
-    process.exit = origExit;
-    process.chdir(origCwd);
+      const output = await captureOutput(async () => {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "doctor",
+          "--db",
+          dbDir,
+          "-j",
+        ]);
+      });
 
-    const parsed = JSON.parse(output);
-    expect(parsed).toHaveProperty("checks");
+      const parsed = JSON.parse(output);
+      expect(parsed).toHaveProperty("checks");
+    } finally {
+      process.exit = origExit;
+      process.chdir(origCwd);
+    }
   });
 });
 
 describe("engram doctor — --fix layout migration", () => {
+  let tmpDir: string | undefined;
+
+  afterEach(() => {
+    if (tmpDir && fs.existsSync(tmpDir)) {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      tmpDir = undefined;
+    }
+  });
+
   it("migrates flat .engram file to .engram/engram.db atomically", async () => {
-    const dir = makeTmpDir();
-    const flatPath = path.join(dir, ".engram");
+    tmpDir = makeTmpDir();
+    const flatPath = path.join(tmpDir, ".engram");
 
     // Create flat file DB
     const graph = createGraph(flatPath);
@@ -516,38 +638,41 @@ describe("engram doctor — --fix layout migration", () => {
 
     const program = makeProgram();
     const origCwd = process.cwd();
-    process.chdir(dir);
-    let _exitCode = 0;
     const origExit = process.exit.bind(process);
-    process.exit = ((code: number) => {
-      _exitCode = code ?? 1;
-    }) as never;
+    process.chdir(tmpDir);
+    let _exitCode = 0;
 
-    await captureOutput(async () => {
-      await program.parseAsync([
-        "node",
-        "engram",
-        "doctor",
-        "--db",
-        flatPath,
-        "--fix",
-        "--yes",
-      ]);
-    });
+    try {
+      process.exit = ((code: number) => {
+        _exitCode = code ?? 1;
+      }) as never;
 
-    process.exit = origExit;
-    process.chdir(origCwd);
+      await captureOutput(async () => {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "doctor",
+          "--db",
+          flatPath,
+          "--fix",
+          "--yes",
+        ]);
+      });
+    } finally {
+      process.exit = origExit;
+      process.chdir(origCwd);
+    }
 
     // After fix: flat file replaced by .engram/ directory containing engram.db
     // flatPath = /tmp/.../  .engram — now a directory, not a file
-    expect(fs.existsSync(path.join(dir, ".engram"))).toBe(true);
-    expect(fs.statSync(path.join(dir, ".engram")).isDirectory()).toBe(true);
-    expect(fs.existsSync(path.join(dir, ".engram", "engram.db"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, ".engram"))).toBe(true);
+    expect(fs.statSync(path.join(tmpDir, ".engram")).isDirectory()).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, ".engram", "engram.db"))).toBe(true);
     // The flat file (same path as dir) is no longer a regular file
-    expect(fs.statSync(path.join(dir, ".engram")).isFile()).toBe(false);
+    expect(fs.statSync(path.join(tmpDir, ".engram")).isFile()).toBe(false);
 
     // New DB should be openable
-    const newPath = path.join(dir, ".engram", "engram.db");
+    const newPath = path.join(tmpDir, ".engram", "engram.db");
     const newGraph = openGraph(newPath);
     expect(newGraph.formatVersion).toBeTruthy();
     closeGraph(newGraph);
@@ -555,37 +680,49 @@ describe("engram doctor — --fix layout migration", () => {
 });
 
 describe("engram doctor — --fix gitignore update", () => {
+  let tmpDir: string | undefined;
+
+  afterEach(() => {
+    if (tmpDir && fs.existsSync(tmpDir)) {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      tmpDir = undefined;
+    }
+  });
+
   it("updates flat .engram entry to .engram/ in .gitignore", async () => {
-    const dir = makeTmpDir();
-    const dbDir = makeGoodDb(dir);
+    tmpDir = makeTmpDir();
+    const dbDir = makeGoodDb(tmpDir);
     // Write flat entry
-    fs.writeFileSync(path.join(dir, ".gitignore"), ".engram\n", "utf8");
+    fs.writeFileSync(path.join(tmpDir, ".gitignore"), ".engram\n", "utf8");
 
     const program = makeProgram();
     const origCwd = process.cwd();
-    process.chdir(dir);
-    let _exitCode = 0;
     const origExit = process.exit.bind(process);
-    process.exit = ((code: number) => {
-      _exitCode = code ?? 1;
-    }) as never;
+    process.chdir(tmpDir);
+    let _exitCode = 0;
 
-    await captureOutput(async () => {
-      await program.parseAsync([
-        "node",
-        "engram",
-        "doctor",
-        "--db",
-        dbDir,
-        "--fix",
-        "--yes",
-      ]);
-    });
+    try {
+      process.exit = ((code: number) => {
+        _exitCode = code ?? 1;
+      }) as never;
 
-    process.exit = origExit;
-    process.chdir(origCwd);
+      await captureOutput(async () => {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "doctor",
+          "--db",
+          dbDir,
+          "--fix",
+          "--yes",
+        ]);
+      });
+    } finally {
+      process.exit = origExit;
+      process.chdir(origCwd);
+    }
 
-    const content = fs.readFileSync(path.join(dir, ".gitignore"), "utf8");
+    const content = fs.readFileSync(path.join(tmpDir, ".gitignore"), "utf8");
     expect(content).toContain(".engram/");
     // Flat entry should be replaced (not both)
     const lines = content
@@ -598,88 +735,121 @@ describe("engram doctor — --fix gitignore update", () => {
 });
 
 describe("engram doctor — --fix WAL cleanup", () => {
-  it("deletes stale .engram-wal and .engram-shm files", async () => {
-    const dir = makeTmpDir();
-    const dbDir = makeGoodDb(dir);
+  let tmpDir: string | undefined;
 
-    // Create stale files
-    fs.writeFileSync(path.join(dir, ".engram-wal"), "stale", "utf8");
-    fs.writeFileSync(path.join(dir, ".engram-shm"), "stale", "utf8");
+  afterEach(() => {
+    if (tmpDir && fs.existsSync(tmpDir)) {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      tmpDir = undefined;
+    }
+  });
+
+  it("deletes stale .engram-wal and .engram-shm files", async () => {
+    tmpDir = makeTmpDir();
+    const dbDir = makeGoodDb(tmpDir);
+
+    // Create stale WAL files (derived from the db path: .engram-wal, .engram-shm)
+    fs.writeFileSync(path.join(tmpDir, ".engram-wal"), "stale", "utf8");
+    fs.writeFileSync(path.join(tmpDir, ".engram-shm"), "stale", "utf8");
 
     const program = makeProgram();
     const origCwd = process.cwd();
-    process.chdir(dir);
-    let _exitCode = 0;
     const origExit = process.exit.bind(process);
-    process.exit = ((code: number) => {
-      _exitCode = code ?? 1;
-    }) as never;
+    process.chdir(tmpDir);
+    let _exitCode = 0;
 
-    await captureOutput(async () => {
-      await program.parseAsync([
-        "node",
-        "engram",
-        "doctor",
-        "--db",
-        dbDir,
-        "--fix",
-        "--yes",
-      ]);
-    });
+    try {
+      process.exit = ((code: number) => {
+        _exitCode = code ?? 1;
+      }) as never;
 
-    process.exit = origExit;
-    process.chdir(origCwd);
+      await captureOutput(async () => {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "doctor",
+          "--db",
+          dbDir,
+          "--fix",
+          "--yes",
+        ]);
+      });
+    } finally {
+      process.exit = origExit;
+      process.chdir(origCwd);
+    }
 
-    expect(fs.existsSync(path.join(dir, ".engram-wal"))).toBe(false);
-    expect(fs.existsSync(path.join(dir, ".engram-shm"))).toBe(false);
+    expect(fs.existsSync(path.join(tmpDir, ".engram-wal"))).toBe(false);
+    expect(fs.existsSync(path.join(tmpDir, ".engram-shm"))).toBe(false);
   });
 });
 
 describe("engram doctor — exit codes", () => {
+  let tmpDir: string | undefined;
+
+  afterEach(() => {
+    if (tmpDir && fs.existsSync(tmpDir)) {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      tmpDir = undefined;
+    }
+  });
+
   it("exits 0 when all checks pass", async () => {
-    const dir = makeTmpDir();
-    const dbDir = makeGoodDb(dir);
-    fs.writeFileSync(path.join(dir, ".gitignore"), ".engram/\n", "utf8");
+    tmpDir = makeTmpDir();
+    const dbDir = makeGoodDb(tmpDir);
+    fs.writeFileSync(path.join(tmpDir, ".gitignore"), ".engram/\n", "utf8");
 
     const program = makeProgram();
     const origCwd = process.cwd();
-    process.chdir(dir);
-    let exitCode: number | undefined;
     const origExit = process.exit.bind(process);
-    process.exit = ((code: number) => {
-      exitCode = code;
-    }) as never;
+    process.chdir(tmpDir);
+    let exitCode: number | undefined;
 
-    await captureOutput(async () => {
-      await program.parseAsync(["node", "engram", "doctor", "--db", dbDir]);
-    });
+    try {
+      process.exit = ((code: number) => {
+        exitCode = code;
+      }) as never;
 
-    process.exit = origExit;
-    process.chdir(origCwd);
+      await captureOutput(async () => {
+        await program.parseAsync(["node", "engram", "doctor", "--db", dbDir]);
+      });
+    } finally {
+      process.exit = origExit;
+      process.chdir(origCwd);
+    }
 
     // exitCode should remain undefined (no call to process.exit) or 0
     expect(exitCode === undefined || exitCode === 0).toBe(true);
   });
 
   it("exits 1 when any check fails", async () => {
-    const dir = makeTmpDir();
-    const flatPath = makeFlatDb(dir);
+    tmpDir = makeTmpDir();
+    const flatPath = makeFlatDb(tmpDir);
 
     const program = makeProgram();
     const origCwd = process.cwd();
-    process.chdir(dir);
-    let exitCode = 0;
     const origExit = process.exit.bind(process);
-    process.exit = ((code: number) => {
-      exitCode = code ?? 1;
-    }) as never;
+    process.chdir(tmpDir);
+    let exitCode = 0;
 
-    await captureOutput(async () => {
-      await program.parseAsync(["node", "engram", "doctor", "--db", flatPath]);
-    });
+    try {
+      process.exit = ((code: number) => {
+        exitCode = code ?? 1;
+      }) as never;
 
-    process.exit = origExit;
-    process.chdir(origCwd);
+      await captureOutput(async () => {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "doctor",
+          "--db",
+          flatPath,
+        ]);
+      });
+    } finally {
+      process.exit = origExit;
+      process.chdir(origCwd);
+    }
 
     expect(exitCode).toBe(1);
   });
