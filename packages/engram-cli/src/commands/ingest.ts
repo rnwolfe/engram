@@ -91,8 +91,6 @@ See also:
     .option("--branch <branch>", "branch or ref to walk (default: HEAD)")
     .option("--db <path>", "path to .engram file", ".engram")
     .action(async (repoPath: string | undefined, opts: IngestGitOpts) => {
-      intro("engram ingest git");
-
       const dbPath = path.resolve(opts.db);
       const resolvedRepo = path.resolve(repoPath ?? ".");
 
@@ -100,38 +98,42 @@ See also:
       try {
         graph = openGraph(dbPath);
       } catch (err) {
-        log.error(
-          `Cannot open graph: ${err instanceof Error ? err.message : String(err)}`,
+        process.stderr.write(
+          `Cannot open graph: ${err instanceof Error ? err.message : String(err)}\n`,
         );
         process.exit(1);
       }
 
-      log.info(
-        `Ingesting git repo at ${resolvedRepo} — this may take a while...`,
-      );
+      const isTTY = process.stdout.isTTY;
+      if (isTTY) {
+        log.info(
+          `Ingesting git repo at ${resolvedRepo} — this may take a while...`,
+        );
+      }
       try {
         const result = await ingestGitRepo(graph, resolvedRepo, {
           since: opts.since,
           branch: opts.branch,
         });
-        log.success(
-          [
-            "Git ingestion complete",
-            `  Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
-            `  Entities: ${result.entitiesCreated} created`,
-            `  Edges:    ${result.edgesCreated} created, ${result.edgesSuperseded} superseded`,
-          ].join("\n"),
-        );
+        if (isTTY) {
+          log.success(
+            [
+              "Git ingestion complete",
+              `  Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
+              `  Entities: ${result.entitiesCreated} created`,
+              `  Edges:    ${result.edgesCreated} created, ${result.edgesSuperseded} superseded`,
+            ].join("\n"),
+          );
+        }
       } catch (err) {
-        log.error(
-          `Git ingestion failed: ${err instanceof Error ? err.message : String(err)}`,
+        process.stderr.write(
+          `Git ingestion failed: ${err instanceof Error ? err.message : String(err)}\n`,
         );
         closeGraph(graph);
         process.exit(1);
       }
 
       closeGraph(graph);
-      outro("Done");
     });
 
   // ingest md
@@ -157,39 +159,39 @@ See also:
     )
     .option("--db <path>", "path to .engram file", ".engram")
     .action(async (glob: string, opts: IngestMdOpts) => {
-      intro("engram ingest md");
-
       const dbPath = path.resolve(opts.db);
 
       let graph: EngramGraph | undefined;
       try {
         graph = openGraph(dbPath);
       } catch (err) {
-        log.error(
-          `Cannot open graph: ${err instanceof Error ? err.message : String(err)}`,
+        process.stderr.write(
+          `Cannot open graph: ${err instanceof Error ? err.message : String(err)}\n`,
         );
         process.exit(1);
       }
 
-      log.info(`Ingesting markdown: ${glob}`);
+      const isTTY = process.stdout.isTTY;
+      if (isTTY) log.info(`Ingesting markdown: ${glob}`);
       try {
         const result = await ingestMarkdown(graph, glob);
-        log.success(
-          [
-            "Markdown ingestion complete",
-            `  Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
-          ].join("\n"),
-        );
+        if (isTTY) {
+          log.success(
+            [
+              "Markdown ingestion complete",
+              `  Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
+            ].join("\n"),
+          );
+        }
       } catch (err) {
-        log.error(
-          `Markdown ingestion failed: ${err instanceof Error ? err.message : String(err)}`,
+        process.stderr.write(
+          `Markdown ingestion failed: ${err instanceof Error ? err.message : String(err)}\n`,
         );
         closeGraph(graph);
         process.exit(1);
       }
 
       closeGraph(graph);
-      outro("Done");
     });
 
   // ingest source
@@ -233,7 +235,7 @@ See also:
     .option("--verbose", "emit per-file progress output")
     .option("--db <path>", "path to .engram file", ".engram")
     .action(async (sourcePath: string | undefined, opts: IngestSourceOpts) => {
-      intro("engram ingest source");
+      if (process.stdout.isTTY) intro("engram ingest source");
 
       const dbPath = path.resolve(opts.db);
       const resolvedSource = path.resolve(sourcePath ?? ".");
@@ -336,7 +338,7 @@ See also:
       }
 
       closeGraph(graph);
-      outro("Done");
+      if (process.stdout.isTTY) outro("Done");
 
       if (dryRunHadErrors) {
         process.exit(1);
@@ -383,7 +385,7 @@ See also:
     )
     .option("--db <path>", "path to .engram file", ".engram")
     .action(async (opts: IngestEnrichGithubOpts) => {
-      intro("engram ingest enrich github");
+      if (process.stdout.isTTY) intro("engram ingest enrich github");
 
       const dbPath = path.resolve(opts.db);
       const token = opts.token ?? process.env.GITHUB_TOKEN;
@@ -447,6 +449,6 @@ See also:
       }
 
       closeGraph(graph);
-      outro("Done");
+      if (process.stdout.isTTY) outro("Done");
     });
 }
