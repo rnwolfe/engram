@@ -46,6 +46,10 @@ See also:
     .action((opts: VisualizeOpts) => {
       const dbPath = path.resolve(opts.db);
       const port = Number.parseInt(opts.port, 10);
+      if (Number.isNaN(port) || port < 1 || port > 65535) {
+        console.error("Error: --port must be an integer between 1 and 65535");
+        process.exit(1);
+      }
       const host = opts.host;
 
       if (!LOOPBACK_HOSTS.has(host)) {
