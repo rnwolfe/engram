@@ -13,6 +13,7 @@ interface DecayOpts {
   dormantDays: string;
   format: string;
   db: string;
+  j?: boolean;
 }
 
 function renderTable(report: DecayReport): void {
@@ -52,6 +53,7 @@ export function registerDecay(program: Command): void {
     .option("--stale-days <n>", "days without evidence to mark as stale", "180")
     .option("--dormant-days <n>", "days of owner inactivity to flag", "90")
     .option("--format <fmt>", "output format: table or json", "table")
+    .option("-j", "shorthand for --format json")
     .option("--db <path>", "path to .engram file", ".engram")
     .addHelpText(
       "after",
@@ -77,6 +79,7 @@ See also:
   engram verify   check graph evidence invariants`,
     )
     .action((opts: DecayOpts) => {
+      if (opts.j) opts.format = "json";
       const dbPath = resolveDbPath(path.resolve(opts.db));
       const staleDays = parseInt(opts.staleDays, 10);
       const dormantDays = parseInt(opts.dormantDays, 10);

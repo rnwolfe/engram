@@ -12,6 +12,7 @@ import { closeGraph, openGraph, resolveDbPath } from "engram-core";
 interface StatsOpts {
   db: string;
   format: string;
+  j?: boolean;
 }
 
 interface CountRow {
@@ -26,6 +27,7 @@ export function registerStats(program: Command): void {
     )
     .option("--db <path>", "path to .engram file", ".engram")
     .option("--format <fmt>", "output format: text or json", "text")
+    .option("-j", "shorthand for --format json")
     .addHelpText(
       "after",
       `
@@ -45,6 +47,7 @@ See also:
   engram search    find entities by keyword`,
     )
     .action((opts: StatsOpts) => {
+      if (opts.j) opts.format = "json";
       if (opts.format !== "text" && opts.format !== "json") {
         console.error("Error: --format must be 'text' or 'json'");
         process.exit(1);
