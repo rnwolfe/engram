@@ -13,6 +13,7 @@ import {
   createProvider,
   EmbeddingModelMismatchError,
   openGraph,
+  resolveDbPath,
   search,
 } from "engram-core";
 
@@ -53,7 +54,7 @@ See also:
   engram show      display full entity details by ID`,
     )
     .action(async (query: string, opts: SearchOpts) => {
-      const dbPath = path.resolve(opts.db);
+      const dbPath = resolveDbPath(path.resolve(opts.db));
       const limit = parseInt(opts.limit, 10);
 
       if (Number.isNaN(limit) || limit < 1) {

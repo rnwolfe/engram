@@ -1,7 +1,12 @@
 import * as path from "node:path";
 import type { Command } from "commander";
 import type { DecayReport, EngramGraph } from "engram-core";
-import { closeGraph, getDecayReport, openGraph } from "engram-core";
+import {
+  closeGraph,
+  getDecayReport,
+  openGraph,
+  resolveDbPath,
+} from "engram-core";
 
 interface DecayOpts {
   staleDays: string;
@@ -72,7 +77,7 @@ See also:
   engram verify   check graph evidence invariants`,
     )
     .action((opts: DecayOpts) => {
-      const dbPath = path.resolve(opts.db);
+      const dbPath = resolveDbPath(path.resolve(opts.db));
       const staleDays = parseInt(opts.staleDays, 10);
       const dormantDays = parseInt(opts.dormantDays, 10);
       const format = opts.format;

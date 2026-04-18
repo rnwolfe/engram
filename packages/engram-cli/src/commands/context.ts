@@ -19,6 +19,7 @@ import {
   getEntity,
   getEpisode,
   openGraph,
+  resolveDbPath,
   search,
 } from "engram-core";
 
@@ -1324,7 +1325,7 @@ See also:
   engram ingest git  Populate the knowledge graph from git history`,
     )
     .action(async (query: string, opts: ContextCommandOpts) => {
-      const dbPath = path.resolve(opts.db);
+      const dbPath = resolveDbPath(path.resolve(opts.db));
       const tokenBudget = parseInt(opts.tokenBudget, 10);
       const minConfidence = parseFloat(opts.minConfidence);
 

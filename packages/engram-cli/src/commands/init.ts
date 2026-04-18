@@ -24,6 +24,7 @@ import {
   ingestSource,
   OllamaProvider,
   reindexEmbeddings,
+  resolveDbPath,
   setEmbeddingModel,
 } from "engram-core";
 
@@ -52,6 +53,40 @@ interface InitOpts {
 function cancelAndExit(): never {
   log.error("Cancelled.");
   process.exit(1);
+}
+
+/**
+ * Prepares the directory for a new engram database:
+ *  - Creates the directory at `dbDir` if it doesn't already exist.
+ *  - Appends `<dirName>/` to the nearest `.gitignore` (if one exists in cwd)
+ *    when that pattern isn't already present, and only when dbDir is inside cwd.
+ */
+function prepareDbDirectory(dbDir: string): void {
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+  }
+
+  const cwd = process.cwd();
+  // Only update .gitignore when the db directory lives inside the current working directory.
+  // This avoids polluting gitignore files when the db is in /tmp or another unrelated location.
+  if (!dbDir.startsWith(cwd + path.sep) && dbDir !== cwd) {
+    return;
+  }
+
+  const gitignorePath = path.join(cwd, ".gitignore");
+  const dirName = path.basename(dbDir);
+  const gitignoreEntry = `${dirName}/`;
+
+  if (fs.existsSync(gitignorePath)) {
+    const content = fs.readFileSync(gitignorePath, "utf8");
+    const lines = content.split("\n").map((l) => l.trim());
+    const alreadyIgnored =
+      lines.includes(gitignoreEntry) || lines.includes(dirName);
+    if (!alreadyIgnored) {
+      const suffix = content.endsWith("\n") ? "" : "\n";
+      fs.appendFileSync(gitignorePath, `${suffix}${gitignoreEntry}\n`);
+    }
+  }
 }
 
 function assertNotCancel<T>(val: T | symbol): T {
@@ -187,7 +222,8 @@ async function runInteractive(opts: InitOpts): Promise<void> {
       initialValue: opts.db !== ".engram" ? opts.db : undefined,
     }),
   );
-  const dbPath = path.resolve(rawDb as string);
+  const rawDbPath = path.resolve(rawDb as string);
+  const dbPath = resolveDbPath(rawDbPath);
 
   if (fs.existsSync(dbPath)) {
     log.error(
@@ -195,6 +231,9 @@ async function runInteractive(opts: InitOpts): Promise<void> {
     );
     process.exit(1);
   }
+
+  // Ensure the parent directory exists and .gitignore is updated
+  prepareDbDirectory(path.dirname(dbPath));
 
   const ingestChoice = assertNotCancel(
     await select({
@@ -404,7 +443,8 @@ async function runInteractive(opts: InitOpts): Promise<void> {
 }
 
 async function runNonInteractive(opts: InitOpts): Promise<void> {
-  const dbPath = path.resolve(opts.db);
+  const rawDbPath = path.resolve(opts.db);
+  const dbPath = resolveDbPath(rawDbPath);
 
   if (fs.existsSync(dbPath)) {
     log.error(
@@ -412,6 +452,9 @@ async function runNonInteractive(opts: InitOpts): Promise<void> {
     );
     process.exit(1);
   }
+
+  // Ensure the parent directory exists and .gitignore is updated
+  prepareDbDirectory(path.dirname(dbPath));
 
   const embeddingModel = opts.embeddingModel ?? "mxbai-embed-large";
 

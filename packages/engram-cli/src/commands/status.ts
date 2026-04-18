@@ -16,7 +16,12 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { Command } from "commander";
 import type { EngramGraph } from "engram-core";
-import { closeGraph, getEmbeddingModel, openGraph } from "engram-core";
+import {
+  closeGraph,
+  getEmbeddingModel,
+  openGraph,
+  resolveDbPath,
+} from "engram-core";
 
 interface StatusOpts {
   db: string;
@@ -637,7 +642,7 @@ See also:
   engram embed     manage embedding index`,
     )
     .action(async (opts: StatusOpts) => {
-      const dbPath = path.resolve(opts.db);
+      const dbPath = resolveDbPath(path.resolve(opts.db));
 
       // Open graph — exit 1 on failure
       let graph: EngramGraph | undefined;

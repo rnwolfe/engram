@@ -23,6 +23,7 @@ import {
   OllamaProvider,
   openGraph,
   reindexEmbeddings,
+  resolveDbPath,
 } from "engram-core";
 
 type ReindexTarget = "all" | "entities" | "episodes";
@@ -592,7 +593,7 @@ Examples:
         process.exit(1);
       }
 
-      const dbPath = path.resolve(opts.db);
+      const dbPath = resolveDbPath(path.resolve(opts.db));
       let graph: ReturnType<typeof openGraph>;
       try {
         graph = openGraph(dbPath);

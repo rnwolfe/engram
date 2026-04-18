@@ -7,6 +7,7 @@ import {
   getEntity,
   getFactHistory,
   openGraph,
+  resolveDbPath,
   resolveEntity,
 } from "engram-core";
 
@@ -62,7 +63,7 @@ See also:
           process.exit(1);
         }
 
-        const dbPath = path.resolve(opts.db);
+        const dbPath = resolveDbPath(path.resolve(opts.db));
 
         let graph: EngramGraph | undefined;
         try {

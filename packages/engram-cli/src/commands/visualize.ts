@@ -7,6 +7,7 @@
 import * as path from "node:path";
 import { startServer } from "@engram/engram-web";
 import type { Command } from "commander";
+import { resolveDbPath } from "engram-core";
 
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "localhost"]);
 
@@ -44,7 +45,7 @@ See also:
   engram search    find entities by keyword`,
     )
     .action((opts: VisualizeOpts) => {
-      const dbPath = path.resolve(opts.db);
+      const dbPath = resolveDbPath(path.resolve(opts.db));
       const port = Number.parseInt(opts.port, 10);
       if (Number.isNaN(port) || port < 1 || port > 65535) {
         console.error("Error: --port must be an integer between 1 and 65535");

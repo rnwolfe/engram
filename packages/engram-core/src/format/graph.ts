@@ -1,12 +1,16 @@
 /**
  * graph.ts — lifecycle operations for .engram files.
  *
- * createGraph: creates a new .engram file with the full schema.
- * openGraph:   opens an existing .engram file and validates format_version.
- * closeGraph:  cleanly closes the database connection.
+ * createGraph:    creates a new .engram file with the full schema.
+ * openGraph:      opens an existing .engram file and validates format_version.
+ * closeGraph:     cleanly closes the database connection.
+ * resolveDbPath:  resolves a user-supplied path to the actual SQLite file.
+ *                 Handles both the legacy flat-file layout and the new directory layout.
  */
 
 import { Database } from "bun:sqlite";
+import * as fs from "node:fs";
+import * as nodePath from "node:path";
 import { ulid } from "ulid";
 import { SCHEMA_DDL } from "./schema.js";
 import {
@@ -14,6 +18,32 @@ import {
   FORMAT_VERSION,
   MIN_READABLE_VERSION,
 } from "./version.js";
+
+/**
+ * Resolves the user-supplied --db path to the actual SQLite file path.
+ *
+ * Resolution rules (in priority order):
+ *  1. If input is a directory → return `<input>/engram.db`
+ *  2. If input exists as a file → emit deprecation warning, return as-is
+ *  3. If input doesn't exist → return `<input>/engram.db`
+ *     (treats input as directory that will be created by the caller)
+ */
+export function resolveDbPath(input: string): string {
+  try {
+    const stat = fs.statSync(input);
+    if (stat.isDirectory()) {
+      return nodePath.join(input, "engram.db");
+    }
+    // Exists as a flat file — legacy layout. Emit deprecation warning.
+    process.stderr.write(
+      `warning: ${input} is a flat file — run 'engram doctor --fix' to migrate to ${input}/engram.db\n`,
+    );
+    return input;
+  } catch {
+    // Path doesn't exist — new database; resolve to directory layout.
+    return nodePath.join(input, "engram.db");
+  }
+}
 
 export interface EngramGraph {
   db: Database;

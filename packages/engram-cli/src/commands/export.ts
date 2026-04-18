@@ -15,6 +15,7 @@ import {
   findEntities,
   listActiveProjections,
   openGraph,
+  resolveDbPath,
 } from "engram-core";
 
 interface ExportOpts {
@@ -104,7 +105,7 @@ function registerWiki(exportCmd: Command): void {
     .option("--include-superseded", "include invalidated projections", false)
     .action(function (this: Command, opts: WikiOpts) {
       const globalOpts = this.optsWithGlobals<WikiGlobalOpts & WikiOpts>();
-      const dbPath = path.resolve(globalOpts.db ?? ".engram");
+      const dbPath = resolveDbPath(path.resolve(globalOpts.db ?? ".engram"));
       const outDir = path.resolve(opts.out);
 
       let graph: EngramGraph | undefined;
@@ -242,7 +243,7 @@ See also:
   engram project    author projections on graph entities`,
     )
     .action((opts: ExportOpts) => {
-      const dbPath = path.resolve(opts.db);
+      const dbPath = resolveDbPath(path.resolve(opts.db));
 
       if (opts.format !== "jsonl" && opts.format !== "md") {
         console.error("Error: --format must be 'jsonl' or 'md'");

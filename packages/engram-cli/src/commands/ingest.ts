@@ -27,6 +27,7 @@ import {
   ingestMarkdown,
   ingestSource,
   openGraph,
+  resolveDbPath,
 } from "engram-core";
 
 interface IngestGitOpts {
@@ -91,7 +92,7 @@ See also:
     .option("--branch <branch>", "branch or ref to walk (default: HEAD)")
     .option("--db <path>", "path to .engram file", ".engram")
     .action(async (repoPath: string | undefined, opts: IngestGitOpts) => {
-      const dbPath = path.resolve(opts.db);
+      const dbPath = resolveDbPath(path.resolve(opts.db));
       const resolvedRepo = path.resolve(repoPath ?? ".");
 
       let graph: EngramGraph | undefined;
@@ -159,7 +160,7 @@ See also:
     )
     .option("--db <path>", "path to .engram file", ".engram")
     .action(async (glob: string, opts: IngestMdOpts) => {
-      const dbPath = path.resolve(opts.db);
+      const dbPath = resolveDbPath(path.resolve(opts.db));
 
       let graph: EngramGraph | undefined;
       try {
@@ -237,7 +238,7 @@ See also:
     .action(async (sourcePath: string | undefined, opts: IngestSourceOpts) => {
       if (process.stdout.isTTY) intro("engram ingest source");
 
-      const dbPath = path.resolve(opts.db);
+      const dbPath = resolveDbPath(path.resolve(opts.db));
       const resolvedSource = path.resolve(sourcePath ?? ".");
       const startMs = Date.now();
 
@@ -387,7 +388,7 @@ See also:
     .action(async (opts: IngestEnrichGithubOpts) => {
       if (process.stdout.isTTY) intro("engram ingest enrich github");
 
-      const dbPath = path.resolve(opts.db);
+      const dbPath = resolveDbPath(path.resolve(opts.db));
       const token = opts.token ?? process.env.GITHUB_TOKEN;
 
       if (!token) {
