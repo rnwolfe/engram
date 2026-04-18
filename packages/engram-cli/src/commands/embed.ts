@@ -30,6 +30,7 @@ type ReindexTarget = "all" | "entities" | "episodes";
 
 interface EmbedOpts {
   reindex?: boolean;
+  fill?: boolean;
   check?: boolean;
   enable?: boolean;
   status?: boolean;
@@ -89,19 +90,41 @@ function buildProvider(model: string, providerHint?: string): AIProvider {
   }
 }
 
-function buildProviderFromEnv(): AIProvider | null {
-  const p = process.env.ENGRAM_AI_PROVIDER ?? "null";
-  if (p === "ollama") {
+function buildProviderFromEnv(storedModel?: string): AIProvider | null {
+  const explicit = process.env.ENGRAM_AI_PROVIDER;
+
+  if (explicit === "ollama") {
     return new OllamaProvider({
+      embedModel: storedModel,
       baseUrl: process.env.ENGRAM_OLLAMA_ENDPOINT ?? "http://localhost:11434",
     });
   }
-  if (p === "gemini") {
+  if (explicit === "gemini") {
     return new GeminiProvider({
+      embedModel: storedModel,
       apiKey: process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY,
     });
   }
-  // openai and other providers: not supported for embeddings in this CLI version
+
+  // Auto-detect: infer provider from stored model, then validate credentials exist.
+  const inferred = storedModel ? inferProviderName(storedModel) : null;
+
+  if (
+    inferred === "gemini" &&
+    (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY)
+  ) {
+    return new GeminiProvider({
+      embedModel: storedModel,
+      apiKey: process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY,
+    });
+  }
+  if (inferred === "ollama") {
+    return new OllamaProvider({
+      embedModel: storedModel,
+      baseUrl: process.env.ENGRAM_OLLAMA_ENDPOINT ?? "http://localhost:11434",
+    });
+  }
+
   return null;
 }
 
@@ -163,40 +186,52 @@ function pct(num: number, den: number): string {
 async function runReindex(
   graph: ReturnType<typeof openGraph>,
   opts: EmbedOpts,
+  gapOnly = false,
 ): Promise<number> {
-  const provider = buildProviderFromEnv();
+  const stored = getEmbeddingModel(graph);
+  const provider = buildProviderFromEnv(stored?.model);
   if (!provider) {
     log.error(
       "No embedding provider configured.\n" +
-        "Set ENGRAM_AI_PROVIDER=ollama (or gemini) before running --reindex.\n" +
+        "Set ENGRAM_AI_PROVIDER=gemini (or ollama), or set GEMINI_API_KEY / GOOGLE_API_KEY.\n" +
         "Or use --enable --model <id> to configure a model first.",
     );
     return 1;
   }
 
   const activeModel = provider.modelName();
-  const stored = getEmbeddingModel(graph);
   const counts = countEmbeddings(graph);
   const target = opts.target ?? "all";
   const targetLabel = target === "all" ? "entities + episodes" : target;
 
-  log.info(
-    [
-      "About to reindex embeddings:",
-      `  Target:         ${targetLabel}`,
-      `  Current index:  ${counts.entities} entity, ${counts.episodes} episode embeddings`,
-      `  New model:      ${activeModel}`,
-      stored
-        ? `  Stored model:   ${stored.model} (${stored.dimensions} dims)`
-        : "  Stored model:   (none recorded)",
-    ].join("\n"),
-  );
+  if (gapOnly) {
+    log.info(
+      [
+        "Filling embedding gaps (existing embeddings are preserved):",
+        `  Target:    ${targetLabel}`,
+        `  Model:     ${activeModel}`,
+        `  Indexed:   ${counts.entities} entities, ${counts.episodes} episodes`,
+      ].join("\n"),
+    );
+  } else {
+    log.info(
+      [
+        "About to reindex embeddings:",
+        `  Target:         ${targetLabel}`,
+        `  Current index:  ${counts.entities} entity, ${counts.episodes} episode embeddings`,
+        `  New model:      ${activeModel}`,
+        stored
+          ? `  Stored model:   ${stored.model} (${stored.dimensions} dims)`
+          : "  Stored model:   (none recorded)",
+      ].join("\n"),
+    );
+  }
 
   if (!opts.yes) {
-    const ok = await confirm({
-      message: `Rebuild the ${targetLabel} vector index with ${activeModel}?`,
-      initialValue: false,
-    });
+    const message = gapOnly
+      ? `Embed missing ${targetLabel} with ${activeModel}?`
+      : `Rebuild the ${targetLabel} vector index with ${activeModel}?`;
+    const ok = await confirm({ message, initialValue: false });
     if (!ok || typeof ok !== "boolean") {
       log.info("Aborted.");
       return 0;
@@ -205,7 +240,8 @@ async function runReindex(
 
   const startMs = Date.now();
   const s = spinner();
-  s.start("Reindexing…");
+  const verb = gapOnly ? "Filling gaps" : "Reindexing";
+  s.start(`${verb}…`);
 
   const result = await reindexEmbeddings(
     graph,
@@ -215,17 +251,24 @@ async function runReindex(
         p.done > 0
           ? `${(p.done / ((Date.now() - startMs) / 1000)).toFixed(0)}/s`
           : "…";
-      s.message(`Reindexing… ${p.done}/${p.total} (${rate})`);
+      s.message(`${verb}… ${p.done}/${p.total} (${rate})`);
     },
     target,
+    gapOnly,
   );
 
   const elapsedSec = ((Date.now() - startMs) / 1000).toFixed(1);
   const rate = (
     result.done / Math.max(1, (Date.now() - startMs) / 1000)
   ).toFixed(1);
+
+  if (gapOnly && result.total === 0) {
+    s.stop("Coverage is already complete — nothing to fill.");
+    return 0;
+  }
+
   s.stop(
-    `Reindexed ${result.done.toLocaleString()} items in ${elapsedSec}s (${rate} items/s)`,
+    `${gapOnly ? "Filled" : "Reindexed"} ${result.done.toLocaleString()} items in ${elapsedSec}s (${rate} items/s)`,
   );
 
   if (result.errors > 0) {
@@ -253,7 +296,7 @@ async function runCheck(
   }
 
   const aiProviderEnv = process.env.ENGRAM_AI_PROVIDER ?? "null";
-  const provider = buildProviderFromEnv();
+  const provider = buildProviderFromEnv(stored.model);
 
   const modelLine = `Embedding model (stored):      ${stored.model} (${stored.dimensions} dims)`;
 
@@ -324,7 +367,7 @@ async function runEnable(
 ): Promise<number> {
   if (!opts.model) {
     log.error(
-      "--enable requires --model <id>.\nExample: engram embed --enable --model nomic-embed-text",
+      "--enable requires --model <id>.\nExample: engram embed --enable --model mxbai-embed-large",
     );
     return 1;
   }
@@ -467,6 +510,7 @@ export function registerEmbed(program: Command): void {
       "Manage embeddings for semantic search. For FTS index rebuilding, see engram rebuild-index.",
     )
     .option("--reindex", "clear and rebuild the vector index")
+    .option("--fill", "embed only items missing an embedding (preserves existing index)")
     .option("--check", "validate stored model matches configured provider")
     .option(
       "--enable",
@@ -491,6 +535,12 @@ export function registerEmbed(program: Command): void {
       "after",
       `
 Examples:
+  # Fill only the coverage gap (safe to run anytime, idempotent)
+  engram embed --fill
+
+  # Fill only missing entity embeddings
+  engram embed --fill --target entities
+
   # Rebuild the full vector index after switching models
   engram embed --reindex
 
@@ -504,7 +554,7 @@ Examples:
   engram embed --check
 
   # Enable semantic search on a database that was init'd with --embedding-model none
-  engram embed --enable --model nomic-embed-text
+  engram embed --enable --model mxbai-embed-large
 
   # Show embedding coverage without reindexing
   engram embed --status`,
@@ -512,6 +562,7 @@ Examples:
     .action(async (opts: EmbedOpts) => {
       const modeCount = [
         opts.reindex,
+        opts.fill,
         opts.check,
         opts.enable,
         opts.status,
@@ -525,7 +576,7 @@ Examples:
       }
       if (modeCount > 1) {
         log.error(
-          "Only one of --reindex, --check, --enable, --status may be used at a time.",
+          "Only one of --reindex, --fill, --check, --enable, --status may be used at a time.",
         );
         process.exit(1);
       }
@@ -558,6 +609,8 @@ Examples:
       try {
         if (opts.reindex) {
           exitCode = await runReindex(graph, opts);
+        } else if (opts.fill) {
+          exitCode = await runReindex(graph, opts, true);
         } else if (opts.check) {
           exitCode = await runCheck(graph, opts);
         } else if (opts.enable) {

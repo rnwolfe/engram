@@ -139,11 +139,15 @@ export interface ReindexProgress {
 }
 
 /**
- * Re-index all episodes in the graph with the given provider.
+ * Re-index episodes/entities with the given provider.
  *
- * Atomic approach: write new embeddings first (old ones preserved), then swap
- * in a single transaction (delete stale rows, update metadata). A crash at any
- * point before the final swap leaves the database in its previous valid state.
+ * Full reindex (gapOnly=false, default): embeds all targeted items, then atomically
+ * deletes stale embeddings under old models and records the new model in metadata.
+ * A crash before the final swap leaves the DB in its previous valid state.
+ *
+ * Gap fill (gapOnly=true): embeds only items that have no embedding under the
+ * current model. Existing embeddings are never touched. Model metadata is updated
+ * only if it was previously unset.
  *
  * onProgress is called after each batch (batch size 50).
  */
@@ -152,6 +156,7 @@ export async function reindexEmbeddings(
   provider: AIProvider,
   onProgress?: (p: ReindexProgress) => void,
   target: "all" | "episodes" | "entities" = "all",
+  gapOnly = false,
 ): Promise<ReindexProgress> {
   const newModel = provider.modelName();
 
@@ -162,22 +167,30 @@ export async function reindexEmbeddings(
   const workItems: WorkItem[] = [];
 
   if (target === "all" || target === "episodes") {
-    const rows = graph.db
-      .query<{ id: string; content: string }, []>(
-        "SELECT id, content FROM episodes WHERE status != 'redacted' ORDER BY id",
-      )
-      .all();
+    const sql = gapOnly
+      ? `SELECT id, content FROM episodes
+         WHERE status != 'redacted'
+           AND id NOT IN (SELECT target_id FROM embeddings WHERE target_type = 'episode' AND model = ?)
+         ORDER BY id`
+      : "SELECT id, content FROM episodes WHERE status != 'redacted' ORDER BY id";
+    const rows = gapOnly
+      ? graph.db.query<{ id: string; content: string }, [string]>(sql).all(newModel)
+      : graph.db.query<{ id: string; content: string }, []>(sql).all();
     for (const r of rows) {
       workItems.push({ kind: "episode", id: r.id, text: r.content });
     }
   }
 
   if (target === "all" || target === "entities") {
-    const rows = graph.db
-      .query<EntityTextRow, []>(
-        "SELECT id, canonical_name, summary FROM entities WHERE status = 'active' ORDER BY id",
-      )
-      .all();
+    const sql = gapOnly
+      ? `SELECT id, canonical_name, summary FROM entities
+         WHERE status = 'active'
+           AND id NOT IN (SELECT target_id FROM embeddings WHERE target_type = 'entity' AND model = ?)
+         ORDER BY id`
+      : "SELECT id, canonical_name, summary FROM entities WHERE status = 'active' ORDER BY id";
+    const rows = gapOnly
+      ? graph.db.query<EntityTextRow, [string]>(sql).all(newModel)
+      : graph.db.query<EntityTextRow, []>(sql).all();
     for (const r of rows) {
       workItems.push({
         kind: "entity",
@@ -229,7 +242,20 @@ export async function reindexEmbeddings(
     onProgress?.({ total, done, errors });
   }
 
-  // Atomic swap: delete stale embeddings for targeted types.
+  // Gap fill: no stale-embedding cleanup — only update metadata if it was unset.
+  if (gapOnly) {
+    if (newDimensions > 0) {
+      const existing = graph.db
+        .query<{ model: string }, []>("SELECT model FROM embedding_model LIMIT 1")
+        .get();
+      if (!existing) {
+        setEmbeddingModel(graph, newModel, newDimensions);
+      }
+    }
+    return { total, done, errors };
+  }
+
+  // Full reindex — atomic swap: delete stale embeddings for targeted types.
   // Only update the stored model metadata for full reindex — a partial reindex
   // (entities or episodes only) leaves the other type's embeddings in place,
   // so updating metadata would record a false "all embeddings use model X" state.
