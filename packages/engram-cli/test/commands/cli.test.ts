@@ -7,7 +7,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { Command } from "commander";
-import { addEpisode, createGraph } from "engram-core";
+import { addEntity, addEpisode, createGraph } from "engram-core";
 import { registerAdd } from "../../src/commands/add.js";
 import { registerDecay } from "../../src/commands/decay.js";
 import { registerExport } from "../../src/commands/export.js";
@@ -452,6 +452,190 @@ describe("engram decay", () => {
       }
       expect(exitCode).toBe(1);
       expect(errors.join("\n")).toContain("--format must be 'table' or 'json'");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("engram show", () => {
+  function makeEntityInDb(dbPath: string) {
+    const graph = createGraph(dbPath);
+    const episode = addEpisode(graph, {
+      source_type: "manual",
+      content: "test episode for show",
+      timestamp: new Date().toISOString(),
+    });
+    const entity = addEntity(
+      graph,
+      {
+        canonical_name: "TestModule",
+        entity_type: "module",
+        summary: "a test module",
+      },
+      [{ episode_id: episode.id, extractor: "test" }],
+    );
+    graph.db.close();
+    return entity;
+  }
+
+  it("default text output shows entity fields", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      const entity = makeEntityInDb(dbPath);
+      const program = makeProgram();
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => logs.push(args.join(" "));
+      try {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "show",
+          entity.id,
+          "--db",
+          dbPath,
+        ]);
+      } finally {
+        console.log = origLog;
+      }
+      const output = logs.join("\n");
+      expect(output).toContain("TestModule");
+      expect(output).toContain(entity.id);
+      expect(output).toContain("module");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("--format json emits valid JSON with entity, edges, evidenceCount", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      const entity = makeEntityInDb(dbPath);
+      const program = makeProgram();
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => logs.push(args.join(" "));
+      try {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "show",
+          entity.id,
+          "--format",
+          "json",
+          "--db",
+          dbPath,
+        ]);
+      } finally {
+        console.log = origLog;
+      }
+      const parsed = JSON.parse(logs.join("\n"));
+      expect(parsed.entity.id).toBe(entity.id);
+      expect(parsed.entity.canonical_name).toBe("TestModule");
+      expect(parsed.entity.entity_type).toBe("module");
+      expect(parsed.entity.status).toBeDefined();
+      expect(parsed.entity.created_at).toBeDefined();
+      expect(Array.isArray(parsed.edges)).toBe(true);
+      expect(typeof parsed.evidenceCount).toBe("number");
+      expect(parsed.evidenceCount).toBeGreaterThanOrEqual(1);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("--format json resolves by canonical name", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      const entity = makeEntityInDb(dbPath);
+      const program = makeProgram();
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => logs.push(args.join(" "));
+      try {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "show",
+          "TestModule",
+          "--format",
+          "json",
+          "--db",
+          dbPath,
+        ]);
+      } finally {
+        console.log = origLog;
+      }
+      const parsed = JSON.parse(logs.join("\n"));
+      expect(parsed.entity.id).toBe(entity.id);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("exits 1 on invalid --format value", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      createGraph(dbPath).db.close();
+      const program = makeProgram();
+      const errors: string[] = [];
+      const origErr = console.error;
+      console.error = (...args: unknown[]) => errors.push(args.join(" "));
+      let exitCode: number | undefined;
+      const origExit = process.exit;
+      process.exit = (code?: number) => {
+        exitCode = code;
+        throw new Error(`process.exit(${code})`);
+      };
+      try {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "show",
+          "anything",
+          "--format",
+          "xml",
+          "--db",
+          dbPath,
+        ]);
+      } catch {
+        // expected — process.exit throws
+      } finally {
+        console.error = origErr;
+        process.exit = origExit;
+      }
+      expect(exitCode).toBe(1);
+      expect(errors.join("\n")).toContain("--format must be 'text' or 'json'");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("--format text is unchanged (same as default)", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      const entity = makeEntityInDb(dbPath);
+      const program = makeProgram();
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => logs.push(args.join(" "));
+      try {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "show",
+          entity.id,
+          "--format",
+          "text",
+          "--db",
+          dbPath,
+        ]);
+      } finally {
+        console.log = origLog;
+      }
+      const output = logs.join("\n");
+      expect(output).toContain("TestModule");
+      expect(output).toContain(entity.id);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
