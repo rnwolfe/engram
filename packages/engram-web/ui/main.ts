@@ -55,13 +55,9 @@ function showError(msg: string): void {
 // ── Stats bar ─────────────────────────────────────────────
 
 function updateStatsBar(entityCount: number, edgeCount: number): void {
-  const entitiesEl = document.getElementById("stat-entities");
-  const edgesEl = document.getElementById("stat-edges");
-  if (entitiesEl) {
-    entitiesEl.innerHTML = `<span class="stat-value">${entityCount}</span> entities`;
-  }
-  if (edgesEl) {
-    edgesEl.innerHTML = `<span class="stat-value">${edgeCount}</span> edges`;
+  const el = document.getElementById("stats-display");
+  if (el) {
+    el.textContent = `${entityCount} entities · ${edgeCount} edges`;
   }
 }
 
@@ -193,12 +189,12 @@ async function init(): Promise<void> {
       if (evt.target === cy) cy?.fit();
     });
 
-    runCoseLayout(cy);
     updateStatsBar(data.stats.entity_count, data.stats.edge_count);
-    buildLegend();
+    buildLegend(data);
 
-    // Init filter sidebar, search, time slider, and decay overlay
-    initFilters(cy, data);
+    // Init filters first so defaults are applied before layout
+    initFilters(cy, data, () => runCoseLayout(cy));
+    runCoseLayout(cy);
     initSearch(cy, openEntityPanel);
     initTimeSlider(cy, (validAt) => applyGraphSnapshot(cy, validAt));
     initDecayOverlay(cy);

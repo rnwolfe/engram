@@ -65,10 +65,11 @@ export function initCytoscape(container: HTMLElement): Core {
           label: "data(label)",
           color: "#c9d1d9",
           "font-size": "10px",
+          "min-zoomed-font-size": 14,
           "text-valign": "bottom",
           "text-halign": "center",
           "text-margin-y": 4,
-          "text-max-width": "80px",
+          "text-max-width": "120px",
           "text-wrap": "ellipsis",
           width: (ele: NodeSingular) =>
             nodeSize((ele.degree(false) as number) ?? 0),
@@ -203,7 +204,7 @@ export const COSE_LAYOUT_OPTIONS = {
 } as const;
 
 export function runCoseLayout(cy: Core): void {
-  cy.layout(COSE_LAYOUT_OPTIONS).run();
+  cy.elements().not(":hidden").layout(COSE_LAYOUT_OPTIONS).run();
 }
 
 // ── Elements builder ──────────────────────────────────────
@@ -227,6 +228,12 @@ export interface GraphEdge {
   valid_until: string | null;
 }
 
+function shortLabel(canonicalName: string): string {
+  const parts = canonicalName.split("/");
+  if (parts.length <= 2) return canonicalName;
+  return parts.slice(-2).join("/");
+}
+
 export function buildElements(
   nodes: GraphNode[],
   edges: GraphEdge[],
@@ -238,7 +245,7 @@ export function buildElements(
     group: "nodes" as const,
     data: {
       id: n.id,
-      label: n.canonical_name,
+      label: shortLabel(n.canonical_name),
       entity_type: n.entity_type,
       status: n.status,
       updated_at: n.updated_at,

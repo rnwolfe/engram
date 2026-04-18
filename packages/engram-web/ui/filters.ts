@@ -1,8 +1,5 @@
 /**
- * filters.ts — left sidebar with filter checkboxes for the graph visualization.
- *
- * Provides client-side filtering via cytoscape show/hide.
- * Filters: entity_type, relation_type, edge_kind, "hide orphans" toggle.
+ * filters.ts — left sidebar with filter controls for the graph visualization.
  */
 
 import type { Core } from "cytoscape";
@@ -27,78 +24,89 @@ interface GraphData {
   }>;
 }
 
-// Current filter state
+// Structural boilerplate types hidden by default to reduce hairball density
+const DEFAULT_HIDDEN_ENTITY_TYPES = new Set(["symbol"]);
+const DEFAULT_HIDDEN_RELATION_TYPES = new Set(["defined_in", "contains"]);
+
 const activeFilters = {
   entityTypes: new Set<string>(),
   relationTypes: new Set<string>(),
   edgeKinds: new Set<string>(),
   hideOrphans: false,
+  minDegree: 0,
 };
 
 let cytoscapeInstance: Core | null = null;
+let reLayoutCallback: (() => void) | null = null;
 
-/**
- * Apply current filter state to the cytoscape instance.
- * Shows/hides elements based on checked filters.
- */
-function applyFilters(): void {
+export function applyFilters(): void {
   const cy = cytoscapeInstance;
   if (!cy) return;
 
-  // First show everything
   cy.elements().show();
 
-  // Hide nodes whose entity_type is unchecked
-  if (activeFilters.entityTypes.size > 0) {
-    cy.nodes().forEach((node) => {
-      const entityType = node.data("entity_type") as string;
-      if (!activeFilters.entityTypes.has(entityType)) {
-        node.hide();
-      }
-    });
-  }
+  // Hide nodes by entity type
+  cy.nodes().forEach((node) => {
+    if (!activeFilters.entityTypes.has(node.data("entity_type") as string)) {
+      node.hide();
+    }
+  });
 
-  // Hide edges whose relation_type is unchecked
-  if (activeFilters.relationTypes.size > 0) {
-    cy.edges().forEach((edge) => {
-      const relationType = edge.data("relation_type") as string;
-      if (!activeFilters.relationTypes.has(relationType)) {
-        edge.hide();
-      }
-    });
-  }
+  // Hide edges by relation type
+  cy.edges().forEach((edge) => {
+    if (!activeFilters.relationTypes.has(edge.data("relation_type") as string)) {
+      edge.hide();
+    }
+  });
 
-  // Hide edges whose edge_kind is unchecked
-  if (activeFilters.edgeKinds.size > 0) {
-    cy.edges().forEach((edge) => {
-      const edgeKind = edge.data("edge_kind") as string;
-      if (!activeFilters.edgeKinds.has(edgeKind)) {
-        edge.hide();
-      }
-    });
-  }
+  // Hide edges by edge kind
+  cy.edges().forEach((edge) => {
+    if (!edge.hidden() && !activeFilters.edgeKinds.has(edge.data("edge_kind") as string)) {
+      edge.hide();
+    }
+  });
 
-  // Hide orphan nodes (nodes with no visible edges)
-  if (activeFilters.hideOrphans) {
+  // Cascade: hide edges whose endpoints are hidden
+  cy.edges().forEach((edge) => {
+    if (!edge.hidden() && (edge.source().hidden() || edge.target().hidden())) {
+      edge.hide();
+    }
+  });
+
+  // Min visible-degree filter
+  if (activeFilters.minDegree > 0) {
     cy.nodes().forEach((node) => {
       if (!node.hidden()) {
-        const visibleEdges = node.connectedEdges().filter((e) => !e.hidden());
-        if (visibleEdges.length === 0) {
+        const visibleDegree = node.connectedEdges().filter((e) => !e.hidden()).length;
+        if (visibleDegree < activeFilters.minDegree) {
           node.hide();
         }
+      }
+    });
+    // Cascade again after degree filter
+    cy.edges().forEach((edge) => {
+      if (!edge.hidden() && (edge.source().hidden() || edge.target().hidden())) {
+        edge.hide();
+      }
+    });
+  }
+
+  // Hide orphans (nodes with no visible edges)
+  if (activeFilters.hideOrphans) {
+    cy.nodes().forEach((node) => {
+      if (!node.hidden() && node.connectedEdges().filter((e) => !e.hidden()).length === 0) {
+        node.hide();
       }
     });
   }
 }
 
-/**
- * Build a section of checkboxes inside the sidebar.
- */
 function buildCheckboxSection(
   container: HTMLElement,
   title: string,
   values: string[],
   activeSet: Set<string>,
+  defaultHidden: Set<string>,
   onChange: () => void,
 ): void {
   const section = document.createElement("div");
@@ -109,14 +117,15 @@ function buildCheckboxSection(
   section.appendChild(heading);
 
   for (const value of values) {
-    activeSet.add(value);
+    const isChecked = !defaultHidden.has(value);
+    if (isChecked) activeSet.add(value);
 
     const label = document.createElement("label");
     label.className = "filter-label";
 
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
-    checkbox.checked = true;
+    checkbox.checked = isChecked;
     checkbox.dataset.value = value;
 
     checkbox.addEventListener("change", () => {
@@ -136,21 +145,22 @@ function buildCheckboxSection(
   container.appendChild(section);
 }
 
-/**
- * Initialize the filter sidebar.
- * Reads unique values from graph data and builds checkboxes.
- */
-export function initFilters(cy: Core, data: GraphData): void {
+export function initFilters(cy: Core, data: GraphData, onReLayout: () => void): void {
   cytoscapeInstance = cy;
+  reLayoutCallback = onReLayout;
+
+  // Reset state (handles time-slider re-inits)
+  activeFilters.entityTypes.clear();
+  activeFilters.relationTypes.clear();
+  activeFilters.edgeKinds.clear();
+  activeFilters.hideOrphans = false;
+  activeFilters.minDegree = 0;
 
   const sidebar = document.getElementById("filter-sidebar");
   if (!sidebar) return;
 
-  // Collect unique values
   const entityTypes = [...new Set(data.nodes.map((n) => n.entity_type))].sort();
-  const relationTypes = [
-    ...new Set(data.edges.map((e) => e.relation_type)),
-  ].sort();
+  const relationTypes = [...new Set(data.edges.map((e) => e.relation_type))].sort();
   const edgeKinds = [...new Set(data.edges.map((e) => e.edge_kind))].sort();
 
   sidebar.innerHTML = "";
@@ -159,38 +169,50 @@ export function initFilters(cy: Core, data: GraphData): void {
   title.textContent = "Filters";
   sidebar.appendChild(title);
 
-  // Entity type filters
   if (entityTypes.length > 0) {
-    buildCheckboxSection(
-      sidebar,
-      "Entity type",
-      entityTypes,
-      activeFilters.entityTypes,
-      applyFilters,
-    );
+    buildCheckboxSection(sidebar, "Entity type", entityTypes, activeFilters.entityTypes, DEFAULT_HIDDEN_ENTITY_TYPES, applyFilters);
   }
 
-  // Relation type filters
   if (relationTypes.length > 0) {
-    buildCheckboxSection(
-      sidebar,
-      "Relation type",
-      relationTypes,
-      activeFilters.relationTypes,
-      applyFilters,
-    );
+    buildCheckboxSection(sidebar, "Relation type", relationTypes, activeFilters.relationTypes, DEFAULT_HIDDEN_RELATION_TYPES, applyFilters);
   }
 
-  // Edge kind filters
   if (edgeKinds.length > 0) {
-    buildCheckboxSection(
-      sidebar,
-      "Edge kind",
-      edgeKinds,
-      activeFilters.edgeKinds,
-      applyFilters,
-    );
+    buildCheckboxSection(sidebar, "Edge kind", edgeKinds, activeFilters.edgeKinds, new Set(), applyFilters);
   }
+
+  // Min degree slider
+  const degreeSection = document.createElement("div");
+  degreeSection.className = "filter-section";
+
+  const degreeHeading = document.createElement("h4");
+  degreeHeading.textContent = "Min connections";
+  degreeSection.appendChild(degreeHeading);
+
+  const degreeRow = document.createElement("div");
+  degreeRow.className = "filter-degree-row";
+
+  const degreeSlider = document.createElement("input");
+  degreeSlider.type = "range";
+  degreeSlider.min = "0";
+  degreeSlider.max = "20";
+  degreeSlider.value = "0";
+  degreeSlider.className = "filter-degree-slider";
+
+  const degreeValue = document.createElement("span");
+  degreeValue.className = "filter-degree-value";
+  degreeValue.textContent = "0";
+
+  degreeSlider.addEventListener("input", () => {
+    activeFilters.minDegree = Number.parseInt(degreeSlider.value, 10);
+    degreeValue.textContent = degreeSlider.value;
+    applyFilters();
+  });
+
+  degreeRow.appendChild(degreeSlider);
+  degreeRow.appendChild(degreeValue);
+  degreeSection.appendChild(degreeRow);
+  sidebar.appendChild(degreeSection);
 
   // Hide orphans toggle
   const orphanSection = document.createElement("div");
@@ -201,7 +223,6 @@ export function initFilters(cy: Core, data: GraphData): void {
 
   const orphanCheckbox = document.createElement("input");
   orphanCheckbox.type = "checkbox";
-  orphanCheckbox.id = "filter-hide-orphans";
   orphanCheckbox.checked = false;
 
   orphanCheckbox.addEventListener("change", () => {
@@ -213,4 +234,18 @@ export function initFilters(cy: Core, data: GraphData): void {
   orphanLabel.appendChild(document.createTextNode(" Hide orphans"));
   orphanSection.appendChild(orphanLabel);
   sidebar.appendChild(orphanSection);
+
+  // Re-layout button
+  const reLayoutSection = document.createElement("div");
+  reLayoutSection.className = "filter-section";
+
+  const reLayoutBtn = document.createElement("button");
+  reLayoutBtn.textContent = "Re-layout";
+  reLayoutBtn.className = "filter-relayout-btn";
+  reLayoutBtn.addEventListener("click", () => onReLayout());
+  reLayoutSection.appendChild(reLayoutBtn);
+  sidebar.appendChild(reLayoutSection);
+
+  // Apply defaults immediately so layout runs on the filtered graph
+  applyFilters();
 }

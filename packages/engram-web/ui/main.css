@@ -45,6 +45,82 @@ body {
   color: #f85149;
 }
 
+/* Filter sidebar degree slider */
+
+.filter-degree-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-degree-slider {
+  flex: 1;
+  accent-color: #58a6ff;
+  cursor: pointer;
+}
+
+.filter-degree-value {
+  font-size: 0.75rem;
+  color: #c9d1d9;
+  min-width: 1.5rem;
+  text-align: right;
+}
+
+.filter-relayout-btn {
+  width: 100%;
+  padding: 0.3rem 0;
+  background: #21262d;
+  border: 1px solid #30363d;
+  color: #c9d1d9;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
+.filter-relayout-btn:hover {
+  background: #30363d;
+  border-color: #58a6ff55;
+  color: #58a6ff;
+}
+
+/* Loading overlay */
+
+#loading {
+  position: fixed;
+  inset: 0;
+  background: rgba(13, 17, 23, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  color: #8b949e;
+  font-size: 0.9rem;
+}
+
+#loading.hidden {
+  display: none;
+}
+
+/* Error banner */
+
+#error-banner {
+  position: fixed;
+  top: 44px;
+  left: 0;
+  right: 0;
+  padding: 0.5rem 1rem;
+  background: #3d1a1a;
+  border-bottom: 1px solid #f8514966;
+  color: #f85149;
+  font-size: 0.85rem;
+  z-index: 100;
+  display: none;
+}
+
+#error-banner.visible {
+  display: block;
+}
+
 #toolbar-actions {
   display: flex;
   gap: 0.5rem;
