@@ -43,7 +43,7 @@ Examples:
   engram companion --harness cursor >> .cursor/rules/engram.md
 
   # Idempotent CI setup (only append if not already present)
-  engram companion --check --file CLAUDE.md \\
+  engram companion --harness claude-code --check --file CLAUDE.md \\
     || engram companion --harness claude-code >> CLAUDE.md
 
 When to use:
