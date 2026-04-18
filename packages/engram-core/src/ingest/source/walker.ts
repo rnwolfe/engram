@@ -24,10 +24,8 @@ const DENY_DIRS = new Set([
   "node_modules",
   "dist",
   "build",
-  ".next",
   "out",
   "target",
-  ".git",
   "coverage",
 ]);
 
@@ -37,6 +35,10 @@ const DENY_FILE_PATTERNS = [
   /\.min\.css$/,
   /\.map$/,
   /\.lockb$/,
+  /\.wasm$/,
+  /\.engram$/,
+  /\.engram-wal$/,
+  /\.engram-shm$/,
   /^package-lock\.json$/,
   /^bun\.lock$/,
   /^bun\.lockb$/,
@@ -57,7 +59,7 @@ function isDeniedFile(filename: string): boolean {
 }
 
 function isDeniedDir(dirname: string): boolean {
-  return DENY_DIRS.has(dirname);
+  return DENY_DIRS.has(dirname) || dirname.startsWith(".");
 }
 
 function isBinary(buffer: Buffer): boolean {

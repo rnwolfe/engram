@@ -35,12 +35,33 @@ function isGlobPattern(input: string): boolean {
   return input.includes("*") || input.includes("?");
 }
 
+/** Recursively collect all .md files under a directory. */
+function walkMarkdown(dir: string): string[] {
+  const results: string[] = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      results.push(...walkMarkdown(full));
+    } else if (entry.isFile() && entry.name.endsWith(".md")) {
+      results.push(full);
+    }
+  }
+  return results;
+}
+
 /**
- * Minimal glob expansion using node:fs.
- * Supports simple patterns like "/dir/*.md" where the directory is a literal path
- * and the filename portion may contain * or ? wildcards.
+ * Expand a path/glob/directory to a list of markdown file paths.
+ * - Directory: recursively finds all .md files.
+ * - Glob pattern (contains * or ?): expands within the parent directory.
+ * - File path: returned as-is.
  */
 async function expandPaths(input: string): Promise<string[]> {
+  const resolved = path.resolve(input);
+
+  if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
+    return walkMarkdown(resolved);
+  }
+
   if (!isGlobPattern(input)) {
     return [input];
   }
