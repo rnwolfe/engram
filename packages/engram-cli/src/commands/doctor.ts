@@ -26,6 +26,7 @@ import * as nodePath from "node:path";
 import { confirm, log } from "@clack/prompts";
 import type { Command } from "commander";
 import { resolveDbPath } from "engram-core";
+import { c } from "../colors.js";
 import type { CheckResult, CheckStatus } from "./doctor-checks.js";
 import {
   checkEmbeddingIndex,
@@ -64,11 +65,11 @@ interface DoctorOpts {
 function statusIcon(status: CheckStatus): string {
   switch (status) {
     case "pass":
-      return "✓";
+      return c.green("✓");
     case "fail":
-      return "✗";
+      return c.red("✗");
     case "warn":
-      return "⚠";
+      return c.yellow("⚠");
     case "skip":
       return "-";
   }
@@ -91,13 +92,13 @@ function renderHuman(report: DoctorReport): void {
   const hasIssues = failed.length > 0 || warned.length > 0;
 
   if (hasIssues) {
-    console.log("\nIssues found:");
+    console.log(`\n${c.red("Issues found:")}`);
     for (const check of [...failed, ...warned]) {
       if (check.fix) {
-        console.log(`  ${check.name}  ${check.message}`);
+        console.log(`  ${c.bold(check.name)}  ${check.message}`);
         console.log(`    fix: ${check.fix}`);
       } else {
-        console.log(`  ${check.name}  ${check.message}`);
+        console.log(`  ${c.bold(check.name)}  ${check.message}`);
       }
     }
   }
@@ -105,8 +106,12 @@ function renderHuman(report: DoctorReport): void {
   if (report.fixes_applied.length > 0) {
     console.log("\nFixes applied:");
     for (const f of report.fixes_applied) {
-      console.log(`  ✓  ${f}`);
+      console.log(`  ${c.green("✓")}  ${f}`);
     }
+  }
+
+  if (failed.length === 0 && warned.length === 0) {
+    console.log(`\n${c.green("All checks passed.")}`);
   }
 
   if (failed.length > 0) {

@@ -9,6 +9,7 @@ import * as path from "node:path";
 import type { Command } from "commander";
 import type { EngramGraph } from "engram-core";
 import { closeGraph, openGraph, resolveDbPath } from "engram-core";
+import { c } from "../colors.js";
 
 interface VerifyOpts {
   db: string;
@@ -49,7 +50,7 @@ See also:
         graph = openGraph(dbPath);
       } catch (err) {
         console.error(
-          `Error opening graph: ${err instanceof Error ? err.message : String(err)}`,
+          `${c.red("Error:")} opening graph: ${err instanceof Error ? err.message : String(err)}`,
         );
         process.exit(1);
       }
@@ -128,7 +129,7 @@ See also:
         }
       } catch (err) {
         console.error(
-          `Verify failed: ${err instanceof Error ? err.message : String(err)}`,
+          `${c.red("Error:")} verify failed: ${err instanceof Error ? err.message : String(err)}`,
         );
         closeGraph(graph);
         process.exit(1);
@@ -137,13 +138,13 @@ See also:
       closeGraph(graph);
 
       if (violations.length === 0) {
-        console.log("Graph integrity OK — no violations found.");
+        console.log(c.green("Graph integrity OK — no violations found."));
         return;
       }
 
-      console.error(`Found ${violations.length} integrity violation(s):`);
+      console.error(c.red(`Found ${violations.length} integrity violation(s):`));
       for (const v of violations) {
-        console.error(`  - ${v}`);
+        console.error(c.red(`  - ${v}`));
       }
       process.exit(2);
     });

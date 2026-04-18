@@ -16,6 +16,7 @@ import {
   resolveDbPath,
   search,
 } from "engram-core";
+import { c } from "../colors.js";
 
 interface SearchOpts {
   limit: string;
@@ -61,12 +62,12 @@ See also:
       const limit = parseInt(opts.limit, 10);
 
       if (Number.isNaN(limit) || limit < 1) {
-        console.error("Error: --limit must be a positive integer");
+        console.error(`${c.red("Error:")} --limit must be a positive integer`);
         process.exit(1);
       }
 
       if (opts.format !== "text" && opts.format !== "json") {
-        console.error("Error: --format must be 'text' or 'json'");
+        console.error(`${c.red("Error:")} --format must be 'text' or 'json'`);
         process.exit(1);
       }
 
@@ -75,7 +76,7 @@ See also:
         graph = openGraph(dbPath);
       } catch (err) {
         console.error(
-          `Error opening graph: ${err instanceof Error ? err.message : String(err)}`,
+          `${c.red("Error:")} opening graph: ${err instanceof Error ? err.message : String(err)}`,
         );
         process.exit(1);
       }
@@ -108,7 +109,7 @@ See also:
           );
         } else {
           console.error(
-            `Search failed: ${err instanceof Error ? err.message : String(err)}`,
+            `${c.red("Error:")} search failed: ${err instanceof Error ? err.message : String(err)}`,
           );
         }
         closeGraph(graph);
@@ -122,15 +123,17 @@ See also:
       }
 
       if (results.length === 0) {
-        console.log("No results found.");
+        console.log(c.dim("No results found."));
         return;
       }
 
       for (const r of results) {
         const score = r.score.toFixed(3);
         const kind = r.edge_kind ? ` [${r.edge_kind}]` : "";
-        console.log(`[${r.type}${kind}] (${score}) ${r.content}`);
-        console.log(`  id: ${r.id}`);
+        console.log(
+          `${c.cyan(`[${r.type}${kind}]`)} ${c.dim(`(${score})`)} ${r.content}`,
+        );
+        console.log(`${c.dim("  id: ")}${r.id}`);
         if (r.provenance.length > 0) {
           console.log(`  evidence: ${r.provenance.length} episode(s)`);
         }
