@@ -812,7 +812,9 @@ describe("engram history", () => {
         process.exit = origExit;
       }
       expect(exitCode).toBe(1);
-      expect(errors.join("\n")).toContain("Error: --format must be 'text' or 'json'");
+      expect(errors.join("\n")).toContain(
+        "Error: --format must be 'text' or 'json'",
+      );
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
