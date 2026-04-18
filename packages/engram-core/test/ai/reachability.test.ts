@@ -117,13 +117,13 @@ describe("checkGoogle", () => {
   test("returns ok:false with hint when no API key provided", async () => {
     const result = await checkGoogle(undefined);
     expect(result.ok).toBe(false);
-    expect(result.hint).toContain("GOOGLE_API_KEY");
+    expect(result.hint).toContain("GEMINI_API_KEY");
   });
 
   test("returns ok:false for empty string key", async () => {
     const result = await checkGoogle("");
     expect(result.ok).toBe(false);
-    expect(result.hint).toContain("GOOGLE_API_KEY");
+    expect(result.hint).toContain("GEMINI_API_KEY");
   });
 
   test("returns ok:true when API responds successfully", async () => {
@@ -136,7 +136,7 @@ describe("checkGoogle", () => {
     mockFetch({ error: "Forbidden" }, 403);
     const result = await checkGoogle("bad-key");
     expect(result.ok).toBe(false);
-    expect(result.hint).toContain("GOOGLE_API_KEY");
+    expect(result.hint).toContain("GEMINI_API_KEY");
   });
 
   test("result has required shape", async () => {

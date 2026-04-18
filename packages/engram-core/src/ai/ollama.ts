@@ -8,7 +8,7 @@
 import type { AIProvider, EntityHint } from "./provider.js";
 
 const DEFAULT_BASE_URL = "http://localhost:11434";
-const DEFAULT_EMBED_MODEL = "nomic-embed-text";
+const DEFAULT_EMBED_MODEL = "mxbai-embed-large";
 
 interface OllamaEmbedResponse {
   embeddings?: number[][];

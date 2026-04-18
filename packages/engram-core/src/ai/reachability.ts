@@ -96,8 +96,8 @@ export async function checkGoogle(
   if (!apiKey) {
     return {
       ok: false,
-      message: "GOOGLE_API_KEY is not set",
-      hint: "export GOOGLE_API_KEY=...",
+      message: "GEMINI_API_KEY / GOOGLE_API_KEY is not set",
+      hint: "export GEMINI_API_KEY=...",
     };
   }
 
@@ -113,7 +113,7 @@ export async function checkGoogle(
         message: `Google API returned HTTP ${response.status}`,
         hint:
           response.status === 400 || response.status === 403
-            ? "Check your GOOGLE_API_KEY is valid"
+            ? "Check your GEMINI_API_KEY / GOOGLE_API_KEY is valid"
             : undefined,
       };
     }

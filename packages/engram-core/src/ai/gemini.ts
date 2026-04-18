@@ -1,14 +1,14 @@
 /**
  * gemini.ts — GeminiProvider: Google Gemini AI via @google/genai SDK.
  *
- * Default embed model: gemini-embedding-001 (overridable via config).
- * API key read from GEMINI_API_KEY env var; never stored in .engram files.
+ * Default embed model: gemini-embedding-2-preview (overridable via config).
+ * API key read from GEMINI_API_KEY or GOOGLE_API_KEY env var; never stored in .engram files.
  * Gracefully degrades when key is missing or API returns errors.
  */
 
 import type { AIProvider, EntityHint } from "./provider.js";
 
-const DEFAULT_EMBED_MODEL = "gemini-embedding-001";
+const DEFAULT_EMBED_MODEL = "gemini-embedding-2-preview";
 
 export class GeminiProvider implements AIProvider {
   private apiKey: string;
@@ -21,13 +21,17 @@ export class GeminiProvider implements AIProvider {
     embedModel?: string;
     extractModel?: string;
   }) {
-    this.apiKey = opts?.apiKey ?? process.env.GEMINI_API_KEY ?? "";
+    this.apiKey =
+      opts?.apiKey ??
+      process.env.GEMINI_API_KEY ??
+      process.env.GOOGLE_API_KEY ??
+      "";
     this.embedModel = opts?.embedModel ?? DEFAULT_EMBED_MODEL;
     this.extractModel = opts?.extractModel;
 
     if (!this.apiKey) {
       console.warn(
-        "[engram] GeminiProvider: GEMINI_API_KEY not set — falling back to null behavior",
+        "[engram] GeminiProvider: GEMINI_API_KEY / GOOGLE_API_KEY not set — falling back to null behavior",
       );
     }
   }

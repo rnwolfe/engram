@@ -109,7 +109,7 @@ export function createGenerator(opts?: {
     return new GeminiGenerator({
       model: opts?.model,
       promptTemplateId: opts?.promptTemplateId,
-      apiKey: process.env.GEMINI_API_KEY,
+      apiKey: process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY,
     });
   }
   if (provider === "openai") {
@@ -134,11 +134,11 @@ export function createGenerator(opts?: {
       apiKey: process.env.ANTHROPIC_API_KEY,
     });
   }
-  if (process.env.GEMINI_API_KEY) {
+  if (process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY) {
     return new GeminiGenerator({
       model: opts?.model,
       promptTemplateId: opts?.promptTemplateId,
-      apiKey: process.env.GEMINI_API_KEY,
+      apiKey: process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY,
     });
   }
   if (process.env.OPENAI_API_KEY) {

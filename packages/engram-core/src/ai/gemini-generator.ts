@@ -4,8 +4,8 @@
  * Uses @google/genai (already a dependency for embeddings) to call the
  * Gemini generative models API.
  *
- * Default model: gemini-2.0-flash
- * API key read from GEMINI_API_KEY env var.
+ * Default model: gemini-3-flash-preview
+ * API key read from GEMINI_API_KEY or GOOGLE_API_KEY env var.
  */
 
 import type { Projection } from "../graph/projections.js";
@@ -42,7 +42,8 @@ export class GeminiGenerator implements ProjectionGenerator {
   }) {
     this.model = opts?.model ?? DEFAULT_MODEL;
     this.promptTemplateId = opts?.promptTemplateId ?? "default.v1";
-    this.apiKey = opts?.apiKey ?? process.env.GEMINI_API_KEY;
+    this.apiKey =
+      opts?.apiKey ?? process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
   }
 
   isConfigured(): boolean {
