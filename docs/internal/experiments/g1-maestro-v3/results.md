@@ -1,0 +1,4699 @@
+# G1 Maestro v3 — Raw Results
+
+> Updated pack with direct episode search track — PR/issue discussions
+> surfaced as first-class content alongside code entities.
+> Same 9 questions as v2 for direct comparison.
+> Both conditions run from cwd=/home/rnwolfe/dev/Maestro.
+
+---
+
+## Q1 [small] — Why does the output buffer store streaming chunks in an array rather than concatenating them into a string?
+
+**Context pack:** 442 lines — includes Discussions section
+
+<details><summary>Full context pack</summary>
+
+```
+## Context pack
+> Query: Why does the output buffer store streaming chunks in an array rather than concatenating them into a string?  Budget: 6000 tokens | Used: ~4332 | 50 results
+
+### Entities
+
+- `src/main/group-chat/output-buffer.ts` **[module]** — score 1.000 | evidence: 2 episode(s)
+- `src/main/group-chat/output-buffer.ts::groupChatOutputBuffers` **[symbol]** — score 0.945 | evidence: 1 episode(s)
+- `src/main/group-chat/output-buffer.ts::appendToGroupChatBuffer` **[symbol]** — score 0.945 | evidence: 1 episode(s)
+- `src/main/group-chat/output-buffer.ts::getGroupChatBufferedOutput` **[symbol]** — score 0.945 | evidence: 1 episode(s)
+- `src/main/group-chat/output-buffer.ts::clearGroupChatBuffer` **[symbol]** — score 0.945 | evidence: 1 episode(s)
+- `src/main/group-chat/output-buffer.ts::hasGroupChatBuffer` **[symbol]** — score 0.945 | evidence: 1 episode(s)
+- `src/main/group-chat/output-buffer.ts::isGroupChatBufferTruncated` **[symbol]** — score 0.945 | evidence: 1 episode(s)
+- `src/__tests__/main/group-chat/output-buffer.test.ts` **[module]** — score 0.897 | evidence: 2 episode(s)
+- `src/main/index.ts::store` **[symbol]** — score 0.807 | evidence: 1 episode(s)
+- `https://github.com/RunMaestro/Maestro/issues/291` **[issue]** — score 0.554 | evidence: 1 episode(s)
+- `src/cli/output` **[module]** — score 0.518 | evidence: 1 episode(s)
+- `https://github.com/RunMaestro/Maestro/issues/660` **[issue]** — score 0.488 | evidence: 1 episode(s)
+- `src/__tests__/cli/output` **[module]** — score 0.481 | evidence: 1 episode(s)
+- `src/cli/output/formatter.ts` **[module]** — score 0.450 | evidence: 2 episode(s)
+- `src/cli/output/jsonl.ts` **[module]** — score 0.450 | evidence: 2 episode(s)
+- `src/cli/output/formatter.ts::colors` **[symbol]** — score 0.423 | evidence: 1 episode(s)
+- `src/cli/output/formatter.ts::supportsColor` **[symbol]** — score 0.423 | evidence: 1 episode(s)
+- `src/cli/output/formatter.ts::c` **[symbol]** — score 0.423 | evidence: 1 episode(s)
+- `src/cli/output/formatter.ts::bold` **[symbol]** — score 0.423 | evidence: 1 episode(s)
+- `src/cli/output/formatter.ts::dim` **[symbol]** — score 0.423 | evidence: 1 episode(s)
+- `src/cli/output/formatter.ts::truncate` **[symbol]** — score 0.423 | evidence: 1 episode(s)
+- `src/cli/output/formatter.ts::GroupDisplay` **[symbol]** — score 0.423 | evidence: 1 episode(s)
+- `src/cli/output/formatter.ts::formatGroups` **[symbol]** — score 0.423 | evidence: 1 episode(s)
+- `src/cli/output/formatter.ts::AgentDisplay` **[symbol]** — score 0.423 | evidence: 1 episode(s)
+- `src/cli/output/formatter.ts::formatAgents` **[symbol]** — score 0.423 | evidence: 1 episode(s)
+- `src/cli/output/formatter.ts::PlaybookDocDisplay` **[symbol]** — score 0.423 | evidence: 1 episode(s)
+- `src/cli/output/formatter.ts::PlaybookDisplay` **[symbol]** — score 0.423 | evidence: 1 episode(s)
+- `src/cli/output/formatter.ts::PlaybooksByAgent` **[symbol]** — score 0.423 | evidence: 1 episode(s)
+- `src/cli/output/formatter.ts::formatPlaybooks` **[symbol]** — score 0.423 | evidence: 1 episode(s)
+- `src/cli/output/formatter.ts::PlaybookDetailDisplay` **[symbol]** — score 0.423 | evidence: 1 episode(s)
+
+### Edges
+
+- src/__tests__/main/group-chat/output-buffer.test.ts imports src/main/group-chat/output-buffer.ts **[observed]** — score 1.000
+- src/main/group-chat/output-buffer.ts defines groupChatOutputBuffers **[observed]** — score 0.903
+- src/main/group-chat/output-buffer.ts defines appendToGroupChatBuffer **[observed]** — score 0.903
+- src/main/group-chat/output-buffer.ts defines getGroupChatBufferedOutput **[observed]** — score 0.903
+- src/main/group-chat/output-buffer.ts defines clearGroupChatBuffer **[observed]** — score 0.903
+- src/main/group-chat/output-buffer.ts defines hasGroupChatBuffer **[observed]** — score 0.903
+- src/main/group-chat/output-buffer.ts defines isGroupChatBufferTruncated **[observed]** — score 0.903
+- src/main/index.ts defines store **[observed]** — score 0.885
+- groupChatOutputBuffers is defined in src/main/group-chat/output-buffer.ts **[observed]** — score 0.844
+- appendToGroupChatBuffer is defined in src/main/group-chat/output-buffer.ts **[observed]** — score 0.844
+- getGroupChatBufferedOutput is defined in src/main/group-chat/output-buffer.ts **[observed]** — score 0.844
+- clearGroupChatBuffer is defined in src/main/group-chat/output-buffer.ts **[observed]** — score 0.844
+- hasGroupChatBuffer is defined in src/main/group-chat/output-buffer.ts **[observed]** — score 0.844
+- isGroupChatBufferTruncated is defined in src/main/group-chat/output-buffer.ts **[observed]** — score 0.844
+- store is defined in src/main/index.ts **[observed]** — score 0.820
+- src/main/group-chat/output-buffer.ts imports src/main/constants.ts **[observed]** — score 0.818
+- src/main/index.ts imports src/main/group-chat/output-buffer.ts **[observed]** — score 0.818
+- src/main/group-chat contains file src/main/group-chat/output-buffer.ts **[observed]** — score 0.792
+- src/__tests__/main/group-chat/output-buffer.test.ts imports src/main/constants.ts **[observed]** — score 0.769
+- src/__tests__/main/group-chat contains file src/__tests__/main/group-chat/output-buffer.test.ts **[observed]** — score 0.726
+
+### Discussions
+_PR descriptions, issue discussions, and commit messages retrieved directly from the graph._
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/784` (2026-04-10 by chr1syy) — score 1.000:
+```
+PR #784: fix: extract clean output from Cue scheduled tasks
+URL: https://github.com/RunMaestro/Maestro/pull/784
+State: closed
+Author: chr1syy
+Created: 2026-04-10T06:46:23Z
+
+## Summary
+- Cue scheduled tasks were showing raw JSONL instead of formatted agent output
+- Root cause: Claude Code emits `"result": ""` (empty string) when the agent's last action is a tool use, and `extractCleanStdout()` treated empty string as falsy, falling back to raw output
+- Now falls back to assistant message text when the result event is empty, with deduplication of streaming chunks by message ID
+
+## Test plan
+- [x] Existing 46 cue-executor tests still pass
+- [x] New test: empty result with assistant text fallback
+- [x] New test: streaming chunk deduplication by message ID
+- [x] Manual: trigger a Cue scheduled task and verify clean output in Activity Log
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+<!-- This is an auto-generated comment: release notes by coderabbit.ai -->
+## Summary by CodeRabbit
+
+* **Bug Fixes**
+  * Improved stdout extraction for streaming responses: explicit parser result content is prioritized; when empty, the system falls back to the latest assistant text.
+  * D…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/679` (2026-03-28 by chr1syy) — score 0.926:
+```
+PR #679: fix(cli): capture response from claude-code in maestro-cli send
+URL: https://github.com/RunMaestro/Maestro/pull/679
+State: closed
+Author: chr1syy
+Created: 2026-03-28T11:12:39Z
+
+## Summary
+- `maestro-cli send` returned `response: null` for claude-code agents because Claude Code emits the response text in `assistant` messages, not in the `result` message's `result` field (which is empty string)
+- Now accumulates text from `assistant` messages as a fallback when `result` field is empty
+- Also flushes the JSONL buffer on process close to handle output lacking a trailing newline (both `spawnClaudeAgent` and `spawnJsonLineAgent`)
+
+## Test plan
+- [x] Unit tests pass (80/80, including 5 new tests for assistant text fallback, string content, result preference, and buffer flush)
+- [x] Type-check passes
+- [x] Manual e2e test: `maestro-cli send <agent-id> "Respond with exactly: CLI capture test OK"` now returns `success: true` with correct response text
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+<!-- This is an auto-generated comment: release notes by coderabbit.ai -->
+## Summary by CodeRabbit
+
+* **Bug Fixes**
+  * Improved CLI stream parsing to flush and parse t…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/226` (2026-01-22 by reachrazamair) — score 0.797:
+```
+PR #226: refactor: extract modules from main/index.ts
+URL: https://github.com/RunMaestro/Maestro/pull/226
+State: closed
+Author: reachrazamair
+Created: 2026-01-22T20:54:37Z
+
+## Summary
+- Extract reusable modules from `main/index.ts` to improve maintainability
+- Add comprehensive test coverage for extracted code (133 new tests)
+- Consolidate constants to eliminate redundant directory structure
+
+## Changes
+
+### 1: Pure Function Extractions
+| File | Description |
+|------|-------------|
+| `constants.ts` | Regex patterns for group chat session IDs + `debugLog` utility |
+| `group-chat/session-parser.ts` | Parse participant session IDs (handles hyphenated names) |
+| `group-chat/output-parser.ts` | Extract text from agent JSONL output streams |
+| `group-chat/output-buffer.ts` | Buffer management for streaming output |
+
+### 2: Dependency Injection Factories
+| File | Description |
+|------|-------------|
+| `utils/safe-send.ts` | Factory for safe IPC messaging (handles destroyed windows) |
+| `web-server/web-server-factory.ts` | Factory for creating configured web servers |
+
+### Test Coverage
+- 6 new test files with 133 tests
+- All 365 test suites pass (15,964 tests total)…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/410` (2026-02-18 by openasocket) — score 0.739:
+```
+PR #410: fix: auto-scroll follows thinking streams + Codex tool display
+URL: https://github.com/RunMaestro/Maestro/pull/410
+State: closed
+Author: openasocket
+Created: 2026-02-18T20:33:56Z
+
+## Summary
+
+- Replace `filteredLogs.length` auto-scroll dependency with `MutationObserver` to detect in-place content changes (thinking stream text growth, tool status updates)
+- Add programmatic scroll guard to prevent the scroll handler from falsely pausing auto-scroll during effect-driven `scrollTo()` calls
+- Fix Codex tool execution display: carry tool name from `tool_call` to `tool_result`, handle array-typed `command` args, add Codex-specific arg extraction, truncate large outputs
+
+## Motivation
+
+### Auto-scroll stops following thinking/tool streams (Fixes #402, supersedes #406)
+
+The auto-scroll feature ([PR #390](https://github.com/RunMaestro/Maestro/pull/390)) depends on `filteredLogs.length` to trigger scroll-to-bottom. However, thinking chunks update the **last log entry's text in-place** without changing the array length:
+
+```typescript
+// useAgentListeners.ts — thinking chunk handler
+logs: [...tab.logs.slice(0, -1), { ...lastLog, text: combinedText }]
+//                               …
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/499` (2026-03-02 by chr1syy) — score 0.738:
+```
+PR #499: fix: show tool call details and fix text routing for OpenCode thinking
+URL: https://github.com/RunMaestro/Maestro/pull/499
+State: closed
+Author: chr1syy
+Created: 2026-03-02T21:16:21Z
+
+This pull request updates the OpenCode output parsing logic and its associated tests to align with recent changes in the OpenCode protocol. The main changes ensure that text messages are treated as final results (not streamed), and that `step_finish` events are now used only for usage statistics, not for emitting result content. This improves the accuracy of parsing and downstream handling of OpenCode agent responses.
+
+**Test and parser logic updates:**
+
+* Text messages are now parsed and emitted as `result` events (final response, not streaming), with the `isPartial` property removed. (`src/__tests__/main/parsers/opencode-output-parser.test.ts`, `src/main/parsers/opencode-output-parser.ts`) [[1]](diffhunk://#diff-c7d0f040af8a3d76221d643a25ee8f8a302e769d95d76413a3fa49dbf2b5e07aL32-R32) [[2]](diffhunk://#diff-c7d0f040af8a3d76221d643a25ee8f8a302e769d95d76413a3fa49dbf2b5e07aL43-R46) [[3]](diffhunk://#diff-926b13f710645a3d9ce8c79875d3ae6e5da59b0c56fe460fb2666a9b1e5ef17dL157-L163)
+* `step_fin…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/435` (2026-02-21 by openasocket) — score 0.681:
+```
+PR #435: Add Gemini CLI as first-class agent
+URL: https://github.com/RunMaestro/Maestro/pull/435
+State: closed
+Author: openasocket
+Created: 2026-02-21T18:58:58Z
+
+## Summary
+
+- Adds Google Gemini CLI as a fully integrated agent in Maestro across all surfaces: type system, agent definitions, capabilities, output parser, session storage, error handling, group chat, CLI tooling, and UI
+- Achieves feature parity with Claude Code and Codex on 18/20 integration dimensions (image input and model discovery are Gemini CLI limitations, not Maestro gaps)
+- Includes 2,200+ lines of tests across 16 test files
+
+## Changes by area
+
+### Core agent plumbing (types, definitions, capabilities)
+- Added `gemini-cli` to `ToolType` union, `AGENT_DEFINITIONS`, and `AGENT_CAPABILITIES`
+- Configured all agent flags: `batchModeArgs` (`-y`), `jsonOutputArgs` (`--output-format stream-json`), `resumeArgs` (`--resume`), `modelArgs` (`-m`), `yoloModeArgs`, `workingDirArgs` (`--include-directories`)
+- Added `gemini-cli` to every `Record<ToolType>` map, hardcoded array, and `VALID_MODERATOR_AGENT_IDS`
+
+### Output parser (`gemini-output-parser.ts`)
+- Full NDJSON stream-json parser handling 6 event types: `init`, `mes…
+```
+
+### Evidence excerpts
+
+**git_commit** `0916960f25388805f99f85213aa1e0375e30aa3b` (2026-01-22 by reachrazarauf@gmail.com):
+```
+commit 0916960f25388805f99f85213aa1e0375e30aa3b
+Author: Raza Rauf <reachrazarauf@gmail.com>
+Date: 2026-01-22T21:26:53.000Z
+
+fix: address code review feedback for Phase 1 & 2 refactor
+
+- Add MAX_GROUP_CHAT_BUFFER_SIZE (10MB) to prevent memory exhaustion
+- Add buffer truncation with marker when exceeding limit
+- Add isGroupChatBufferTruncated() to check truncation status
+- Add debugLogLazy() for laz…
+```
+
+**source** `src/main/group-chat/output-buffer.ts@de21734157a80b09a8c2b3a` (2026-04-15):
+```
+/**
+ * Output buffer management for group chat.
+ * Buffers streaming output from group chat processes and releases on process exit.
+ */
+
+import { MAX_GROUP_CHAT_BUFFER_SIZE } from '../constants';
+
+// Buffer for group chat output (keyed by sessionId)
+// We buffer output and only route it on process exit to avoid duplicate messages from streaming chunks
+// Uses array of chunks for O(1) append performance instead of O(n) string concatenation
+// Tracks totalLength incrementally to avoid O(n) reduce …
+```
+
+**source** `src/__tests__/main/group-chat/output-buffer.test.ts@35fbb562` (2026-04-15):
+```
+/**
+ * @file output-buffer.test.ts
+ * @description Unit tests for group chat output buffer management.
+ */
+
+import { describe, it, expect } from 'vitest';
+import {
+	appendToGroupChatBuffer,
+	getGroupChatBufferedOutput,
+	clearGroupChatBuffer,
+	hasGroupChatBuffer,
+	isGroupChatBufferTruncated,
+} from '../../../main/group-chat/output-buffer';
+import { MAX_GROUP_CHAT_BUFFER_SIZE } from '../../../main/constants';
+
+describe('group-chat/output-buffer', () => {
+	// Use unique session IDs for each test to…
+```
+
+**source** `src/main/index.ts@2548fe389cae05340b4ede150ba1d17857c7198917` (2026-04-15):
+```
+import { app, BrowserWindow, powerMonitor } from 'electron';
+import path from 'path';
+import os from 'os';
+import crypto from 'crypto';
+// Sentry is imported dynamically below to avoid module-load-time access to electron.app
+// which causes "Cannot read properties of undefined (reading 'getAppPath')" errors
+import { ProcessManager } from './process-manager';
+import { WebServer } from './web-server';
+import { AgentDetector } from './agents';
+import { logger } from './utils/logger';
+import { tunne…
+```
+
+**github_issue** `https://github.com/RunMaestro/Maestro/issues/291` (2026-02-04 by danieliser):
+```
+Issue #291: Streaming responses for Claude/Codex
+URL: https://github.com/RunMaestro/Maestro/issues/291
+State: closed
+Author: danieliser
+Created: 2026-02-04T08:21:05Z
+
+The one thing that has me really wanting to go back to terminal or VS Code extension is the streaming of collapsible thinking blocks, tool calls (collapsed responses), and the small 1 line responses that often come between them showing what its intending to do.
+
+I saw it may have been added for `OpenCode`.
+
+Is it a simple fix, if s…
+```
+
+**source** `src/cli/output/formatter.ts@9b60207d21bfe2890a111abfd2f822b1` (2026-04-15):
+```
+// Human-readable output formatter for CLI
+// Provides beautiful, colored terminal output
+
+// ANSI color codes
+const colors = {
+	reset: '\x1b[0m',
+	bold: '\x1b[1m',
+	dim: '\x1b[2m',
+
+	// Foreground colors
+	black: '\x1b[30m',
+	red: '\x1b[31m',
+	green: '\x1b[32m',
+	yellow: '\x1b[33m',
+	blue: '\x1b[34m',
+	magenta: '\x1b[35m',
+	cyan: '\x1b[36m',
+	white: '\x1b[37m',
+	gray: '\x1b[90m',
+
+	// Bright foreground colors
+	brightRed: '\x1b[91m',
+	brightGreen: '\x1b[92m',
+	brightYellow: '\x1b[93m',
+	brightBlu…
+```
+
+**github_issue** `https://github.com/RunMaestro/Maestro/issues/660` (2026-03-27 by Ashraf-Ali-aa):
+```
+Issue #660: [Mobile App] iOS App Store & Google Play Preparation
+URL: https://github.com/RunMaestro/Maestro/issues/660
+State: closed
+Author: Ashraf-Ali-aa
+Created: 2026-03-27T21:52:27Z
+
+## Overview
+
+Prepare the Maestro mobile app for release on iOS App Store and Google Play Store.
+
+## App Metadata
+
+| Field | Value |
+|-------|-------|
+| App Name | "Maestro Remote" or "Maestro Mobile" |
+| Category | Developer Tools / Productivity |
+| Age Rating | 4+ |
+
+## iOS App Store
+
+### App Store Connect
+- [ ]…
+```
+
+**source** `src/__tests__/cli/output/jsonl.test.ts@3789d0ea1b2a9f7acab50` (2026-04-15):
+```
+/**
+ * @file jsonl.test.ts
+ * @description Tests for CLI JSONL output functions
+ *
+ * Tests all JSONL event emitters used for machine-parseable CLI output.
+ */
+
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+	emitJsonl,
+	emitError,
+	emitStart,
+	emitDocumentStart,
+	emitTaskStart,
+	emitTaskComplete,
+	emitDocumentComplete,
+	emitLoopComplete,
+	emitComplete,
+	emitGroup,
+	emitAgent,
+	emitPlaybook,
+} from '../../../cli/output/jsonl';
+import type { UsageStats } from '…
+```
+
+**git_commit** `85711f577b22f39d82ee65cbe15b9884599e2831` (2026-02-08 by pedram.amini@gmail.com):
+```
+commit 85711f577b22f39d82ee65cbe15b9884599e2831
+Author: Pedram Amini <pedram.amini@gmail.com>
+Date: 2026-02-08T10:10:35.000Z
+
+feat: add query command, list sessions with pagination, and refactor agent-spawner
+
+Add `query` command for sending messages to agents with JSON response,
+`list sessions` command with --limit/--skip pagination and --search
+filtering, and refactor agent-spawner to use shared…
+```
+
+**git_commit** `231fe2fd8884318019bfaf4bd74a5dd48f7f8525` (2026-01-19 by reachrazarauf@gmail.com):
+```
+commit 231fe2fd8884318019bfaf4bd74a5dd48f7f8525
+Author: Raza Rauf <reachrazarauf@gmail.com>
+Date: 2026-01-19T21:21:36.000Z
+
+chore: format entire codebase with prettier
+
+Run `npm run format` across all TypeScript/TSX files
+for consistent code formatting throughout the project.
+
+Files:
+src/__tests__/cli/commands/list-agents.test.ts
+src/__tests__/cli/commands/list-groups.test.ts
+src/__tests__/cli/com…
+```
+
+**source** `src/cli/output/jsonl.ts@d5edad5dc5ea972da75dce619f06546176f0` (2026-04-15):
+```
+// JSONL output helper for CLI
+// Outputs machine-parseable JSON lines to stdout
+
+import type { UsageStats } from '../../shared/types';
+
+// Base event interface - all events have a type and timestamp
+export interface JsonlEvent {
+	type: string;
+	timestamp: number;
+	[key: string]: unknown;
+}
+
+// Event types for playbook execution
+export interface StartEvent extends JsonlEvent {
+	type: 'start';
+	playbook: {
+		id: string;
+		name: string;
+	};
+	session: {
+		id: string;
+		name: string;
+		cwd: string;
+…
+```
+```
+
+</details>
+
+**Condition A (bare):**
+
+I will begin by searching for terms like "output buffer" and "streaming" to locate the relevant implementation in the codebase.
+I'll examine the implementation of `src/main/group-chat/output-buffer.ts` to understand why it uses an array and the benefits of this approach.
+I've identified that `src/main/group-chat/output-buffer.ts` uses an array for $O(1)$ append performance, avoiding the $O(n)$ cost of string concatenation. I'll also check `src/renderer/components/Wizard/services/conversationManager.ts` to see if similar patterns are used elsewhere.
+In `ConversationManager`, `outputBuffer` is defined as a `string` (line 105). I'll now examine how it's appended to in `ConversationManager.ts`.
+I'll search for modifications to `outputBuffer` in `src/renderer/components/Wizard/services/conversationManager.ts`.
+`outputBuffer` is reset to `''` in `ConversationManager`, but I didn't see it appended. I'll search more broadly for `outputBuffer`.
+`src/main/group-chat/output-buffer.ts` optimizes performance by using an array of chunks, avoiding the overhead of string re-allocation and copying. I'll synthesize my answer based on this common JavaScript optimization, mentioning how it handles numerous small appends to large buffers more efficiently than string concatenation. I'll also re-examine the file for any further details.
+The output buffer (specifically `src/main/group-chat/output-buffer.ts`) uses an array of chunks instead of string concatenation primarily for **performance and memory efficiency**.
+
+As documented in the code:
+
+1.  **$O(1)$ Append Performance:** In JavaScript, strings are immutable. Using `str += chunk` repeatedly for thousands of streaming chunks would be an $O(n)$ operation for each append (requiring the entire existing string to be copied into a new memory location), leading to $O(n^2)$ total complexity. Using `Array.push()` is $O(1)$, which is significantly faster for high-frequency streaming data.
+2.  **Deferred Concatenation:** By storing chunks in an array, the cost of joining them into a single string is paid only once when the full output is requested (`buffer.chunks.join('')`), rather than on every single streaming packet.
+3.  **Memory Safety:** The implementation tracks `totalLength` incrementally (avoiding an expensive `reduce` or `join` to check size) and enforces a `MAX_GROUP_CHAT_BUFFER_SIZE` to prevent memory exhaustion from runaway processes.
+4.  **Message Integrity:** Buffering until process exit prevents the system from routing partial, duplicate, or malformed messages that might occur if streaming chunks were processed individually before they were complete.
+
+**Condition B (with context pack):**
+
+I will read the `src/main/group-chat/output-buffer.ts` file to confirm the implementation details and the performance rationale mentioned in the comments.
+The `src/main/group-chat/output-buffer.ts` module uses an array of chunks instead of string concatenation primarily for **performance** and **memory efficiency**.
+
+As explicitly documented in the source code, appending to an array is an **O(1)** operation, whereas string concatenation in JavaScript is typically **O(n)** because strings are immutable. For a high-frequency streaming process (like an AI agent's output), repeatedly concatenating small chunks would lead to quadratic time complexity and excessive memory allocations as the buffer grows.
+
+Additionally, this architecture supports several critical features:
+- **Incremental Length Tracking:** The system tracks `totalLength` incrementally during each `push`, avoiding an O(n) `reduce` or `join` operation just to check the buffer size.
+- **Memory Safety:** By tracking length efficiently, the buffer can enforce the `MAX_GROUP_CHAT_BUFFER_SIZE` (10MB) limit and apply a truncation marker once reached, preventing memory exhaustion from runaway agent processes.
+- **Strategic Routing:** The system buffers streaming chunks and only joins/routes them as a single string via `getGroupChatBufferedOutput` upon process exit. This prevents the UI from displaying duplicate or fragmented messages that can occur when raw streaming chunks are processed individually.
+
+By deferring the expensive `join('')` operation until the output is actually needed, Maestro ensures the main thread remains responsive during active agent streaming.
+
+---
+
+## Q2 [small] — Why does session recovery clear the agentSessionId rather than retrying with the same ID?
+
+**Context pack:** 668 lines — includes Discussions section
+
+<details><summary>Full context pack</summary>
+
+```
+## Context pack
+> Query: Why does session recovery clear the agentSessionId rather than retrying with the same ID?  Budget: 6000 tokens | Used: ~5983 | 29 results (21 truncated by budget)
+
+### Entities
+
+- `src/main/group-chat/session-recovery.ts` **[module]** — score 1.000 | evidence: 2 episode(s)
+- `src/main/group-chat/session-recovery.ts::detectSessionNotFoundError` **[symbol]** — score 0.945 | evidence: 1 episode(s)
+- `src/main/group-chat/session-recovery.ts::buildRecoveryContext` **[symbol]** — score 0.945 | evidence: 1 episode(s)
+- `src/main/group-chat/session-recovery.ts::initiateSessionRecovery` **[symbol]** — score 0.945 | evidence: 1 episode(s)
+- `src/main/group-chat/session-recovery.ts::needsSessionRecovery` **[symbol]** — score 0.945 | evidence: 1 episode(s)
+- `src/__tests__/main/group-chat/session-recovery.test.ts` **[module]** — score 0.897 | evidence: 2 episode(s)
+- `src/__tests__/main/group-chat/session-recovery.test.ts::mockedGetErrorPatterns` **[symbol]** — score 0.853 | evidence: 1 episode(s)
+- `src/__tests__/main/group-chat/session-recovery.test.ts::mockedMatchErrorPattern` **[symbol]** — score 0.853 | evidence: 1 episode(s)
+- `src/__tests__/main/group-chat/session-recovery.test.ts::mockedReadLog` **[symbol]** — score 0.853 | evidence: 1 episode(s)
+- `src/__tests__/main/group-chat/session-recovery.test.ts::mockedLoadGroupChat` **[symbol]** — score 0.853 | evidence: 1 episode(s)
+- `src/__tests__/main/group-chat/session-recovery.test.ts::mockedUpdateParticipant` **[symbol]** — score 0.853 | evidence: 1 episode(s)
+- `CLAUDE-SESSION.md` **[module]** — score 0.477 | evidence: 2 episode(s)
+- `src/renderer/hooks/session` **[module]** — score 0.444 | evidence: 1 episode(s)
+- `docs/screenshots/session-tracking.png` **[module]** — score 0.415 | evidence: 1 episode(s)
+- `src/renderer/hooks/session/useBatchedSessionUpdates.ts` **[module]** — score 0.389 | evidence: 2 episode(s)
+- `src/main/stats/session-lifecycle.ts` **[module]** — score 0.389 | evidence: 2 episode(s)
+- `src/main/agents/session-storage.ts` **[module]** — score 0.389 | evidence: 2 episode(s)
+- `src/main/agent-session-storage.ts` **[module]** — score 0.389 | evidence: 1 episode(s)
+- `src/renderer/hooks/session/index.ts` **[module]** — score 0.389 | evidence: 2 episode(s)
+- `src/renderer/hooks/session/useActivityTracker.ts` **[module]** — score 0.389 | evidence: 2 episode(s)
+- `src/renderer/hooks/session/useGroupManagement.ts` **[module]** — score 0.389 | evidence: 2 episode(s)
+- `src/renderer/hooks/session/useHandsOnTimeTracker.ts` **[module]** — score 0.389 | evidence: 2 episode(s)
+- `src/renderer/hooks/session/useNavigationHistory.ts` **[module]** — score 0.389 | evidence: 2 episode(s)
+- `src/renderer/hooks/session/useSessionNavigation.ts` **[module]** — score 0.389 | evidence: 2 episode(s)
+- `src/renderer/hooks/session/useSortedSessions.ts` **[module]** — score 0.389 | evidence: 2 episode(s)
+- `src/main/session-web-server.ts` **[module]** — score 0.389 | evidence: 1 episode(s)
+- `src/web/hooks/useSessions.ts::Session` **[symbol]** — score 0.389 | evidence: 1 episode(s)
+- `src/renderer/types/index.ts::Session` **[symbol]** — score 0.389 | evidence: 1 episode(s)
+- `src/main/storage/claude-session-storage.ts` **[module]** — score 0.367 | evidence: 2 episode(s)
+
+### Discussions
+_PR descriptions, issue discussions, and commit messages retrieved directly from the graph._
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/412` (2026-02-18 by reachrazamair) — score 1.000:
+```
+PR #412: refactor: extracted 3 more hooks from App.tsx
+URL: https://github.com/RunMaestro/Maestro/pull/412
+State: closed
+Author: reachrazamair
+Created: 2026-02-18T21:04:26Z
+
+## Summary
+
+Continues the App.tsx decomposition (Phases 2E–2G), extracting three more custom hooks to reduce the monolith by **~830 lines** (9,556 → 8,767). Each hook is fully self-contained, reads from Zustand stores directly, and has comprehensive unit tests.
+
+### `useSessionRestoration` (405 lines, 49 tests)
+Extracts session loading, migration, and corruption recovery into `hooks/session/useSessionRestoration.ts`:
+- **Session & group loading on mount** with React Strict Mode guard
+- **Legacy field migrations**: `projectRoot`, `autoRunFolderPath`, `fileTreeAutoRefreshInterval`
+- **Corruption recovery**: missing `aiTabs` → creates default tab with warning; `toolType: 'terminal'` → migrates to `claude-code`
+- **Git info restoration**: local repos checked synchronously, SSH remotes fetched in background
+- **Tab state reset**: all tabs reset to `idle` on restart (processes don't survive app restart)
+- `initialLoadComplete` proxy ref bridging `.current` API to store boolean
+
+### `useInputKeyDown` (319…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/435` (2026-02-21 by openasocket) — score 0.972:
+```
+PR #435: Add Gemini CLI as first-class agent
+URL: https://github.com/RunMaestro/Maestro/pull/435
+State: closed
+Author: openasocket
+Created: 2026-02-21T18:58:58Z
+
+## Summary
+
+- Adds Google Gemini CLI as a fully integrated agent in Maestro across all surfaces: type system, agent definitions, capabilities, output parser, session storage, error handling, group chat, CLI tooling, and UI
+- Achieves feature parity with Claude Code and Codex on 18/20 integration dimensions (image input and model discovery are Gemini CLI limitations, not Maestro gaps)
+- Includes 2,200+ lines of tests across 16 test files
+
+## Changes by area
+
+### Core agent plumbing (types, definitions, capabilities)
+- Added `gemini-cli` to `ToolType` union, `AGENT_DEFINITIONS`, and `AGENT_CAPABILITIES`
+- Configured all agent flags: `batchModeArgs` (`-y`), `jsonOutputArgs` (`--output-format stream-json`), `resumeArgs` (`--resume`), `modelArgs` (`-m`), `yoloModeArgs`, `workingDirArgs` (`--include-directories`)
+- Added `gemini-cli` to every `Record<ToolType>` map, hardcoded array, and `VALID_MODERATOR_AGENT_IDS`
+
+### Output parser (`gemini-output-parser.ts`)
+- Full NDJSON stream-json parser handling 6 event types: `init`, `mes…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/74` (2025-12-23 by pedramamini) — score 0.967:
+```
+PR #74: feat: Show Thinking toggle for real-time AI reasoning display
+URL: https://github.com/RunMaestro/Maestro/pull/74
+State: closed
+Author: pedramamini
+Created: 2025-12-23T03:40:45Z
+
+## Summary
+
+Adds a per-tab "Thinking" toggle that displays AI reasoning/thinking content as it streams in real-time, rather than waiting for the final result. Works across all three supported agents (Claude Code, OpenCode, Codex).
+
+**Key features:**
+- Per-tab toggle pill (next to History and Read-Only toggles)
+- Global default setting in preferences (default: OFF)
+- Real-time streaming with RAF-throttled updates for performance
+- Tool execution monitoring shows which tools the AI is using
+- Distinct visual styling for thinking and tool entries
+- Keyboard shortcut: Cmd+Shift+K
+
+## Implementation
+
+### Phase 1-2: Foundation
+- `supportsThinkingDisplay` capability flag
+- `LogEntry.source: 'thinking' | 'tool'` types
+- `AITab.showThinking` field
+- `defaultShowThinking` setting
+
+### Phase 3: IPC Infrastructure
+- `thinking-chunk` event from process-manager
+- `onThinkingChunk` IPC bridge
+
+### Phase 4-5: UI
+- Toggle pill in InputArea
+- Thinking content rendering in TerminalOutput
+- Tool execution rendering wit…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/224` (2026-01-22 by reachrazamair) — score 0.927:
+```
+PR #224: refactor: modularize preload.ts into domain-specific modules with tests
+URL: https://github.com/RunMaestro/Maestro/pull/224
+State: closed
+Author: reachrazamair
+Created: 2026-01-22T15:38:06Z
+
+## Summary
+
+- Refactored monolithic preload.ts (3,761 lines) into 21 domain-specific modules
+- Added comprehensive test coverage with 20 new test files (~5,700 lines)
+- Established clean module boundaries with typed factory functions
+
+## Key Gains
+
+### Maintainability
+
+- Single 3,761-line file → 21 focused modules averaging ~180 lines each
+- Each module owns one domain: agents.ts, git.ts, process.ts, settings.ts, etc.
+- Clear separation of concerns makes code easier to navigate and modify
+
+### Testability
+
+- From 0 → 5,700+ lines of dedicated test coverage
+- Each module can be tested in isolation via factory functions
+- Mocking is straightforward with clear API boundaries
+
+### Type Safety
+
+- All types are co-located with their implementations and re-exported from index
+- External consumers import from ./preload with full TypeScript support
+- API contracts are explicit and documented
+
+### Team Scalability
+
+- Multiple developers can work on different modules w…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/543` (2026-03-09 by openasocket) — score 0.842:
+```
+PR #543: fix: Gemini CLI response handling and session_not_found loop
+URL: https://github.com/RunMaestro/Maestro/pull/543
+State: closed
+Author: openasocket
+Created: 2026-03-09T04:17:11Z
+
+## Summary
+
+- **Gemini CLI frozen agent**: Non-partial (delta:false) text events were silently dropped in StdoutHandler — complete message blocks now emit immediately as data
+- **Gemini responses labeled STDERR**: Restored Gemini-specific filtering in StderrHandler that suppresses info noise (YOLO mode, extension loading, hooks, etc.) and re-emits actual response content as `data` events instead of `stderr`
+- **session_not_found infinite loop**: Clears stale `agentSessionId` at both tab and session level when a `session_not_found` error is received, so the next prompt starts a fresh session instead of retrying `--resume` with a dead ID
+
+## Test plan
+
+- [x] 7 new tests added (2 StdoutHandler, 4 StderrHandler, 1 useAgentListeners)
+- [ ] Verify Gemini CLI agent responses appear in the main output (not STDERR label)
+- [ ] Verify Gemini CLI agent shows completion after each turn (not frozen)
+- [ ] Verify Claude agent recovers after session expiration without manual intervention
+- [ ] Run full test suite…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/461` (2026-02-25 by croakingtoad) — score 0.841:
+```
+PR #461: fix: Files panel hangs on "Loading remote files..." indefinitely
+URL: https://github.com/RunMaestro/Maestro/pull/461
+State: closed
+Author: croakingtoad
+Created: 2026-02-25T17:08:23Z
+
+## Problem
+
+The Files right panel in SSH remote sessions gets permanently stuck showing "Loading remote files..." with a spinner and a stale progress count (e.g., "25 files in 7 folders"), but never actually renders the file tree. This happens especially after extended Maestro usage (hours), making the Files panel effectively non-functional for remote sessions.
+
+<img width="993" height="672" alt="image" src="https://github.com/user-attachments/assets/32fa89b6-5bf7-40fe-a559-0e03fec71cfa" />
+
+## Root Cause Analysis
+
+I traced the issue through three interacting code paths:
+
+### 1. No timeout on SSH commands — the primary cause
+
+`loadFileTree()` (`fileExplorer.ts`) walks the remote directory tree by making **one SSH call per directory** via `window.maestro.fs.readDir`. Each call flows through:
+
+```
+loadFileTreeRecursive (per directory, sequential for-of loop)
+  → IPC: fs:readDir
+    → readDirRemote (remote-fs.ts)
+      → execRemoteCommand
+        → execFileNoThrow('ssh', args) …
+```
+
+### Evidence excerpts
+
+**git_commit** `231fe2fd8884318019bfaf4bd74a5dd48f7f8525` (2026-01-19 by reachrazarauf@gmail.com):
+```
+commit 231fe2fd8884318019bfaf4bd74a5dd48f7f8525
+Author: Raza Rauf <reachrazarauf@gmail.com>
+Date: 2026-01-19T21:21:36.000Z
+
+chore: format entire codebase with prettier
+
+Run `npm run format` across all TypeScript/TSX files
+for consistent code formatting throughout the project.
+
+Files:
+src/__tests__/cli/commands/list-agents.test.ts
+src/__tests__/cli/commands/list-groups.test.ts
+src/__tests__/cli/com…
+```
+
+**source** `src/main/group-chat/session-recovery.ts@f99007d580204a5f3795` (2026-04-15):
+```
+/**
+ * Session Recovery for Group Chat
+ *
+ * This module handles detection and recovery from session-not-found errors
+ * in group chat participants. When an agent's session has been deleted
+ * (out of band), this module:
+ *
+ * 1. Detects the error from the agent's output
+ * 2. Clears the participant's stored agentSessionId
+ * 3. Builds rich context including the agent's prior statements
+ * 4. Re-spawns the participant with this context to continue the conversation
+ *
+ * This enables participants…
+```
+
+**git_commit** `90a463b9190fa9566b7a72c10b6c3cc59ceae156` (2026-01-31 by pedram.amini@gmail.com):
+```
+commit 90a463b9190fa9566b7a72c10b6c3cc59ceae156
+Author: Pedram Amini <pedram.amini@gmail.com>
+Date: 2026-01-31T18:31:29.000Z
+
+added a bunch of tests
+
+
+Files:
+src/__tests__/main/claude-session-storage.test.ts
+src/__tests__/main/group-chat/session-recovery.test.ts
+src/__tests__/main/history-manager.test.ts
+src/__tests__/main/process-manager/handlers/StdoutHandler.test.ts
+src/__tests__/main/utils/age…
+```
+
+**source** `src/__tests__/main/group-chat/session-recovery.test.ts@1d601` (2026-04-15):
+```
+/**
+ * @file session-recovery.test.ts
+ * @description Unit tests for the Group Chat session recovery module.
+ *
+ * Tests cover:
+ * - detectSessionNotFoundError: detecting session-not-found errors from agent output
+ * - needsSessionRecovery: delegation to detectSessionNotFoundError
+ * - buildRecoveryContext: constructing recovery context with chat history
+ * - initiateSessionRecovery: clearing agentSessionId for re-spawn
+ */
+
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+// Mock…
+```
+
+**git_commit** `99fc8c0d9f09d87a46a0388eeb0ffea6e3b6d0c4` (2026-02-09 by pedram.amini@gmail.com):
+```
+commit 99fc8c0d9f09d87a46a0388eeb0ffea6e3b6d0c4
+Author: Pedram Amini <pedram.amini@gmail.com>
+Date: 2026-02-09T05:26:32.000Z
+
+Standardize agent vs session terminology across docs and fix Director's Notes shortcut display
+
+Docs: Establish "agent" for user-facing entities (Left Bar items) and "session/provider session" for conversation contexts (tabs). Updated 11 documentation files to enforce this …
+```
+
+**source** `CLAUDE-SESSION.md@3cf44671485c0ac26f4389353f0a3ea9f18899e00f` (2026-04-15):
+```
+# CLAUDE-SESSION.md
+
+Session interface (agent data model) and code conventions for the Maestro codebase. For the main guide, see [[CLAUDE.md]].
+
+> **Terminology:** In code, the `Session` interface represents what users see as an **agent** in the Left Bar. The name is historical. Within each agent, "provider sessions" refer to individual conversation contexts (tabs). See [[CLAUDE.md#terminology-agent-vs-session]] for the full distinction.
+
+## Session Interface (Agent Data Model)
+
+Key fields on th…
+```
+
+**source** `src/renderer/hooks/session/useGroupManagement.ts@8229b379a96` (2026-04-15):
+```
+import { useCallback, useState } from 'react';
+import type { Session, Group } from '../../types';
+
+/**
+ * State returned from useGroupManagement for modal management
+ */
+export interface GroupModalState {
+	/** Whether the create group modal is open */
+	createGroupModalOpen: boolean;
+	/** Setters for modal state */
+	setCreateGroupModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+/**
+ * Dependencies for useGroupManagement hook
+ */
+export interface UseGroupManagementDeps {
+	/** All group…
+```
+
+**git_commit** `a927584207a1d74c5cb551319b9c72e5acfa8767` (2026-01-09 by pedram.amini@gmail.com):
+```
+commit a927584207a1d74c5cb551319b9c72e5acfa8767
+Author: Pedram Amini <pedram.amini@gmail.com>
+Date: 2026-01-09T01:31:41.000Z
+
+## CHANGES
+
+- Generate playbooks mid-session with the new Inline Wizard flow 🧙
+- Add confidence gauge and organized wizard subfolders for generated docs 📈
+- Launch **Maestro Symphony** to donate tokens and ship OSS PRs 🎵
+- Browse/filter/search Symphony projects and issue…
+```
+
+**git_commit** `8de53cd84b2866785c3a47d297619744e19fe982` (2026-02-11 by reachrazarauf@gmail.com):
+```
+commit 8de53cd84b2866785c3a47d297619744e19fe982
+Author: Raza Rauf <reachrazarauf@gmail.com>
+Date: 2026-02-11T13:14:41.000Z
+
+refactor: complete agentStore Phases 2-3, extract ~1,850 lines from App.tsx
+
+Phase 2 — useAgentListeners hook:
+- Extract IPC listener useEffect (~1,520 lines) from App.tsx into
+  src/renderer/hooks/agent/useAgentListeners.ts
+- Covers onData, onUsage, onStderr, onExit, onAgent…
+```
+
+**source** `src/renderer/hooks/session/useBatchedSessionUpdates.ts@562ae` (2026-04-15):
+```
+/**
+ * useBatchedSessionUpdates.ts
+ *
+ * A hook that batches session state updates to reduce React re-renders.
+ * During AI streaming, IPC handlers can trigger 100+ state updates per second.
+ * This hook accumulates updates in a ref and flushes them every 150ms.
+ *
+ * Features:
+ * - Configurable flush interval (default 150ms)
+ * - Support for multiple update types: appendLog, setStatus, updateUsage, etc.
+ * - Proper ordering of updates within each flush
+ * - Immediate flush capability for critic…
+```
+
+**git_commit** `dbcbda1324927db1a87c0e7fbc7c76e6dcb7e5a0` (2026-01-30 by reachrazarauf@gmail.com):
+```
+commit dbcbda1324927db1a87c0e7fbc7c76e6dcb7e5a0
+Author: Raza Rauf <reachrazarauf@gmail.com>
+Date: 2026-01-30T15:10:56.000Z
+
+refactor: decompose stats-db into focused modules
+
+Break the 1,870-line monolithic stats-db.ts into 13 focused modules under
+src/main/stats/, following the same pattern used in the agents module refactor.
+
+Key improvements:
+- StatementCache for prepared statement reuse across…
+```
+
+**source** `src/main/stats/session-lifecycle.ts@4f0ab5204577caaf1a38a3aa` (2026-04-15):
+```
+/**
+ * Session Lifecycle CRUD Operations
+ *
+ * Tracks when sessions are created (launched) and closed,
+ * enabling session duration and lifecycle analytics.
+ */
+
+import type Database from 'better-sqlite3';
+import type { SessionLifecycleEvent, StatsTimeRange } from '../../shared/stats-types';
+import { generateId, getTimeRangeStart, normalizePath, LOG_CONTEXT } from './utils';
+import { mapSessionLifecycleRow, type SessionLifecycleRow } from './row-mappers';
+import { StatementCache } from './utils'…
+```
+
+**git_commit** `454cdefd44832a12fbb684c9fd58e7b39445350b` (2026-01-29 by reachrazarauf@gmail.com):
+```
+commit 454cdefd44832a12fbb684c9fd58e7b39445350b
+Author: Raza Rauf <reachrazarauf@gmail.com>
+Date: 2026-01-29T17:20:58.000Z
+
+refactor: consolidate agents module and reorganize test structure
+
+Create src/main/agents/ directory with barrel exports:
+- Move agent-detector.ts → agents/detector.ts
+- Move agent-definitions.ts → agents/definitions.ts
+- Move agent-capabilities.ts → agents/capabilities.ts
+- …
+```
+
+**source** `src/main/agents/session-storage.ts@31cd104eb1fd779040a7c769e` (2026-04-15):
+```
+/**
+ * Agent Session Storage Interface
+ *
+ * This module defines the abstract interface for agent session storage.
+ * Different AI agents (Claude Code, OpenCode, etc.) store their sessions
+ * differently. This interface provides a common abstraction layer.
+ *
+ * Usage:
+ * ```typescript
+ * const storage = getSessionStorage('claude-code');
+ * if (storage) {
+ *   const sessions = await storage.listSessions('/path/to/project');
+ * }
+ * ```
+ */
+
+import type { ToolType, SshRemoteConfig } from '../../s…
+```
+
+**git_commit** `43177df7bff991582f69bbaf6787873e9bbeb46f` (2026-01-22 by info@vvx7.io):
+```
+commit 43177df7bff991582f69bbaf6787873e9bbeb46f
+Author: VVX7 <info@vvx7.io>
+Date: 2026-01-22T19:04:40.000Z
+
+Add support for Factory.ai droid agent.
+
+See: https://factory.ai/product/cli
+
+Files:
+package-lock.json
+src/__tests__/main/parsers/index.test.ts
+src/__tests__/renderer/services/contextGroomer.test.ts
+src/main/agent-capabilities.ts
+src/main/agent-detector.ts
+src/main/agent-session-storage.ts
+s…
+```
+
+**source** `src/renderer/hooks/session/index.ts@aeab8e884d0d50ceeb5faf5d` (2026-04-15):
+```
+/**
+ * Session State Management Module
+ *
+ * Hooks for session navigation, sorting, filtering, grouping,
+ * activity tracking, and batched updates.
+ */
+
+// Navigation history (back/forward)
+export { useNavigationHistory } from './useNavigationHistory';
+export type { NavHistoryEntry } from './useNavigationHistory';
+
+// Session navigation handlers
+export { useSessionNavigation } from './useSessionNavigation';
+export type { UseSessionNavigationReturn, UseSessionNavigationDeps } from './useSessionNa…
+```
+
+**source** `src/renderer/hooks/session/useActivityTracker.ts@3e61dff4f5b` (2026-04-15):
+```
+import { useEffect, useRef, useCallback } from 'react';
+import type { Session } from '../../types';
+
+const ACTIVITY_TIMEOUT_MS = 60000; // 1 minute of inactivity = idle
+const TICK_INTERVAL_MS = 1000; // Update every second
+const BATCH_UPDATE_INTERVAL_MS = 30000; // Batch updates every 30 seconds to reduce re-renders
+
+export interface UseActivityTrackerReturn {
+	onActivity: () => void; // Call this when user activity is detected
+}
+
+/**
+ * Hook to track user activity and update session's activeTim…
+```
+
+**source** `src/renderer/hooks/session/useHandsOnTimeTracker.ts@d49bdc82` (2026-04-15):
+```
+import { useEffect, useRef, useCallback } from 'react';
+
+const ACTIVITY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes of inactivity = idle
+const TICK_INTERVAL_MS = 1000; // Update every second
+const PERSIST_INTERVAL_MS = 30000; // Persist to settings every 30 seconds
+
+/**
+ * Hook to track global user hands-on time in Maestro.
+ *
+ * Time is tracked when the user is "active" - meaning they've interacted
+ * with the app (keyboard, mouse, wheel, touch) within the last 5 minutes.
+ *
+ * The accumulated tim…
+```
+
+**source** `src/renderer/hooks/session/useNavigationHistory.ts@29bf4daa5` (2026-04-15):
+```
+import { useRef, useCallback } from 'react';
+
+// Navigation history entry - tracks session and AI tab position
+export interface NavHistoryEntry {
+	sessionId: string;
+	tabId?: string; // Optional AI tab ID (only for AI mode with tabs)
+}
+
+const MAX_HISTORY = 50;
+
+/**
+ * Hook for managing navigation history (back/forward) through sessions and AI tabs.
+ *
+ * Usage:
+ * - Call `pushNavigation` when navigating to a new session or tab
+ * - Call `navigateBack` to go back
+ * - Call `navigateForward` to go…
+```
+
+**source** `src/renderer/hooks/session/useSessionNavigation.ts@cedb29a01` (2026-04-15):
+```
+import { useCallback, MutableRefObject } from 'react';
+import type { Session } from '../../types';
+import type { NavHistoryEntry } from './useNavigationHistory';
+
+/**
+ * Dependencies required by the useSessionNavigation hook
+ */
+export interface UseSessionNavigationDeps {
+	/** Function from useNavigationHistory to navigate back */
+	navigateBack: () => NavHistoryEntry | null;
+	/** Function from useNavigationHistory to navigate forward */
+	navigateForward: () => NavHistoryEntry | null;
+	/** Sessio…
+```
+
+**source** `src/renderer/hooks/session/useSortedSessions.ts@f0721fca196c` (2026-04-15):
+```
+import { useMemo } from 'react';
+import type { Session, Group } from '../../types';
+import { stripLeadingEmojis, compareNamesIgnoringEmojis } from '../../../shared/emojiUtils';
+
+// Re-export for backwards compatibility with existing imports
+export { stripLeadingEmojis, compareNamesIgnoringEmojis };
+
+/**
+ * Dependencies for the useSortedSessions hook.
+ */
+export interface UseSortedSessionsDeps {
+	/** All sessions */
+	sessions: Session[];
+	/** All groups */
+	groups: Group[];
+	/** Whether the bookm…
+```
+
+**git_commit** `bbf6612f35aea27f908dc5cfa34f3863227a8381` (2025-11-28 by pedram.amini@gmail.com):
+```
+commit bbf6612f35aea27f908dc5cfa34f3863227a8381
+Author: Pedram Amini <pedram.amini@gmail.com>
+Date: 2025-11-28T03:42:03.000Z
+
+feat: Mobile-first remote access with QR codes and live sessions
+
+Redesign the web server architecture for simplified mobile remote control:
+
+- Replace per-session web servers with single server using random port and
+  auto-generated security token for secure access
+- Add "…
+```
+
+**source** `src/web/hooks/useSessions.ts@50b7f5cb6bae72bb545c4a971821e99` (2026-04-15):
+```
+/**
+ * useSessions hook for Maestro web interface
+ *
+ * Provides real-time session state management for the web interface.
+ * Uses the WebSocket connection to receive session updates and provides
+ * methods to interact with sessions (send commands, interrupt, etc.).
+ */
+
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import {
+	useWebSocket,
+	type SessionData,
+	type UseWebSocketOptions,
+	type UseWebSocketReturn,
+	type WebSocketState,
+	type UsageStats,
+	type LastRespons…
+```
+
+**source** `src/renderer/types/index.ts@92c34e526fc37800b3c1650fbe3e9831` (2026-04-15):
+```
+// Type definitions for Maestro renderer
+
+// Re-export context merge types
+export * from './contextMerge';
+
+// Re-export theme types from shared location
+export type { Theme, ThemeId, ThemeMode, ThemeColors } from '../../shared/theme-types';
+export { isValidThemeId } from '../../shared/theme-types';
+
+// Re-export types from shared location
+export type {
+	AgentError,
+	AgentErrorType,
+	AgentErrorRecovery,
+	ToolType,
+	Group,
+	UsageStats,
+	BatchDocumentEntry,
+	PlaybookDocumentEntry,
+	Playbook,
+	Thin…
+```
+
+**git_commit** `11d0c672e82d518b29cd8fb30a813bb3b4cb54a1` (2026-02-08 by pedram.amini@gmail.com):
+```
+commit 11d0c672e82d518b29cd8fb30a813bb3b4cb54a1
+Author: Pedram Amini <pedram.amini@gmail.com>
+Date: 2026-02-08T17:33:33.000Z
+
+fix: add Sentry captureException to swallowed errors across main process
+
+Error handlers in group chat, history, agent detector, and all session
+storage implementations were logging errors locally but never reporting
+to Sentry. Added captureException calls alongside existin…
+```
+
+**source** `src/main/storage/claude-session-storage.ts@d7c9dfcfe1eb4dbfd` (2026-04-15):
+```
+/**
+ * Claude Code Session Storage Implementation
+ *
+ * This module implements the AgentSessionStorage interface for Claude Code.
+ * Claude Code stores sessions as JSONL files in ~/.claude/projects/<encoded-path>/
+ *
+ * File structure:
+ * - Each session is a .jsonl file named <session-id>.jsonl
+ * - Each line is a JSON object with type, timestamp, message, etc.
+ * - User and assistant messages contain the actual conversation
+ * - Result messages contain token usage and cost information
+ */
+
+impo…
+```
+```
+
+</details>
+
+**Condition A (bare):**
+
+I will start by searching the codebase for "session recovery" and `agentSessionId` to understand how they are handled and identify the logic responsible for clearing the session ID.
+I will now examine the `src/main/group-chat/session-recovery.ts` file to understand why the `agentSessionId` is cleared and if there are any comments explaining the reasoning behind this logic.
+I have analyzed the `src/main/group-chat/session-recovery.ts` file and found that session recovery is triggered by a `session_not_found` error, indicating the existing `agentSessionId` is invalid or deleted. Therefore, clearing it and starting a fresh session with rich context is necessary, as retrying with the same ID would fail again. I will now examine `src/main/group-chat/group-chat-router.ts` to see how `buildRecoveryContext` is utilized.
+I've confirmed that `respawnParticipantWithRecovery` clears the `agentSessionId` because a `session_not_found` error indicates the session is permanently lost on the provider's end, making retries futile. Instead, a new session is started with the missing context manually added to the prompt. I'll now check `src/main/process-listeners/exit-listener.ts` for any further session recovery logic.
+The current logic confirms that when a `session_not_found` error occurs, the `agentSessionId` is cleared because it's invalid, and a new session is initiated with the necessary context. I'll now investigate if there's any other session recovery logic, particularly in the main chat tab (non-group chat), to see if the user's question pertains to that instead.
+The `agentSessionId` is cleared during session recovery because a `session_not_found` error confirms the ID is invalid on the provider's side, making retries pointless. I've confirmed this in both `src/main/group-chat/session-recovery.ts` and `src/main/group-chat/group-chat-router.ts`. I'll now check `src/main/parsers/error-patterns.ts` to understand the specific triggers for this recovery process.
+The `session_not_found` error patterns for Claude Code are explicitly marked as recoverable, and when detected, `initiateSessionRecovery` clears the `agentSessionId`. This is done because the error indicates the ID is invalid on the server, making retries with the same ID futile. I'll now examine `src/main/process-listeners/exit-listener.ts` to see if retries without clearing are attempted for other error types.
+`exit-listener.ts` only triggers recovery for `session_not_found` errors by clearing the `agentSessionId`, and it doesn't appear to have automatic retries for other errors like `network_error`. The user might be concerned that specific error patterns are too aggressive in clearing the ID, potentially losing session state during transient issues. I'll check `src/main/index.ts` and main tab spawning logic to see if this behavior extends beyond group chats.
+`spawnAgentProcess` is located in `src/main/process-manager.ts`, so I'll examine that file.
+I'll use `glob` to locate the file, as I'm not sure of its exact path.
+The grep indicated that `src/__tests__/main/group-chat-images.test.ts` mocks `../../main/process-manager`, which should be `src/main/process-manager`. I'll check the `src/main/` directory to confirm.
+`src/main/process-manager` is a directory, so I'll check its contents.
+I'll check `src/main/process-manager/ProcessManager.ts` for the logic.
+`ProcessManager` handles mechanics, while recovery logic resides in `src/main/group-chat/session-recovery.ts` and `src/main/process-listeners/exit-listener.ts`. I'll now search for `session_not_found` in other parts of the codebase to see if it's used in regular sessions.
+`src/renderer/hooks/agent/useAgentListeners.ts` uses `session_not_found`, so I'll examine it to see how non-group chat sessions are handled.
+In `useAgentListeners`, `session_not_found` is treated as informational and doesn't trigger the error modal. I need to find what actually handles recovery in normal tabs, so I'll search for `onResumeSession` and check `src/renderer/hooks/agent/useAgentLifecycle.ts` or `useAgentSession.ts` to see where `agentSessionId` might be cleared.
+I'll try `useAgentSession.ts` instead.
+I'll search for "clearAgentSessionId" or "setActiveAgentSessionId".
+I'll examine `src/renderer/hooks/agent/useAgentSessionManagement.ts`.
+`agentSessionId` isn't being cleared during errors here. I'll check `src/renderer/App.tsx` for `handleRetryAfterError` or `handleStartNewSessionAfterError` to see if that's where it happens.
+I'll check `src/renderer/hooks/modal/useModalHandlers.ts`.
+`useAgentStore.getState().retryAfterError(sessionId)` is called. I need to locate the `agentStore`.
+I'll check `src/renderer/stores/agentStore.ts`.
+`agentStore.ts` doesn't clear `agentSessionId` in `retryAfterError`, but `startNewSessionAfterError` starts a new tab without one. The user's question likely refers to Group Chat Session Recovery, where `agentSessionId` is explicitly cleared in `session-recovery.ts` and `group-chat-router.ts` because a `session_not_found` error means the session is gone, and retrying would cause an infinite loop. The recovery logic re-injects context manually. I'll check `ARCHITECTURE.md` or `docs/symphony.md` for further insights.
+`ARCHITECTURE.md` confirms `agentSessionId` is per-tab. In Group Chat (Symphony), a `session_not_found` error triggers Session Recovery, which clears the `agentSessionId` because it's invalid on the provider's side. Retrying with the same ID would cause an immediate, identical failure. Instead, a fresh session is started, and context is manually re-injected to maintain continuity. I'll check for any "retry" logic that doesn't clear the ID, particularly in the context of potentially transient errors or SSH remote sessions.
+The `retryCount` hits aren't related to agent session recovery. I'm confident about Group Chat, but I'll check `src/main/group-chat/group-chat-moderator.ts` to see if the moderator ever clears its own session ID.
+Session recovery clears the `agentSessionId` because the error that triggers it, `session_not_found`, explicitly indicates the session ID is invalid or no longer exists on the provider's end (e.g., Claude Code). Retrying with the same ID would be inefficient and likely lead to an infinite failure loop. Instead, Maestro starts a fresh session and manually reconstructs the conversation's memory by building a "Recovery Context" from chat history and the agent's prior statements. This context is prepended to the next prompt, allowing the agent to maintain continuity in a new session. Additionally, marking the subsequent spawn as a "recovery" session helps prevent infinite loops.
+
+**Condition B (with context pack):**
+
+In the Maestro codebase, session recovery clears the `agentSessionId` primarily to resolve **"session_not_found" infinite loops**. According to **PR #543**, when an agent (such as Gemini CLI or Claude Code) returns this error, it indicates the underlying provider session has been deleted "out of band" or has expired.
+
+If Maestro attempted to retry using the same ID, it would continue passing that invalid ID via resumption flags (like `--resume`), leading to a recursive failure state. As established in **src/main/group-chat/session-recovery.ts**, the recovery process involves several specific steps:
+
+1.  **Detection:** The system identifies the `session_not_found` error in the agent's output.
+2.  **Clearing State:** `initiateSessionRecovery` clears the stale `agentSessionId` at both the tab and session levels to prevent further resumption attempts.
+3.  **Context Reconstruction:** Instead of losing the conversation, `buildRecoveryContext` constructs a rich context from the existing chat history, including the agent's prior statements.
+4.  **Re-spawning:** The agent is re-spawned with this reconstructed context in a fresh provider session.
+
+This approach ensures that while the specific provider-side session ID is discarded, the functional continuity of the conversation is preserved. By clearing the "dead" ID, Maestro forces the agent to start a new session while manually re-injecting the necessary history to maintain the user's experience.
+
+---
+
+## Q3 [small] — Why does Maestro use JSONL files for conversation logs instead of a database?
+
+**Context pack:** 457 lines — includes Discussions section
+
+<details><summary>Full context pack</summary>
+
+```
+## Context pack
+> Query: Why does Maestro use JSONL files for conversation logs instead of a database?  Budget: 6000 tokens | Used: ~4344 | 50 results
+
+### Entities
+
+- `Auto Run Docs/Phase-02-Conversation-Screen.md` **[module]** — score 1.000 | evidence: 1 episode(s)
+- `docs/screenshots/git-logs.png` **[module]** — score 0.997 | evidence: 1 episode(s)
+- `https://github.com/RunMaestro/Maestro/issues/205` **[issue]** — score 0.919 | evidence: 1 episode(s)
+- `src/main/debug-package/collectors/logs.ts` **[module]** — score 0.882 | evidence: 2 episode(s)
+- `src/main/preload/files.ts` **[module]** — score 0.876 | evidence: 2 episode(s)
+- `https://github.com/RunMaestro/Maestro/issues/11` **[issue]** — score 0.867 | evidence: 1 episode(s)
+- `https://github.com/RunMaestro/Maestro/issues/584` **[issue]** — score 0.840 | evidence: 1 episode(s)
+- `src/main/debug-package/collectors/logs.ts::SanitizedLogEntry` **[symbol]** — score 0.834 | evidence: 1 episode(s)
+- `src/main/debug-package/collectors/logs.ts::LogsInfo` **[symbol]** — score 0.834 | evidence: 1 episode(s)
+- `src/main/debug-package/collectors/logs.ts::sanitizeEntry` **[symbol]** — score 0.834 | evidence: 1 episode(s)
+- `src/main/debug-package/collectors/logs.ts::collectLogs` **[symbol]** — score 0.834 | evidence: 1 episode(s)
+- `src/cli/output/jsonl.ts` **[module]** — score 0.834 | evidence: 2 episode(s)
+- `https://github.com/RunMaestro/Maestro/issues/757` **[issue]** — score 0.822 | evidence: 1 episode(s)
+- `src/main/preload/files.ts::HistoryEntry` **[symbol]** — score 0.822 | evidence: 1 episode(s)
+- `src/main/preload/files.ts::createTempfileApi` **[symbol]** — score 0.822 | evidence: 1 episode(s)
+- `src/main/preload/files.ts::createHistoryApi` **[symbol]** — score 0.822 | evidence: 1 episode(s)
+- `src/main/preload/files.ts::createCliApi` **[symbol]** — score 0.822 | evidence: 1 episode(s)
+- `src/main/preload/files.ts::TempfileApi` **[symbol]** — score 0.822 | evidence: 1 episode(s)
+- `src/main/preload/files.ts::HistoryApi` **[symbol]** — score 0.822 | evidence: 1 episode(s)
+- `src/main/preload/files.ts::CliApi` **[symbol]** — score 0.822 | evidence: 1 episode(s)
+- `src/cli/output/jsonl.ts::JsonlEvent` **[symbol]** — score 0.783 | evidence: 1 episode(s)
+- `src/cli/output/jsonl.ts::StartEvent` **[symbol]** — score 0.783 | evidence: 1 episode(s)
+- `src/cli/output/jsonl.ts::DocumentStartEvent` **[symbol]** — score 0.783 | evidence: 1 episode(s)
+- `src/cli/output/jsonl.ts::TaskStartEvent` **[symbol]** — score 0.783 | evidence: 1 episode(s)
+- `src/cli/output/jsonl.ts::TaskCompleteEvent` **[symbol]** — score 0.783 | evidence: 1 episode(s)
+- `src/cli/output/jsonl.ts::DocumentCompleteEvent` **[symbol]** — score 0.783 | evidence: 1 episode(s)
+- `src/cli/output/jsonl.ts::LoopCompleteEvent` **[symbol]** — score 0.783 | evidence: 1 episode(s)
+- `src/cli/output/jsonl.ts::CompleteEvent` **[symbol]** — score 0.783 | evidence: 1 episode(s)
+- `src/cli/output/jsonl.ts::ErrorEvent` **[symbol]** — score 0.783 | evidence: 1 episode(s)
+- `src/cli/output/jsonl.ts::GroupEvent` **[symbol]** — score 0.783 | evidence: 1 episode(s)
+
+### Edges
+
+- src/__tests__/main/preload/files.test.ts imports src/main/preload/files.ts **[observed]** — score 1.000
+- src/main/preload/files.ts defines HistoryEntry **[observed]** — score 0.896
+- src/main/preload/files.ts defines createTempfileApi **[observed]** — score 0.896
+- src/main/preload/files.ts defines createHistoryApi **[observed]** — score 0.896
+- src/main/preload/files.ts defines createCliApi **[observed]** — score 0.896
+- src/main/preload/files.ts defines TempfileApi **[observed]** — score 0.896
+- src/main/preload/files.ts defines HistoryApi **[observed]** — score 0.896
+- src/main/preload/files.ts defines CliApi **[observed]** — score 0.896
+- Auto Run Docs/Phase-02-Conversation-Screen.md was authored/modified by pedram.amini@gmail.com in commit b7256dbf **[observed]** — score 0.835 | valid: 2025-12-09T16:30:21.000Z → present
+- HistoryEntry is defined in src/main/preload/files.ts **[observed]** — score 0.833
+- createTempfileApi is defined in src/main/preload/files.ts **[observed]** — score 0.833
+- createHistoryApi is defined in src/main/preload/files.ts **[observed]** — score 0.833
+- createCliApi is defined in src/main/preload/files.ts **[observed]** — score 0.833
+- TempfileApi is defined in src/main/preload/files.ts **[observed]** — score 0.833
+- HistoryApi is defined in src/main/preload/files.ts **[observed]** — score 0.833
+- CliApi is defined in src/main/preload/files.ts **[observed]** — score 0.833
+- src/__tests__/main/preload/files.test.ts defines mockInvoke **[observed]** — score 0.833
+- src/__tests__/main/preload/files.test.ts defines mockOn **[observed]** — score 0.833
+- src/__tests__/main/preload/files.test.ts defines mockRemoveListener **[observed]** — score 0.833
+- src/main/debug-package/collectors/logs.ts defines SanitizedLogEntry **[observed]** — score 0.821
+
+### Discussions
+_PR descriptions, issue discussions, and commit messages retrieved directly from the graph._
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/699` (2026-04-01 by jSydorowicz21) — score 1.000:
+```
+PR #699: fix: update Codex integration for v0.111.0 JSONL output format
+URL: https://github.com/RunMaestro/Maestro/pull/699
+State: closed
+Author: jSydorowicz21
+Created: 2026-04-01T01:25:49Z
+
+## Summary
+
+- Rewrites Codex output parser to support v0.111.0 dual-format (new JSONL + legacy) parsing
+- Adds session_meta, response_item, event_msg, turn_context, command_execution handlers
+- Fixes session storage to properly handle custom_tool_call, merge tool outputs by call_id, and include state property for ToolCallCard rendering
+- Adds conditional stderr suppression in JSON mode to prevent duplicate output
+- Filters tool messages in restored sessions to match live session behavior
+
+## Changes
+
+- `codex-output-parser.ts` - Major rewrite for dual-format support (+348/-32)
+- `codex-session-storage.ts` - Fixed tool call handling, added CodexToolUseEntry type, immutable updates
+- `StderrHandler.ts` - Conditional stderr suppression in --json mode
+- `AgentSessionsBrowser.tsx` - Tool message filtering in restored sessions
+- `useAgentSessionManagement.ts` - Matching tool filtering in session hook
+
+## Test Coverage
+
+- 61 new tests added (56 parser + 5 storage edge cases)
+- All 119 tests pass
+- Cov…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/280` (2026-02-02 by reachrazamair) — score 0.890:
+```
+PR #280: fix: correct context usage calculation to include cacheRead tokens an…
+URL: https://github.com/RunMaestro/Maestro/pull/280
+State: closed
+Author: reachrazamair
+Created: 2026-02-02T23:18:27Z
+
+### Problem
+
+The context window usage gauge had several bugs causing inaccurate readings:
+
+1. **Underestimation** — `cacheReadInputTokens` was excluded from the formula. For a single Anthropic API call, the total input context is `inputTokens + cacheReadInputTokens + cacheCreationInputTokens` (three partitions of the same input: uncached, cache-hit, newly-cached). Excluding cache-read meant the gauge showed ~3% when reality was ~23%.
+
+2. **False 100%** — During complex multi-tool turns, Claude Code accumulates token values across all internal API calls in a single `result` JSONL message. With cache-read included, these accumulated totals easily exceed the 200K context window (e.g., 2.5M cache-read from 40 internal calls each reading ~62K). The old code capped at 100%, triggering false compact warnings.
+
+3. **Tooltip inconsistency** — `MainPanel.tsx` recalculated context tokens independently from raw tab `usageStats`, bypassing the fix in `App.tsx`. The hover tooltip still showed…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/784` (2026-04-10 by chr1syy) — score 0.835:
+```
+PR #784: fix: extract clean output from Cue scheduled tasks
+URL: https://github.com/RunMaestro/Maestro/pull/784
+State: closed
+Author: chr1syy
+Created: 2026-04-10T06:46:23Z
+
+## Summary
+- Cue scheduled tasks were showing raw JSONL instead of formatted agent output
+- Root cause: Claude Code emits `"result": ""` (empty string) when the agent's last action is a tool use, and `extractCleanStdout()` treated empty string as falsy, falling back to raw output
+- Now falls back to assistant message text when the result event is empty, with deduplication of streaming chunks by message ID
+
+## Test plan
+- [x] Existing 46 cue-executor tests still pass
+- [x] New test: empty result with assistant text fallback
+- [x] New test: streaming chunk deduplication by message ID
+- [x] Manual: trigger a Cue scheduled task and verify clean output in Activity Log
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+<!-- This is an auto-generated comment: release notes by coderabbit.ai -->
+## Summary by CodeRabbit
+
+* **Bug Fixes**
+  * Improved stdout extraction for streaming responses: explicit parser result content is prioritized; when empty, the system falls back to the latest assistant text.
+  * D…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/270` (2026-02-01 by chr1syy) — score 0.819:
+```
+PR #270: feat: Fix inline wizard for Windows cmd.exe and add OpenCode support
+URL: https://github.com/RunMaestro/Maestro/pull/270
+State: closed
+Author: chr1syy
+Created: 2026-02-01T13:34:11Z
+
+## Windows Command Line Length Fix
+
+Resolved 'Die Befehlszeile ist zu lang' (command line too long) error on Windows by:
+- Modified inline document generation to use sendPromptViaStdin on Windows
+  - Passes prompt via stdin instead of as command line argument
+  - Bypasses Windows cmd.exe ~8KB command line length limit
+  - Matches approach already used for SSH remote execution
+- Added --input-format stream-json when using stdin with stream-json compatible agents
+- Added logging for prompt length and stdin usage for debugging
+
+## OpenCode Agent Support
+
+Extended inline wizard to support OpenCode agent alongside Claude Code and Codex:
+- Added 'opencode' to supported wizard agents list in useInlineWizard hook
+- OpenCode batch mode args handling already present in buildArgsForAgent functions
+- Added SSH-aware availability checking in both conversation and document generation phases
+
+## SSH Remote Configuration
+
+Improved SSH remote session handling:
+- Added sessionSshRemoteConfig …
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/399` (2026-02-17 by jeffscottward) — score 0.809:
+```
+PR #399: fix: prevent duplicate CLI flags in buildAgentArgs
+URL: https://github.com/RunMaestro/Maestro/pull/399
+State: closed
+Author: jeffscottward
+Created: 2026-02-17T15:24:11Z
+
+## Summary
+- deduplicate repeated flag-style args in `buildAgentArgs()` while preserving order
+- only deduplicate flags (`-`/`--`), leaving positional args unchanged
+- add regression tests for the Codex duplicate bypass flag case and positional-arg safety
+
+## Why
+When both batch mode and YOLO mode contribute the same flag (for example Codex `--dangerously-bypass-approvals-and-sandbox`), the final argv can contain duplicates and Codex exits with code 2.
+
+Fixes #398
+
+
+## Follow-up Fix (Wizard/Codex)
+- fix wizard conversation output selection for Codex when multiple `agent_message` events occur in one turn
+- keep the latest Codex result text and emit at turn completion instead of taking the first interim message
+- add regression test in `StdoutHandler.test.ts` to ensure only the final Codex message is emitted
+
+This addresses cases where Wizard got stuck showing interim text like "I’m checking the directory..." instead of the actual final answer.
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/274` (2026-02-01 by greg12579) — score 0.771:
+```
+PR #274: fix(windows): use stdin for long prompts to avoid command line limit
+URL: https://github.com/RunMaestro/Maestro/pull/274
+State: closed
+Author: greg12579
+Created: 2026-02-01T22:25:09Z
+
+## Summary
+- Fixes agent crash on Windows when prompts exceed ~8191 character command line limit
+- Prompts over 7000 characters are now passed via stdin instead of CLI argument
+- Maintains compatibility with Claude Code's `--print` mode which accepts stdin input
+
+## Problem
+On Windows, the command line has a length limit of ~8191 characters. When the wizard builds up conversation history, the prompt can exceed this limit, causing the agent process to fail immediately with exit code 1 and no output.
+
+**Symptoms:**
+- "Agent exited with code 1" error on second or subsequent wizard messages
+- Process spawns but exits within ~30ms
+- No error output from the agent itself
+
+## Solution
+Detect when a prompt exceeds 7000 characters (leaving margin for command and args) on Windows, and instead of passing it as a CLI argument, write it to the process's stdin. Claude Code's `--print` mode accepts prompts via stdin, so this maintains compatibility.
+
+## Test plan
+- [x] First wizard message works (prompt und…
+```
+
+### Evidence excerpts
+
+**git_commit** `b7256dbfe4ac0de8378170c0476f9f03f7008697` (2025-12-09 by pedram.amini@gmail.com):
+```
+commit b7256dbfe4ac0de8378170c0476f9f03f7008697
+Author: Pedram Amini <pedram.amini@gmail.com>
+Date: 2025-12-09T16:30:21.000Z
+
+about modal tweaks
+
+
+Files:
+.gitignore
+Auto Run Docs/Phase-01-Wizard-Foundation.md
+Auto Run Docs/Phase-02-Conversation-Screen.md
+Auto Run Docs/Phase-03-Document-Generation.md
+Auto Run Docs/Phase-04-Phase-Review-Screen.md
+Auto Run Docs/Phase-05-Tour-Overlay-System.md
+Auto Ru…
+```
+
+**git_commit** `77c9a302339def9efcbbe9af1312b8597c456e62` (2025-12-27 by pedram.amini@gmail.com):
+```
+commit 77c9a302339def9efcbbe9af1312b8597c456e62
+Author: Pedram Amini <pedram.amini@gmail.com>
+Date: 2025-12-27T01:11:46.000Z
+
+added mintlify scaffolding
+
+
+Files:
+docs/docs.json
+docs/index.md
+docs/screenshots/achievements.png
+docs/screenshots/autorun-1.png
+docs/screenshots/autorun-2.png
+docs/screenshots/cmd-k-1.png
+docs/screenshots/cmd-k-2.png
+docs/screenshots/cmd-k-3.png
+docs/screenshots/cmd-k-4.p…
+```
+
+**github_issue** `https://github.com/RunMaestro/Maestro/issues/205` (2026-01-18 by pedramamini):
+```
+Issue #205: Enhancement: Fork conversation from any point in AI message history
+URL: https://github.com/RunMaestro/Maestro/issues/205
+State: open
+Author: pedramamini
+Created: 2026-01-18T18:01:04Z
+
+## Summary
+
+Add the ability to fork a conversation from any point in the AI message history, allowing users to explore alternative paths or retry from a specific point without losing the original conversation.
+
+## Proposed Behavior
+
+1. **New Fork Icon**: Add a fork icon (⑂ or similar) to the bottom-rig…
+```
+
+**git_commit** `a45e4a98b388bbbffecede136e29278e1fd981b6` (2026-02-07 by pedram.amini@gmail.com):
+```
+commit a45e4a98b388bbbffecede136e29278e1fd981b6
+Author: Pedram Amini <pedram.amini@gmail.com>
+Date: 2026-02-07T09:18:06.000Z
+
+fix: strip sensitive data from debug packages (paths, names, logs, install dirs)
+
+Users reported debug packages contained prompts, messages, agent
+installation paths, and directory listings. Centralizes sanitization
+into a shared sanitize.ts module and hardens all collector…
+```
+
+**source** `src/main/debug-package/collectors/logs.ts@1bb3fa53711dacc338` (2026-04-15):
+```
+/**
+ * Logs Collector
+ *
+ * Collects recent system logs from the logger.
+ * These are system/application logs, not conversation logs.
+ * Log messages are sanitized to remove embedded paths and truncate
+ * long messages that may contain prompts or conversation content.
+ * The raw `data` field is dropped entirely to prevent leaking sensitive objects.
+ */
+
+import { logger, LogEntry } from '../../utils/logger';
+import { sanitizeLogMessage } from './sanitize';
+
+export interface SanitizedLogEntry {
+	t…
+```
+
+**git_commit** `1c2a8101ee6d125b62da65b5493ec5adfb6cd257` (2026-01-22 by reachrazarauf@gmail.com):
+```
+commit 1c2a8101ee6d125b62da65b5493ec5adfb6cd257
+Author: Raza Rauf <reachrazarauf@gmail.com>
+Date: 2026-01-22T15:33:55.000Z
+
+refactor: modularize preload.ts into domain-specific modules with tests
+
+
+Files:
+package-lock.json
+package.json
+scripts/build-preload.mjs
+src/__tests__/main/preload/agents.test.ts
+src/__tests__/main/preload/attachments.test.ts
+src/__tests__/main/preload/autorun.test.ts
+src/__…
+```
+
+**source** `src/main/preload/files.ts@db2f7c00493f2c50155d2fd3f82de7a664` (2026-04-15):
+```
+/**
+ * Preload API for file operations
+ *
+ * Provides the window.maestro.tempfile, history, and cli namespaces for:
+ * - Temporary file operations
+ * - History persistence
+ * - CLI activity monitoring
+ */
+
+import { ipcRenderer } from 'electron';
+
+/**
+ * History entry
+ */
+export interface HistoryEntry {
+	id: string;
+	type: 'AUTO' | 'USER';
+	timestamp: number;
+	summary: string;
+	fullResponse?: string;
+	agentSessionId?: string;
+	projectPath: string;
+	sessionId?: string;
+	sessionName?: string;
+	cont…
+```
+
+**github_issue** `https://github.com/RunMaestro/Maestro/issues/11` (2025-12-02 by marcomafcorp):
+```
+Issue #11: Feature Request: Files Tab Auto Refresh
+URL: https://github.com/RunMaestro/Maestro/issues/11
+State: closed
+Author: marcomafcorp
+Created: 2025-12-02T20:34:01Z
+
+On the right side, we should implement an auto-refresh feature under the Files tab. I understand that a refresh button is available, and we can keep it for manual updates. However, if the user is currently viewing the Files tab, it should automatically refresh. If the user switches to a different tab, the auto-refresh can pause …
+```
+
+**github_issue** `https://github.com/RunMaestro/Maestro/issues/584` (2026-03-18 by jSydorowicz21):
+```
+Issue #584: Auto Run tab uses source repo path instead of worktree path
+URL: https://github.com/RunMaestro/Maestro/issues/584
+State: open
+Author: jSydorowicz21
+Created: 2026-03-18T04:22:07Z
+
+## Bug
+
+When selecting a worktree, the Auto Run tab reflects the original source repository path rather than the worktree's path. This means auto run docs created in a worktree are not visible in the Auto Run tab - they only appear if you copy them back to the original repo.
+
+## Expected Behavior
+
+The Auto R…
+```
+
+**git_commit** `231fe2fd8884318019bfaf4bd74a5dd48f7f8525` (2026-01-19 by reachrazarauf@gmail.com):
+```
+commit 231fe2fd8884318019bfaf4bd74a5dd48f7f8525
+Author: Raza Rauf <reachrazarauf@gmail.com>
+Date: 2026-01-19T21:21:36.000Z
+
+chore: format entire codebase with prettier
+
+Run `npm run format` across all TypeScript/TSX files
+for consistent code formatting throughout the project.
+
+Files:
+src/__tests__/cli/commands/list-agents.test.ts
+src/__tests__/cli/commands/list-groups.test.ts
+src/__tests__/cli/com…
+```
+
+**source** `src/cli/output/jsonl.ts@d5edad5dc5ea972da75dce619f06546176f0` (2026-04-15):
+```
+// JSONL output helper for CLI
+// Outputs machine-parseable JSON lines to stdout
+
+import type { UsageStats } from '../../shared/types';
+
+// Base event interface - all events have a type and timestamp
+export interface JsonlEvent {
+	type: string;
+	timestamp: number;
+	[key: string]: unknown;
+}
+
+// Event types for playbook execution
+export interface StartEvent extends JsonlEvent {
+	type: 'start';
+	playbook: {
+		id: string;
+		name: string;
+	};
+	session: {
+		id: string;
+		name: string;
+		cwd: string;
+…
+```
+
+**github_issue** `https://github.com/RunMaestro/Maestro/issues/757` (2026-04-09 by jeffscottward):
+```
+Issue #757: Bug: Files panel Hide is unclear and does not hide .maestro folder
+URL: https://github.com/RunMaestro/Maestro/issues/757
+State: open
+Author: jeffscottward
+Created: 2026-04-09T16:45:48Z
+
+## Summary
+Files panel Hide is unclear and does not hide .maestro folder
+
+## Environment
+- Maestro version: 0.16.8-RC
+- Operating system: macOS (Darwin Kernel Version 25.3.0: Wed Jan 28 20:54:46 PST 2026; root:xnu-12377.91.3~2/RELEASE_ARM64_T6000, 25.3.0)
+- Install source: Packaged build (release buil…
+```
+```
+
+</details>
+
+**Condition A (bare):**
+
+I will search for "JSONL" in the codebase and documentation to understand how conversation logs are implemented and why this format was chosen over a database.
+I will read the `ARCHITECTURE.md` file, specifically around line 1392 and 1512, to see if there is an explicit explanation for the choice of JSONL.
+I will search for "database" and "SQLite" in the codebase and check the implementation of `group-chat-storage.ts` to see if there are any clues about the decision to avoid a traditional database.
+I will examine `src/main/storage/stats-db.ts` and `src/main/group-chat/group-chat-storage.ts` to compare their usage and look for comments explaining the architectural choice of using JSONL for logs and SQLite for stats.
+I will read `src/main/storage/stats-db.ts` to understand how the SQLite database is used and if there are any comments comparing it to the JSONL approach used for logs.
+I will search for "better-sqlite3" in the `src/` directory to find the database implementation file.
+I will read `src/main/stats/stats-db.ts` to understand the rationale for using SQLite for stats.
+Maestro uses a hybrid storage approach, selecting the most appropriate format for different types of data. While **JSONL** is used for conversation logs, **SQLite** is used for usage statistics and performance metrics.
+
+The decision to use JSONL for conversation logs is driven by several architectural and practical considerations:
+
+### 1. Interoperability with Wrapped Agents
+Maestro acts as an orchestrator for various AI agents like **Claude Code**, **Codex**, and **Factory Droid**. These tools natively store their session history in JSONL format (e.g., in `~/.claude/sessions/`). By using JSONL, Maestro can:
+-   **Directly read and parse** history from these agents without complex import/export logic.
+-   **Maintain compatibility** with the underlying tools' own storage patterns, allowing users to switch between the CLI and Maestro seamlessly.
+
+### 2. Append-Only Robustness
+Conversation logs are inherently append-only. Every new message or event is simply added to the end of the history.
+-   **Write Performance:** Appending to a text file is an $O(1)$ operation that doesn't require the overhead of updating database indexes or B-trees.
+-   **Corruption Isolation:** In the event of a system crash or power failure during a write, a JSONL file usually only loses the last (partially written) line. In contrast, an interrupted database write can sometimes corrupt the entire database file, making it unreadable without complex recovery procedures.
+
+### 3. Simplicity and "Grep-ability"
+JSONL is a "human-readable-ish" format that is extremely friendly to standard Unix philosophy and tools.
+-   **Debugging:** Developers can easily use `grep`, `tail -f`, `awk`, or `jq` to inspect logs without needing a database client.
+-   **Scripting:** It is trivial to pipe JSONL logs into other scripts or tools for custom analysis.
+
+### 4. Why Stats *Do* Use a Database
+While logs are per-session and append-only, **Usage Statistics** (tracked in `src/main/stats/stats-db.ts`) have different requirements that make SQLite the better choice:
+-   **Complex Aggregations:** Calculating total costs, average response times, or token usage across thousands of events is instant in SQLite using SQL (`SELECT SUM(cost) ...`), but would require parsing every line of every log file if stored in JSONL.
+-   **Global Querying:** Stats are global across all projects and sessions. A database allows for efficient filtering by date ranges or event types using indexes.
+-   **Schema Migrations:** As Maestro evolves, the statistics schema changes. SQLite's robust support for migrations and ACID compliance ensures that global usage data remains consistent over time.
+
+### Summary
+Maestro uses **JSONL** for conversation logs because it is **robust, interoperable, and simple** for per-session history. It uses **SQLite** for stats because it is **optimized for complex queries and global data management**.
+
+**Condition B (with context pack):**
+
+Maestro uses JSONL for conversation logs primarily to maintain **native interoperability** with the AI agents it orchestrates, such as Claude Code and Codex. According to **PR #699** and **PR #784**, these agents natively emit structured events (e.g., `agent_message`, `result`) as JSONL. By adopting this format, Maestro can directly ingest, store, and replay these streams without the overhead of mapping them to a complex relational database schema.
+
+This approach is optimized for **streaming performance** and real-time updates. **PR #784** and **PR #399** highlight how Maestro handles interim messages and tool calls that evolve during a single turn. JSONL allows for efficient, append-only logging of these events, which is critical for an Electron application managing concurrent, long-running agent processes.
+
+Furthermore, JSONL simplifies **state reconstruction and auditability**. **PR #280** demonstrates that context window usage is calculated by aggregating token counts across accumulated JSONL messages. Storing logs as flat files—likely within the `.maestro` folder mentioned in **Issue #757**—ensures they remain portable, human-readable for debugging, and easy to sanitize before packaging for support, as evidenced by the sanitization logic in `src/main/debug-package/collectors/logs.ts`. Using a database would introduce unnecessary complexity for a local-first application where per-project portability is a priority.
+
+---
+
+## Q4 [medium] — Why does the Layer Stack use a capture-phase event listener for the global Escape handler?
+
+**Context pack:** 400 lines — includes Discussions section
+
+<details><summary>Full context pack</summary>
+
+```
+## Context pack
+> Query: Why does the Layer Stack use a capture-phase event listener for the global Escape handler?  Budget: 6000 tokens | Used: ~3949 | 50 results
+
+### Entities
+
+- `src/renderer/types/layer.ts::Layer` **[symbol]** — score 1.000 | evidence: 1 episode(s)
+- `src/renderer/types/layer.ts` **[module]** — score 0.792 | evidence: 2 episode(s)
+- `src/renderer/global.d.ts` **[module]** — score 0.777 | evidence: 2 episode(s)
+- `src/renderer/types/layer.ts::LayerType` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/renderer/types/layer.ts::FocusTrapMode` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/renderer/types/layer.ts::BaseLayer` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/renderer/types/layer.ts::ModalLayer` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/renderer/types/layer.ts::OverlayLayer` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/renderer/types/layer.ts::ModalLayerInput` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/renderer/types/layer.ts::OverlayLayerInput` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/renderer/types/layer.ts::LayerInput` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/renderer/types/layer.ts::isModalLayer` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/renderer/types/layer.ts::isOverlayLayer` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/renderer/global.d.ts::AutoRunTreeNode` **[symbol]** — score 0.730 | evidence: 1 episode(s)
+- `src/renderer/global.d.ts::ProcessConfig` **[symbol]** — score 0.730 | evidence: 1 episode(s)
+- `src/renderer/global.d.ts::AgentConfigOption` **[symbol]** — score 0.730 | evidence: 1 episode(s)
+- `src/renderer/global.d.ts::AgentCapabilities` **[symbol]** — score 0.730 | evidence: 1 episode(s)
+- `src/renderer/global.d.ts::AgentConfig` **[symbol]** — score 0.730 | evidence: 1 episode(s)
+- `src/renderer/global.d.ts::DirectoryEntry` **[symbol]** — score 0.730 | evidence: 1 episode(s)
+- `src/renderer/global.d.ts::ShellInfo` **[symbol]** — score 0.730 | evidence: 1 episode(s)
+- `src/renderer/global.d.ts::UsageStats` **[symbol]** — score 0.730 | evidence: 1 episode(s)
+- `src/renderer/global.d.ts::HistoryEntryType` **[symbol]** — score 0.730 | evidence: 1 episode(s)
+- `src/renderer/global.d.ts::SessionMessagesResult` **[symbol]** — score 0.730 | evidence: 1 episode(s)
+- `src/renderer/global.d.ts::MaestroAPI` **[symbol]** — score 0.730 | evidence: 1 episode(s)
+- `src/__tests__/renderer/types/layer.test.ts` **[module]** — score 0.701 | evidence: 2 episode(s)
+- `https://github.com/RunMaestro/Maestro/issues/367` **[issue]** — score 0.693 | evidence: 1 episode(s)
+- `src/__tests__/renderer/types/layer.test.ts::createModalLayer` **[symbol]** — score 0.662 | evidence: 1 episode(s)
+- `src/__tests__/renderer/types/layer.test.ts::createOverlayLayer` **[symbol]** — score 0.662 | evidence: 1 episode(s)
+- `src/main/process-listeners/wakatime-listener.ts` **[module]** — score 0.620 | evidence: 2 episode(s)
+- `src/main/process-listeners/exit-listener.ts` **[module]** — score 0.620 | evidence: 2 episode(s)
+
+### Edges
+
+- src/renderer/types/layer.ts defines Layer **[observed]** — score 1.000
+- Layer is defined in src/renderer/types/layer.ts **[observed]** — score 0.954
+- src/__tests__/renderer/types/layer.test.ts imports src/renderer/types/layer.ts **[observed]** — score 0.874
+- src/renderer/types/layer.ts defines LayerType **[observed]** — score 0.783
+- src/renderer/types/layer.ts defines FocusTrapMode **[observed]** — score 0.783
+- src/renderer/types/layer.ts defines BaseLayer **[observed]** — score 0.783
+- src/renderer/types/layer.ts defines ModalLayer **[observed]** — score 0.783
+- src/renderer/types/layer.ts defines OverlayLayer **[observed]** — score 0.783
+- src/renderer/types/layer.ts defines ModalLayerInput **[observed]** — score 0.783
+- src/renderer/types/layer.ts defines OverlayLayerInput **[observed]** — score 0.783
+- src/renderer/types/layer.ts defines LayerInput **[observed]** — score 0.783
+- src/renderer/types/layer.ts defines isModalLayer **[observed]** — score 0.783
+- src/renderer/types/layer.ts defines isOverlayLayer **[observed]** — score 0.783
+- LayerType is defined in src/renderer/types/layer.ts **[observed]** — score 0.728
+- FocusTrapMode is defined in src/renderer/types/layer.ts **[observed]** — score 0.728
+- BaseLayer is defined in src/renderer/types/layer.ts **[observed]** — score 0.728
+- ModalLayer is defined in src/renderer/types/layer.ts **[observed]** — score 0.728
+- OverlayLayer is defined in src/renderer/types/layer.ts **[observed]** — score 0.728
+- ModalLayerInput is defined in src/renderer/types/layer.ts **[observed]** — score 0.728
+- OverlayLayerInput is defined in src/renderer/types/layer.ts **[observed]** — score 0.728
+
+### Discussions
+_PR descriptions, issue discussions, and commit messages retrieved directly from the graph._
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/789` (2026-04-10 by jSydorowicz21) — score 1.000:
+```
+PR #789: docs: add agent guides and CLAUDE.md anti-duplication section
+URL: https://github.com/RunMaestro/Maestro/pull/789
+State: closed
+Author: jSydorowicz21
+Created: 2026-04-10T23:53:51Z
+
+Reference documentation for future contributors (Maestro ♥) to find existing utilities before writing duplicates.
+
+Guides in docs/agent-guides/ (17 files, verified 2026-04-10 against rc):
+
+- AGENT-INFRA.md: agent detection, spawning, storage, parsers
+- IPC-PATTERNS.md: IPC handler registration and preload bridge
+- STATE-PATTERNS.md: Zustand stores, selectors, hooks
+- UI-PATTERNS.md: modal layer stack, themes, shared UI
+- TEST-PATTERNS.md: test setup, mocks, integration patterns
+- SHARED-UTILS.md: catalog of 36 util files with canonical exports
+- RENDERER-SERVICES.md: services/ and constants/ layer
+- PROCESS-SYSTEM.md: process manager, listeners, web server
+- MAIN-LIFECYCLE.md: app lifecycle, updater, settings
+- CLI-PLAYBOOKS.md: CLI commands and playbook service
+- CUE-PIPELINE.md: Maestro Cue automation engine (triggers, config, extracted services)
+- GROUP-CHAT.md: group chat and Symphony
+- PROMPTS-SPECS.md: prompts, SpecKit, OpenSpec managers
+- STATS-ANALYTICS.md: stats DB, usa…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/742` (2026-04-06 by reachrazamair) — score 0.957:
+```
+PR #742: cue-hardening: leak fix, panel layout, themed scrollbars + GeneralTab cleanup
+URL: https://github.com/RunMaestro/Maestro/pull/742
+State: closed
+Author: reachrazamair
+Created: 2026-04-06T20:34:53Z
+
+## Summary
+
+Four-commit polish pass on the Cue feature and the surrounding theme/UI surface:
+
+1. **Group-chat → Cue leak fix.** Tightens the boundary so group-chat transcripts can no longer end up inside chained Cue pipeline output (or any other process channel).
+2. **Agent config panel layout.** Fixes three collapsed-view bugs in the Cue pipeline editor: cramped multi-trigger left rail, weirdly small output box, and wasted vertical space in single-trigger mode.
+3. **App-wide themed scrollbars.** Replaces the hardcoded `rgba(255,255,255,0.15)` thumb (invisible on light themes) with a unified, theme-driven scrollbar system that automatically picks up the active theme. Includes a new `<ScrollArea>` wrapper component for new call sites.
+4. **GeneralTab dead code cleanup.** Drops 22 pre-existing eslint warnings left over from the Usage & Stats / WakaTime move to the Encore Features tab.
+
+`npm run lint`, `npm run lint:eslint`, and the relevant test suites are all clean — see …
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/312` (2026-02-06 by reachrazamair) — score 0.922:
+```
+PR #312: refactor: revamp state management logic. Moving from React Context API to Zustand stores ensuring SRP-Driven modules
+URL: https://github.com/RunMaestro/Maestro/pull/312
+State: closed
+Author: reachrazamair
+Created: 2026-02-06T17:00:19Z
+
+## Summary
+
+- Replace `ModalContext` (90+ boolean fields + setters) and `UILayoutContext` (30+ properties) with two Zustand stores: `modalStore` (registry pattern, 47 modal IDs) and `uiStore` (19 state properties, 24 actions)
+- Eliminate an entire provider layer (`ModalProvider`) from the component tree — Zustand stores are global singletons, no context nesting required
+- Provide a drop-in compatibility layer (`useModalActions()`) so downstream components can migrate incrementally from the old `useModalContext()` API
+
+## Motivation
+
+`ModalContext` had grown to 90+ individual boolean fields with corresponding setters, meaning **any** modal open/close caused re-renders in **every** consumer. `UILayoutContext` had a similar problem with 30+ layout properties. This was the single largest source of unnecessary re-renders in the renderer process.
+
+## What changed
+
+### New: `modalStore` (`src/renderer/stores/modalStore.ts`)
+- **Registr…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/240` (2026-01-26 by reachrazamair) — score 0.835:
+```
+PR #240: refactor: extracted process listeners from main/index.ts
+URL: https://github.com/RunMaestro/Maestro/pull/240
+State: closed
+Author: reachrazamair
+Created: 2026-01-26T13:20:43Z
+
+## Summary
+
+Continuation of `main/index.ts` refactoring - extracts the `setupProcessListeners` function (~650 lines) into dedicated modules with dependency injection pattern.
+
+### New Modules
+
+| Module | Lines | Purpose |
+|--------|-------|---------|
+| `types.ts` | 144 | `ProcessListenerDependencies` interface and type re-exports |
+| `data-listener.ts` | 102 | Process output streaming with group chat buffering |
+| `exit-listener.ts` | 414 | Process exit handling with routing, recovery, synthesis |
+| `session-id-listener.ts` | 77 | Agent session ID tracking for group chat |
+| `usage-listener.ts` | 107 | Token/cost statistics for participants and moderator |
+| `error-listener.ts` | 31 | Agent error logging and forwarding |
+| `stats-listener.ts` | 50 | Query-complete events for stats database |
+| `forwarding-listeners.ts` | 48 | Simple IPC forwarding (slash-commands, thinking-chunk, etc.) |
+| `index.ts` | 55 | Setup orchestration and exports |
+
+### Impact
+
+- **main/index.ts**: 1270 →…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/823` (2026-04-13 by jSydorowicz21) — score 0.793:
+```
+PR #823: refactor: migrate to canonical shared hooks (Phase 09)
+URL: https://github.com/RunMaestro/Maestro/pull/823
+State: closed
+Author: jSydorowicz21
+Created: 2026-04-13T03:56:02Z
+
+## Summary
+
+Migrates a conservative subset of hook patterns to canonical shared hooks. **This phase is intentionally narrow** - most call sites had semantic subtleties that would have caused regressions if blindly replaced.
+
+**Net: -19 lines across 4 files**
+
+### 09A - useEventListener migrations (4 sites)
+
+Replaced raw `addEventListener` / `removeEventListener` pairs with the canonical `useEventListener` hook from `src/renderer/hooks/utils/useEventListener.ts`:
+
+- `src/renderer/hooks/ui/useTourActions.ts` - `tour:action` event
+- `src/renderer/components/SessionList/SessionList.tsx` - `tour:action` event
+- `src/renderer/hooks/session/useHandsOnTimeTracker.ts` - `beforeunload` event
+- `src/renderer/components/MarketplaceModal.tsx` - `keydown` event in PlaybookDetailView
+
+### 09A - useFocusAfterRender migrations (0 sites)
+
+**Intentionally zero** - the canonical hook uses `useLayoutEffect` with NO dep array and re-runs every render while its `condition` is true. Replacing the common `useEffect(() => { set…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/559` (2026-03-12 by ets) — score 0.722:
+```
+PR #559: feat: group chat enhancements
+URL: https://github.com/RunMaestro/Maestro/pull/559
+State: closed
+Author: ets
+Created: 2026-03-12T16:40:49Z
+
+## Summary
+
+- Enhanced group chat routing with improved participant response handling, stability fixes, and better observability
+- Added group chat moderator system prompt for synthesis and auto-run registry for managing group chat workflows
+- Extended settings, stores, and IPC handlers to support new group chat capabilities including participant cards and right panel
+
+## Changes
+
+**Core group chat improvements:**
+- `src/main/group-chat/group-chat-router.ts` — Major enhancements to routing logic (+321 lines)
+- `src/main/ipc/handlers/groupChat.ts` — Extended IPC handlers for group chat operations
+- `src/main/preload/groupChat.ts` — New preload bridge for group chat IPC
+- `src/main/process-listeners/data-listener.ts` / `exit-listener.ts` — Process lifecycle improvements
+
+**Renderer/UI:**
+- `src/renderer/App.tsx` — Group chat integration into main app coordinator
+- `src/renderer/components/GroupChat*.tsx` — Updated header, list, panel, participants, and right panel components
+- `src/renderer/components/ParticipantCard.tsx` — Enhanced parti…
+```
+
+### Evidence excerpts
+
+**source** `src/renderer/types/layer.ts@f47ecceceec6a3a3893a79ae9d429139` (2026-04-15):
+```
+/**
+ * Layer Stack Type System
+ *
+ * This module defines the type system for the centralized layer stack management.
+ * Layers represent UI elements that can capture focus and handle escape key events,
+ * such as modals, overlays, search interfaces, and inline editors.
+ */
+
+/**
+ * Types of layers in the UI hierarchy
+ */
+export type LayerType = 'modal' | 'overlay';
+
+/**
+ * Focus trap behavior modes
+ * - strict: Focus must stay within the layer (Tab cycles back to first element)
+ * - lenient: Focu…
+```
+
+**git_commit** `231fe2fd8884318019bfaf4bd74a5dd48f7f8525` (2026-01-19 by reachrazarauf@gmail.com):
+```
+commit 231fe2fd8884318019bfaf4bd74a5dd48f7f8525
+Author: Raza Rauf <reachrazarauf@gmail.com>
+Date: 2026-01-19T21:21:36.000Z
+
+chore: format entire codebase with prettier
+
+Run `npm run format` across all TypeScript/TSX files
+for consistent code formatting throughout the project.
+
+Files:
+src/__tests__/cli/commands/list-agents.test.ts
+src/__tests__/cli/commands/list-groups.test.ts
+src/__tests__/cli/com…
+```
+
+**git_commit** `5c0133ab8367b93678cc37645f06656cda7d3834` (2026-02-16 by kian.pasani@gmail.com):
+```
+commit 5c0133ab8367b93678cc37645f06656cda7d3834
+Author: Kian <kian.pasani@gmail.com>
+Date: 2026-02-16T05:36:37.000Z
+
+feat: WakaTime integration for IDE activity tracking (#326)
+
+* feat: add WakaTime integration settings UI to General tab
+
+Add WakaTime API key and enable/disable toggle to the Settings modal
+General tab with Beta badge. Settings are persisted via electron-store
+following existing pa…
+```
+
+**source** `src/renderer/global.d.ts@3359f4714eb13260f66cc420feaa4f9a67e` (2026-04-15):
+```
+/**
+ * Global type declarations for the renderer process.
+ * This file makes the window.maestro API available throughout the renderer.
+ */
+
+// Vite raw imports for .md files
+declare module '*.md?raw' {
+	const content: string;
+	export default content;
+}
+
+type AutoRunTreeNode = {
+	name: string;
+	type: 'file' | 'folder';
+	path: string;
+	children?: AutoRunTreeNode[];
+};
+
+interface ProcessConfig {
+	sessionId: string;
+	toolType: string;
+	cwd: string;
+	command: string;
+	args: string[];
+	prompt?: string…
+```
+
+**source** `src/__tests__/renderer/types/layer.test.ts@926906c41f16a00da` (2026-04-15):
+```
+/**
+ * Tests for Layer type system utilities
+ */
+
+import { describe, it, expect, vi } from 'vitest';
+import {
+	isModalLayer,
+	isOverlayLayer,
+	Layer,
+	ModalLayer,
+	OverlayLayer,
+} from '../../../renderer/types/layer';
+
+function createModalLayer(overrides: Partial<ModalLayer> = {}): ModalLayer {
+	return {
+		id: 'test-modal',
+		type: 'modal',
+		priority: 100,
+		blocksLowerLayers: true,
+		capturesFocus: true,
+		focusTrap: 'strict',
+		onEscape: vi.fn(),
+		...overrides,
+	};
+}
+
+function createOverlayL…
+```
+
+**github_issue** `https://github.com/RunMaestro/Maestro/issues/367` (2026-02-14 by pedramamini):
+```
+Issue #367: feat: Maestro Cue — Event-Driven Agent Automation
+URL: https://github.com/RunMaestro/Maestro/issues/367
+State: open
+Author: pedramamini
+Created: 2026-02-14T23:12:56Z
+
+## Maestro Cue
+
+**The conductor gives the cue — the agents respond.**
+
+Maestro Cue is an event-driven automation system that lets users define triggers that automatically execute prompts against their AI agents. Think of it as cron for AI agents, with multi-agent orchestration built in.
+
+Inspired by [Sentinel](https://g…
+```
+
+**source** `src/main/process-listeners/wakatime-listener.ts@1037d938f8aa` (2026-04-15):
+```
+/**
+ * WakaTime heartbeat listener.
+ * Sends WakaTime heartbeats on AI activity (data, thinking-chunk events) and batch
+ * query completions. Cleans up debounce tracking on process exit.
+ *
+ * The `data` event fires on every stdout chunk for both interactive and batch sessions.
+ * The `thinking-chunk` event fires while the AI is actively reasoning (extended thinking).
+ * Together these ensure heartbeats cover the full duration of AI activity.
+ * The `query-complete` event fires only for batch/au…
+```
+
+**git_commit** `748e12bbfcfbd971ecabb0a8c1dee97f153509c8` (2026-02-12 by pedram.amini@gmail.com):
+```
+commit 748e12bbfcfbd971ecabb0a8c1dee97f153509c8
+Author: Pedram Amini <pedram.amini@gmail.com>
+Date: 2026-02-12T07:41:34.000Z
+
+fix: use format-agnostic regex for AI tab ID matching
+
+Follow-up to #337. Replace UUID-specific regex with generic /-ai-.+$/
+pattern that supports any tab ID format (UUIDs, nanoids, simple strings).
+Also fix ProcessMonitor.tsx parseTabId and update all missed test files.
+
+F…
+```
+
+**source** `src/main/process-listeners/exit-listener.ts@19627fec140943ba` (2026-04-15):
+```
+/**
+ * Process exit listener.
+ * Handles process exit events, including group chat moderator/participant exits.
+ * This is the largest and most complex listener with routing, recovery, and synthesis logic.
+ */
+
+import type { ProcessManager } from '../process-manager';
+import { GROUP_CHAT_PREFIX, type ProcessListenerDependencies } from './types';
+
+/**
+ * Sets up the exit listener for process termination.
+ * Handles:
+ * - Power management cleanup
+ * - Group chat moderator exit (routing buffered ou…
+```
+```
+
+</details>
+
+**Condition A (bare):**
+
+I will search the codebase for "LayerStack" and global Escape event listeners that use the capture phase to understand the implementation and reasoning.
+I will read `src/renderer/contexts/LayerStackContext.tsx` to understand the implementation and reasoning for using the capture phase for the Escape handler.
+I will check `src/renderer/hooks/index.ts` to locate the source of `useLayerStackHook`.
+I'll check `src/renderer/hooks/ui/index.ts` to locate `useLayerStack`.
+I'll read `src/renderer/hooks/ui/useLayerStack.ts` to understand how the layer stack is managed and how `closeTopLayer` works.
+The **Layer Stack** uses a capture-phase event listener for the global **Escape** handler primarily to ensure **priority-based interception** and to prevent **event collisions** with child components.
+
+### 1. Interception Before Bubble Phase
+In the DOM event model, the **capture phase** occurs before the event reaches the target element and before it begins the **bubble phase**. Most UI components (like text inputs, dropdowns, or buttons) attach their keyboard listeners to the bubble phase. By listening in the capture phase at the `window` level, the Layer Stack gets the "first right of refusal" for the Escape key.
+
+### 2. Preventing "Double Action" Conflicts
+If a modal is open and the user presses Escape, the expected behavior is for the modal to close. However, if the focus is inside a component that also has an Escape handler (e.g., a search input that clears on Escape), a standard bubble-phase listener would trigger both actions: the input would clear *and* the modal would close.
+
+By using the capture phase and calling `e.stopPropagation()`, the Layer Stack effectively "consumes" the event:
+```typescript
+// From src/renderer/contexts/LayerStackContext.tsx
+if (topLayer) {
+    e.preventDefault();
+    e.stopPropagation(); // Stops the event from reaching any child components
+    void stack.closeTopLayer();
+}
+```
+
+### 3. Focus Independence
+The Layer Stack needs to work regardless of where the keyboard focus currently resides. If an element has focus that would otherwise "swallow" the Escape key (or if focus is lost entirely), the capture-phase listener on the `window` ensures the Layer Stack still receives the event and can delegate it to the topmost active layer (like a Modal or Overlay).
+
+### 4. Deterministic Stack Order
+The `useLayerStack` hook maintains a priority-sorted array of layers. Intercepting the event at the top level allows the system to deterministically identify the **highest-priority** layer (the "top" of the stack) and trigger its specific `onEscape` handler, rather than relying on multiple independent components to coordinate who should respond to the keypress.
+
+**Condition B (with context pack):**
+
+I will search for the Layer Stack implementation and its event listener setup to understand why the capture phase is used.
+I will read `src/renderer/contexts/LayerStackContext.tsx` and `src/renderer/hooks/ui/useLayerStack.ts` to understand why the capture phase is used for the Escape handler.
+I will check `ARCHITECTURE.md` to see if there's more detail about the previous issues with scattered Escape handlers and why the capture phase was chosen for centralization.
+The Layer Stack uses a **capture-phase event listener** for its global Escape handler (`window.addEventListener('keydown', handleEscape, { capture: true })`) to ensure centralized, predictable UI behavior in a multi-agent environment.
+
+This design decision solves several critical architectural problems:
+
+1.  **Conflict Prevention & Determinism:** By intercepting the event during the capture phase, the `LayerStackContext` captures the Escape key before it reaches child components. This prevents "fighting" between local component handlers (e.g., a text input or a search bar) and the global modal system. It ensures that the top-most layer always has the first opportunity to handle the event.
+2.  **Consolidation of Scattered Logic:** As noted in `ARCHITECTURE.md`, the system previously had "9+ scattered Escape handlers." Centralizing this in the capture phase allows the application to replace brittle, manual `addEventListener` pairs with a single source of truth that manages a priority-sorted stack.
+3.  **Priority Enforcement:** The stack uses a `MODAL_PRIORITIES` hierarchy (ranging from `STANDING_OVATION` at 1100 to `FILE_TREE_FILTER` at 30). The capture-phase handler identifies the top-most layer via `getTopLayer()`, executes its specific `onEscape` logic, and immediately calls `e.stopPropagation()` and `e.preventDefault()`. This guarantees that only the highest-priority UI element responds to the user's intent to "go back" or "close."
+4.  **Simplified Component Logic:** Components no longer need to manage their own global listeners. They simply register with the stack, and the capture-phase listener handles the delegation logic safely across the entire React tree.
+
+---
+
+## Q5 [medium] — Why does the Layer Stack use explicit priority numbers rather than LIFO (last-in, first-out) ordering?
+
+**Context pack:** 306 lines — includes Discussions section
+
+<details><summary>Full context pack</summary>
+
+```
+## Context pack
+> Query: Why does the Layer Stack use explicit priority numbers rather than LIFO (last-in, first-out) ordering?  Budget: 6000 tokens | Used: ~3093 | 36 results
+
+### Entities
+
+- `src/renderer/types/layer.ts::Layer` **[symbol]** — score 1.000 | evidence: 1 episode(s)
+- `src/renderer/types/layer.ts` **[module]** — score 0.792 | evidence: 2 episode(s)
+- `src/renderer/types/layer.ts::LayerType` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/renderer/types/layer.ts::FocusTrapMode` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/renderer/types/layer.ts::BaseLayer` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/renderer/types/layer.ts::ModalLayer` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/renderer/types/layer.ts::OverlayLayer` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/renderer/types/layer.ts::ModalLayerInput` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/renderer/types/layer.ts::OverlayLayerInput` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/renderer/types/layer.ts::LayerInput` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/renderer/types/layer.ts::isModalLayer` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/renderer/types/layer.ts::isOverlayLayer` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/__tests__/renderer/types/layer.test.ts` **[module]** — score 0.701 | evidence: 2 episode(s)
+- `src/__tests__/renderer/types/layer.test.ts::createModalLayer` **[symbol]** — score 0.662 | evidence: 1 episode(s)
+- `src/__tests__/renderer/types/layer.test.ts::createOverlayLayer` **[symbol]** — score 0.662 | evidence: 1 episode(s)
+- `https://github.com/RunMaestro/Maestro/issues/625` **[issue]** — score 0.429 | evidence: 1 episode(s)
+
+### Edges
+
+- src/renderer/types/layer.ts defines Layer **[observed]** — score 1.000
+- src/shared/logger-types.ts defines LOG_LEVEL_PRIORITY **[observed]** — score 0.965
+- src/renderer/components/LogViewer.tsx defines LOG_LEVEL_PRIORITY **[observed]** — score 0.965
+- Layer is defined in src/renderer/types/layer.ts **[observed]** — score 0.954
+- LOG_LEVEL_PRIORITY is defined in src/shared/logger-types.ts **[observed]** — score 0.902
+- LOG_LEVEL_PRIORITY is defined in src/renderer/components/LogViewer.tsx **[observed]** — score 0.902
+- src/__tests__/renderer/types/layer.test.ts imports src/renderer/types/layer.ts **[observed]** — score 0.874
+- src/renderer/types/layer.ts defines LayerType **[observed]** — score 0.783
+- src/renderer/types/layer.ts defines FocusTrapMode **[observed]** — score 0.783
+- src/renderer/types/layer.ts defines BaseLayer **[observed]** — score 0.783
+- src/renderer/types/layer.ts defines ModalLayer **[observed]** — score 0.783
+- src/renderer/types/layer.ts defines OverlayLayer **[observed]** — score 0.783
+- src/renderer/types/layer.ts defines ModalLayerInput **[observed]** — score 0.783
+- src/renderer/types/layer.ts defines OverlayLayerInput **[observed]** — score 0.783
+- src/renderer/types/layer.ts defines LayerInput **[observed]** — score 0.783
+- src/renderer/types/layer.ts defines isModalLayer **[observed]** — score 0.783
+- src/renderer/types/layer.ts defines isOverlayLayer **[observed]** — score 0.783
+- LayerType is defined in src/renderer/types/layer.ts **[observed]** — score 0.728
+- FocusTrapMode is defined in src/renderer/types/layer.ts **[observed]** — score 0.728
+- BaseLayer is defined in src/renderer/types/layer.ts **[observed]** — score 0.728
+
+### Discussions
+_PR descriptions, issue discussions, and commit messages retrieved directly from the graph._
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/207` (2026-01-18 by ksylvan) — score 1.000:
+```
+PR #207: feat: Add safety friction to Confirm and Erase
+URL: https://github.com/RunMaestro/Maestro/pull/207
+State: closed
+Author: ksylvan
+Created: 2026-01-18T21:01:51Z
+
+## Summary
+
+This PR adds safety friction to the "Confirm and Erase" functionality to prevent accidental directory deletion, addressing the concerns in #206.
+
+**Three safety measures implemented:**
+
+1. **High-contrast warning text** - The warning in the Delete Agent modal now uses error-colored text (red/high contrast) to make it impossible to miss the directory deletion notice
+
+2. **Two-step confirmation flow** - Clicking "Confirm and Erase" now opens a secondary confirmation modal instead of immediately deleting
+
+3. **Type-to-confirm pattern** - Users must type the exact session name to enable the final "Yes, Erase Directory" button, similar to GitHub's dangerous action confirmations
+
+## Implementation Details
+
+- New `EraseConfirmationModal` component with:
+  - Visual warning with directory path display
+  - Case-sensitive name matching
+  - Disabled button state until name matches
+  - Proper layer stack integration (priority 1005, above main confirmation modal)
+  - Focus management for accessibility
+
+- Updated `Dele…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/224` (2026-01-22 by reachrazamair) — score 0.956:
+```
+PR #224: refactor: modularize preload.ts into domain-specific modules with tests
+URL: https://github.com/RunMaestro/Maestro/pull/224
+State: closed
+Author: reachrazamair
+Created: 2026-01-22T15:38:06Z
+
+## Summary
+
+- Refactored monolithic preload.ts (3,761 lines) into 21 domain-specific modules
+- Added comprehensive test coverage with 20 new test files (~5,700 lines)
+- Established clean module boundaries with typed factory functions
+
+## Key Gains
+
+### Maintainability
+
+- Single 3,761-line file → 21 focused modules averaging ~180 lines each
+- Each module owns one domain: agents.ts, git.ts, process.ts, settings.ts, etc.
+- Clear separation of concerns makes code easier to navigate and modify
+
+### Testability
+
+- From 0 → 5,700+ lines of dedicated test coverage
+- Each module can be tested in isolation via factory functions
+- Mocking is straightforward with clear API boundaries
+
+### Type Safety
+
+- All types are co-located with their implementations and re-exported from index
+- External consumers import from ./preload with full TypeScript support
+- API contracts are explicit and documented
+
+### Team Scalability
+
+- Multiple developers can work on different modules w…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/789` (2026-04-10 by jSydorowicz21) — score 0.833:
+```
+PR #789: docs: add agent guides and CLAUDE.md anti-duplication section
+URL: https://github.com/RunMaestro/Maestro/pull/789
+State: closed
+Author: jSydorowicz21
+Created: 2026-04-10T23:53:51Z
+
+Reference documentation for future contributors (Maestro ♥) to find existing utilities before writing duplicates.
+
+Guides in docs/agent-guides/ (17 files, verified 2026-04-10 against rc):
+
+- AGENT-INFRA.md: agent detection, spawning, storage, parsers
+- IPC-PATTERNS.md: IPC handler registration and preload bridge
+- STATE-PATTERNS.md: Zustand stores, selectors, hooks
+- UI-PATTERNS.md: modal layer stack, themes, shared UI
+- TEST-PATTERNS.md: test setup, mocks, integration patterns
+- SHARED-UTILS.md: catalog of 36 util files with canonical exports
+- RENDERER-SERVICES.md: services/ and constants/ layer
+- PROCESS-SYSTEM.md: process manager, listeners, web server
+- MAIN-LIFECYCLE.md: app lifecycle, updater, settings
+- CLI-PLAYBOOKS.md: CLI commands and playbook service
+- CUE-PIPELINE.md: Maestro Cue automation engine (triggers, config, extracted services)
+- GROUP-CHAT.md: group chat and Symphony
+- PROMPTS-SPECS.md: prompts, SpecKit, OpenSpec managers
+- STATS-ANALYTICS.md: stats DB, usa…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/502` (2026-03-03 by reachrazamair) — score 0.754:
+```
+PR #502: refactor: decompose SettingsModal and SessionList components
+URL: https://github.com/RunMaestro/Maestro/pull/502
+State: closed
+Author: reachrazamair
+Created: 2026-03-03T02:16:35Z
+
+Extract 6 components from the monolithic SettingsModal.tsx (3,649 → 601 lines, −84%):
+
+- EnvVarsEditor: environment variable editing sub-component (219 lines)
+- GeneralTab: shell, input, toggles, WakaTime, sync/stats (1,530 lines)
+- DisplayTab: fonts, terminal width, log buffer, alignment (558 lines)
+- EncoreTab: feature flags, Director's Notes agent config (509 lines)
+- ShortcutsTab: shortcut recording, filtering, escape coordination (215 lines)
+- ThemeTab: theme selection, grouping, keyboard navigation (162 lines)
+
+Each tab self-sources settings via useSettings() and owns its local state. SettingsModal.tsx retains modal chrome, tab bar, layer stack, and tab routing.
+
+308 new tests across 6 test files; 416 total Settings tests passing.
+
+<!-- This is an auto-generated comment: release notes by coderabbit.ai -->
+## Summary by CodeRabbit
+
+* **New Features**
+  * Redesigned Settings modal with tabbed sections: General, Display, Encore (Director's Notes), Shortcuts, and Theme.
+  * Added Env…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/742` (2026-04-06 by reachrazamair) — score 0.719:
+```
+PR #742: cue-hardening: leak fix, panel layout, themed scrollbars + GeneralTab cleanup
+URL: https://github.com/RunMaestro/Maestro/pull/742
+State: closed
+Author: reachrazamair
+Created: 2026-04-06T20:34:53Z
+
+## Summary
+
+Four-commit polish pass on the Cue feature and the surrounding theme/UI surface:
+
+1. **Group-chat → Cue leak fix.** Tightens the boundary so group-chat transcripts can no longer end up inside chained Cue pipeline output (or any other process channel).
+2. **Agent config panel layout.** Fixes three collapsed-view bugs in the Cue pipeline editor: cramped multi-trigger left rail, weirdly small output box, and wasted vertical space in single-trigger mode.
+3. **App-wide themed scrollbars.** Replaces the hardcoded `rgba(255,255,255,0.15)` thumb (invisible on light themes) with a unified, theme-driven scrollbar system that automatically picks up the active theme. Includes a new `<ScrollArea>` wrapper component for new call sites.
+4. **GeneralTab dead code cleanup.** Drops 22 pre-existing eslint warnings left over from the Usage & Stats / WakaTime move to the Encore Features tab.
+
+`npm run lint`, `npm run lint:eslint`, and the relevant test suites are all clean — see …
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/364` (2026-02-13 by pedramamini) — score 0.710:
+```
+PR #364: feat: CSV table rendering + fix: group chat write race & SSH spawn
+URL: https://github.com/RunMaestro/Maestro/pull/364
+State: closed
+Author: pedramamini
+Created: 2026-02-13T01:10:32Z
+
+## Summary
+- CSV and TSV files now render as themed, sortable tables instead of plain text in file preview
+- New `CsvTableRenderer` component with RFC-compliant CSV parsing, numeric column detection, click-to-sort headers, and row truncation
+- Edit mode toggle falls through to raw text editor for direct CSV editing
+- **Fix:** Serialize concurrent writes to group chat `metadata.json` to prevent file corruption from racing listeners
+- **Fix:** Add SSH wrapping for group chat participant spawns (user-mention auto-add + recovery respawn)
+- **Fix:** Group chat history panel layout — filter pills, activity graph, and entries now stack vertically instead of being squeezed into a single row
+
+## Group Chat History Panel Layout
+The filter pills and activity graph were crammed into a single flex row, causing the graph to be too narrow. Refactored to three distinct vertical sections:
+1. **Filter pills** — centered horizontally
+2. **Activity graph** — full-width on its own row
+3. **History entries** — scr…
+```
+
+### Evidence excerpts
+
+**source** `src/renderer/types/layer.ts@f47ecceceec6a3a3893a79ae9d429139` (2026-04-15):
+```
+/**
+ * Layer Stack Type System
+ *
+ * This module defines the type system for the centralized layer stack management.
+ * Layers represent UI elements that can capture focus and handle escape key events,
+ * such as modals, overlays, search interfaces, and inline editors.
+ */
+
+/**
+ * Types of layers in the UI hierarchy
+ */
+export type LayerType = 'modal' | 'overlay';
+
+/**
+ * Focus trap behavior modes
+ * - strict: Focus must stay within the layer (Tab cycles back to first element)
+ * - lenient: Focu…
+```
+
+**git_commit** `231fe2fd8884318019bfaf4bd74a5dd48f7f8525` (2026-01-19 by reachrazarauf@gmail.com):
+```
+commit 231fe2fd8884318019bfaf4bd74a5dd48f7f8525
+Author: Raza Rauf <reachrazarauf@gmail.com>
+Date: 2026-01-19T21:21:36.000Z
+
+chore: format entire codebase with prettier
+
+Run `npm run format` across all TypeScript/TSX files
+for consistent code formatting throughout the project.
+
+Files:
+src/__tests__/cli/commands/list-agents.test.ts
+src/__tests__/cli/commands/list-groups.test.ts
+src/__tests__/cli/com…
+```
+
+**source** `src/__tests__/renderer/types/layer.test.ts@926906c41f16a00da` (2026-04-15):
+```
+/**
+ * Tests for Layer type system utilities
+ */
+
+import { describe, it, expect, vi } from 'vitest';
+import {
+	isModalLayer,
+	isOverlayLayer,
+	Layer,
+	ModalLayer,
+	OverlayLayer,
+} from '../../../renderer/types/layer';
+
+function createModalLayer(overrides: Partial<ModalLayer> = {}): ModalLayer {
+	return {
+		id: 'test-modal',
+		type: 'modal',
+		priority: 100,
+		blocksLowerLayers: true,
+		capturesFocus: true,
+		focusTrap: 'strict',
+		onEscape: vi.fn(),
+		...overrides,
+	};
+}
+
+function createOverlayL…
+```
+
+**github_issue** `https://github.com/RunMaestro/Maestro/issues/625` (2026-03-27 by Ashraf-Ali-aa):
+```
+Issue #625: [Mobile App] Epic: HTTP/WebSocket API Layer for React Native App
+URL: https://github.com/RunMaestro/Maestro/issues/625
+State: closed
+Author: Ashraf-Ali-aa
+Created: 2026-03-27T21:27:07Z
+
+## Overview
+
+This epic tracks the creation of HTTP/WebSocket API endpoints needed to support a **React Native mobile app** that serves as a remote control for the desktop Maestro application. The mobile app will have feature parity with the existing mobile web view but as a native app.
+
+## Current Sta…
+```
+```
+
+</details>
+
+**Condition A (bare):**
+
+I will search the codebase for "Layer Stack" or "LayerStack" to identify the relevant implementation and documentation.
+I will read the "Layer Stack System" section in `ARCHITECTURE.md` to understand the design rationale behind explicit priority numbers.
+I will read `src/renderer/hooks/useLayerStack.ts` and look for `constants/modalPriorities.ts` to see how these priorities are used and if there is more explanation in the code.
+I will read `src/renderer/constants/modalPriorities.ts` and `src/renderer/hooks/useLayerStack.ts` to understand how the priorities are used.
+I will read `src/renderer/hooks/useLayerStack.ts` to see how the code handles these priorities and if there's any further explanation.
+I will check the actual path of `useLayerStack` by searching for it again.
+I will check if `useLayerStack.ts` is in `src/renderer/hooks/`.
+I will read `src/renderer/contexts/LayerStackContext.tsx` to understand the core implementation of the layer stack system.
+I will check `src/renderer/hooks/index.ts` to find the source of `useLayerStack`.
+I will search for `useLayerStack` in `src/renderer/hooks/ui` and `src/renderer/hooks/modal` to find its definition.
+I will search for `export function useLayerStack` to find its definition.
+I will read `src/renderer/hooks/ui/useLayerStack.ts` to understand how the layer stack is managed.
+The Maestro Layer Stack uses explicit priority numbers rather than a simple LIFO (last-in, first-out) system to ensure **semantic predictability** and **deterministic interaction handling**.
+
+While LIFO works for simple modal stacks, it breaks down in complex applications where the temporal order of activation shouldn't dictate the hierarchy of importance. Key reasons for this design choice include:
+
+1.  **Semantic Hierarchy**: Certain UI elements must *always* take precedence. For example, a `QUIT_CONFIRM` (1020) or `AGENT_ERROR` (1010) must appear above and capture the Escape key before a standard `SETTINGS` (450) modal, even if the settings were opened after the error occurred (e.g., via an automated background process).
+2.  **Handling Nested/Dependent Modals**: Some modals naturally spawn others. The `MARKETPLACE` (735) can be opened from the `BATCH_RUNNER` (720). Explicit priorities ensure the Marketplace is always treated as "higher" in the stack, preventing race conditions where asynchronous mounting might otherwise cause the parent to "overlap" the child in a LIFO system.
+3.  **Deterministic Escape Handling**: The `LayerStackProvider` (in `src/renderer/contexts/LayerStackContext.tsx`) captures the Escape key and delegates it to the topmost layer. Explicit priorities ensure that the "most critical" layer handles the event first, regardless of when it was registered.
+4.  **Context-Agnostic Registration**: Components can register themselves using pre-defined constants (from `src/renderer/constants/modalPriorities.ts`) based on their role (e.g., `MODAL_PRIORITIES.CONFIRM`) without needing to know which other layers are currently active. This decouples the modal's behavior from the global application state.
+5.  **Visual Alignment**: The priority numbers often mirror CSS `z-index` values, ensuring that the visual layering of the application matches the functional layering of keyboard event handling.
+
+In short, explicit priorities transform the "stack" from a simple list of events into a **managed hierarchy of intent**, where the most important interactions are guaranteed to stay on top.
+
+**Condition B (with context pack):**
+
+Maestro’s Layer Stack uses explicit priority numbers rather than LIFO ordering to maintain a strict, predictable UI hierarchy that temporal ordering cannot guarantee. In a multi-agent environment where overlays, notifications, and modals may trigger asynchronously, LIFO risks burying critical safety prompts under less important UI elements that happen to open later.
+
+The primary justification is **safety and conflict resolution**. As seen in **PR #207**, the `EraseConfirmationModal` is assigned a high **priority of 1005** specifically to ensure it remains "above the main confirmation modal." Using explicit priorities allows developers to implement "safety friction" for dangerous actions—like directory deletion—by ensuring the secondary confirmation always captures focus and remains visible regardless of the sequence of events.
+
+Furthermore, the type system defined in `src/renderer/types/layer.ts` distinguishes between `ModalLayer` and `OverlayLayer`. Explicit priorities allow the system to enforce architectural rules, such as ensuring modals always sit above background overlays. This provides a "Z-index" logic within the application state, ensuring that focus management and escape-key handling (via `onEscape`) are always directed to the most semantically important layer rather than merely the most recent one.
+
+---
+
+## Q6 [medium] — Why does the process manager use PTY instead of child_process.spawn for AI agents?
+
+**Context pack:** 672 lines — includes Discussions section
+
+<details><summary>Full context pack</summary>
+
+```
+## Context pack
+> Query: Why does the process manager use PTY instead of child_process.spawn for AI agents?  Budget: 6000 tokens | Used: ~5925 | 21 results (29 truncated by budget)
+
+### Entities
+
+- `src/main/process-manager` **[module]** — score 1.000 | evidence: 1 episode(s)
+- `src/main/process-manager.ts` **[module]** — score 0.935 | evidence: 1 episode(s)
+- `src/main/process-manager/spawners` **[module]** — score 0.935 | evidence: 1 episode(s)
+- `src/main/process-manager/utils` **[module]** — score 0.935 | evidence: 1 episode(s)
+- `src/main/process-manager/handlers` **[module]** — score 0.935 | evidence: 1 episode(s)
+- `src/main/process-manager/runners` **[module]** — score 0.935 | evidence: 1 episode(s)
+- `src/__tests__/main/process-manager` **[module]** — score 0.935 | evidence: 1 episode(s)
+- `src/main/process-manager/ProcessManager.ts` **[module]** — score 0.878 | evidence: 2 episode(s)
+- `src/main/process-manager/types.ts` **[module]** — score 0.878 | evidence: 2 episode(s)
+- `src/main/process-manager/constants.ts` **[module]** — score 0.878 | evidence: 2 episode(s)
+- `src/main/process-manager/index.ts` **[module]** — score 0.878 | evidence: 2 episode(s)
+- `src/__tests__/main/process-manager/spawners` **[module]** — score 0.878 | evidence: 1 episode(s)
+- `src/__tests__/main/process-manager/utils` **[module]** — score 0.878 | evidence: 1 episode(s)
+- `src/__tests__/main/process-manager/handlers` **[module]** — score 0.878 | evidence: 1 episode(s)
+- `src/main/process-manager/handlers/StdoutHandler.ts` **[module]** — score 0.827 | evidence: 2 episode(s)
+- `src/main/process-manager/spawners/ChildProcessSpawner.ts` **[module]** — score 0.827 | evidence: 2 episode(s)
+- `src/main/process-manager/utils/imageUtils.ts` **[module]** — score 0.827 | evidence: 2 episode(s)
+- `src/main/process-manager/handlers/ExitHandler.ts` **[module]** — score 0.827 | evidence: 2 episode(s)
+- `src/main/process-manager/utils/envBuilder.ts` **[module]** — score 0.827 | evidence: 2 episode(s)
+- `src/main/process-manager/utils/shellEscape.ts` **[module]** — score 0.827 | evidence: 2 episode(s)
+- `src/main/process-manager/utils/index.ts` **[module]** — score 0.827 | evidence: 2 episode(s)
+
+### Discussions
+_PR descriptions, issue discussions, and commit messages retrieved directly from the graph._
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/375` (2026-02-15 by chr1syy) — score 1.000:
+```
+PR #375: feat: enable Codex image support for resumed sessions (local + SSH)
+URL: https://github.com/RunMaestro/Maestro/pull/375
+State: closed
+Author: chr1syy
+Created: 2026-02-15T10:38:40Z
+
+## Summary
+
+This PR enables image inputs when resuming Codex sessions by switching from CLI image flags to prompt-embedded temp file paths in resume mode.
+
+Previously, Codex resume flows could not consume images because codex exec resume does not accept -i. This change introduces a resume-specific image strategy that works for both local and SSH execution paths.
+
+## What changed
+
+- Added a new capability field: imageResumeMode?: 'prompt-embed'
+- Set Codex to imageResumeMode: 'prompt-embed' and marked supportsImageInputOnResume as true
+- Local spawner now embeds temp image paths into prompt text for resume mode instead of adding -i
+- SSH command builder now supports prompt-embed mode for resumed sessions, and cleans up remote temp image files after execution
+- Process IPC forwards resume image mode into SSH command construction
+- Removed renderer-side Codex resume image attach blocking
+
+## Validation
+
+Ran targeted tests:
+
+pm test -- src/__tests__/main/process-manager/utils/imag…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/65` (2025-12-22 by oliveiraantoniocc) — score 0.975:
+```
+PR #65: feat(opencode): Enable real-time streaming and tool execution events
+URL: https://github.com/RunMaestro/Maestro/pull/65
+State: closed
+Author: oliveiraantoniocc
+Created: 2025-12-22T12:02:59Z
+
+## 🎯 Summary
+
+Enable real-time streaming for OpenCode agent responses instead of buffering until completion. Also emit tool execution events so the UI can display what tools the agent is using.
+
+**Fixes #58**
+
+## 🐛 Problem
+
+When using OpenCode agents in Maestro:
+1. **No Token Streaming**: Responses are buffered and displayed all at once after completion, instead of streaming token-by-token in real-time
+2. **No Tool Execution Visibility**: Tool executions happen silently with no UI indication
+
+## ✅ Root Cause Analysis
+
+In `process-manager.ts`, lines 727-731 (before fix):
+
+```typescript
+// Accumulate text from partial streaming events (OpenCode text messages)
+if (event.type === 'text' && event.isPartial && event.text) {
+    managedProcess.streamedText = (managedProcess.streamedText || '') + event.text;
+    // ❌ NO emit() here - text was only buffered, never displayed!
+}
+```
+
+Text was accumulated in `streamedText` but only emitted when `step_finish` with `reason: 'stop'` arrived.
+
+## ✅ S…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/200` (2026-01-16 by reachrazamair) — score 0.921:
+```
+PR #200: refactor: src/main/process-manager.ts from monolithic file to modular scalable directory structure
+URL: https://github.com/RunMaestro/Maestro/pull/200
+State: closed
+Author: reachrazamair
+Created: 2026-01-16T22:53:01Z
+
+## Summary
+
+- Refactored the 2,520-line `process-manager.ts` monolith into a well-organized directory structure.
+- Follows single-responsibility principle with dedicated modules for each concern.
+- Maintains 100% backwards compatibility through barrel exports.
+
+## Changes
+
+**New directory structure:**
+
+src/main/process-manager/
+├── index.ts                    # Public API exports
+├── types.ts                    # Type definitions
+├── ProcessManager.ts           # Main orchestrator class
+├── spawners/
+│   ├── PtySpawner.ts          # PTY process spawning (terminal mode)
+│   └── ChildProcessSpawner.ts # Child process spawning (AI agents)
+├── handlers/
+│   ├── DataBufferManager.ts   # Data buffering for IPC optimization
+│   ├── StdoutHandler.ts       # stdout processing & parsing
+│   ├── StderrHandler.ts       # stderr processing & error detection
+│   └── ExitHandler.ts         # Process exit handling & cleanup
+├── runners/
+│   ├── LocalCo…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/328` (2026-02-08 by chr1syy) — score 0.894:
+```
+PR #328: Windows Shell Handling and Group Chat Fixes
+URL: https://github.com/RunMaestro/Maestro/pull/328
+State: closed
+Author: chr1syy
+Created: 2026-02-08T10:10:03Z
+
+This pull request introduces comprehensive improvements to Windows shell handling and process spawning logic, especially for group chat participants and moderator agents. The main focus is to ensure robust, PowerShell-based execution on Windows to avoid command line length issues and shell parsing problems, and to improve test coverage for these scenarios. It also adds extensive tests for new and existing shell utilities.
+
+**Windows Shell Handling and Process Spawning:**
+
+* Refactored group chat participant and moderator agent spawning to use PowerShell (via `getWindowsShellForAgentExecution`) instead of `cmd.exe` on Windows, preventing command line length errors and improving reliability. This includes support for custom shell paths and fallback logic. [[1]](diffhunk://#diff-bd75d59204561f69f90d53c84e8364a59c19eac8fdeaff2f2ec8d9e54ca6df18R31-R50) [[2]](diffhunk://#diff-bd75d59204561f69f90d53c84e8364a59c19eac8fdeaff2f2ec8d9e54ca6df18R196-R197) [[3]](diffhunk://#diff-bd75d59204561f69f90d53c84e8364a59c19eac8fdeaff2f2…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/788` (2026-04-10 by chr1syy) — score 0.846:
+```
+PR #788: fix: Windows process cleanup for Cue and tunnel on shutdown
+URL: https://github.com/RunMaestro/Maestro/pull/788
+State: closed
+Author: chr1syy
+Created: 2026-04-10T21:39:34Z
+
+## Summary
+- **Cue processes survive shutdown**: `performCleanup()` calls `processManager.killAll()` but Cue processes are tracked separately in `cue-executor.ts`'s `activeProcesses` map — they were never killed on quit. Added `stopAllCueRuns()` and call it during shutdown.
+- **Cue executor uses SIGTERM/SIGKILL on Windows**: `stopCueRun()` and timeout enforcement sent POSIX signals which don't terminate process trees on Windows. Added `killCueProcess()` helper that uses `taskkill /t /f` on Windows.
+- **Tunnel manager uses SIGTERM/SIGKILL on Windows**: `TunnelManager.stop()` sent POSIX signals. Now uses `taskkill /t /f` on Windows for the `cloudflared` process tree.
+
+## Changes
+| File | Change |
+|------|--------|
+| `src/main/cue/cue-executor.ts` | Added `killCueProcess()` (Windows: taskkill, POSIX: SIGTERM→SIGKILL), `stopAllCueRuns()` export, refactored `stopCueRun()` and timeout to use it |
+| `src/main/tunnel-manager.ts` | `stop()` now uses `taskkill /t /f` on Windows instead of SIGTERM/SIGKILL |
+| `src…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/111` (2025-12-28 by pedramamini) — score 0.833:
+```
+PR #111: feat: SSH Remote Execution for AI Agents
+URL: https://github.com/RunMaestro/Maestro/pull/111
+State: closed
+Author: pedramamini
+Created: 2025-12-28T14:35:30Z
+
+## Summary
+
+Add the ability to run AI agents on remote hosts via SSH, enabling users to leverage powerful cloud VMs, access tools not installed locally, or work with projects requiring specific environments.
+
+### Key Features
+
+- **SSH Remote Management**: Configure multiple SSH remote hosts with customizable settings (host, port, username, private key, working directory, environment variables)
+- **Connection Testing**: Validate SSH connectivity and agent availability before use
+- **Global Default**: Set a default SSH remote that applies to all agents
+- **Per-Agent Override**: Individual agents can use specific remotes or force local execution
+- **Status Visibility**: Sessions display which remote host they're running on
+- **Error Detection**: SSH-specific error patterns for authentication failures, connection issues, and agent errors
+
+### Implementation Phases
+
+1. **Phase 1**: Core types and shell-escape utility
+2. **Phase 2**: SshRemoteManager with validation and connection testing  
+3. **Phase 3**: IPC handlers and …
+```
+
+### Evidence excerpts
+
+**source** `src/main/process-manager/spawners/PtySpawner.ts@9ed5ba0a55b8` (2026-04-15):
+```
+import { EventEmitter } from 'events';
+import * as pty from 'node-pty';
+import { stripControlSequences } from '../../utils/terminalFilter';
+import { logger } from '../../utils/logger';
+import type { ProcessConfig, ManagedProcess, SpawnResult } from '../types';
+import type { DataBufferManager } from '../handlers/DataBufferManager';
+import { buildPtyTerminalEnv } from '../utils/envBuilder';
+
+/**
+ * Handles spawning of PTY (pseudo-terminal) processes.
+ * Used for terminal mode and AI agents that re…
+```
+
+**git_commit** `a0ebf02e4a600dfd67c81616cf473dc6b87dbd1b` (2026-01-18 by pedram.amini@gmail.com):
+```
+commit a0ebf02e4a600dfd67c81616cf473dc6b87dbd1b
+Author: Pedram Amini <pedram.amini@gmail.com>
+Date: 2026-01-18T21:58:49.000Z
+
+## CHANGES
+
+- Added per-agent per-day stats breakdown powering richer provider charts 📊
+- Upgraded AgentUsageChart to multi-provider lines with query/time toggle 📈
+- Normalized cumulative usage events into per-turn deltas for Claude/Codex 🧮
+- Fixed context token display …
+```
+
+**source** `src/main/process-manager/utils/streamJsonBuilder.ts@daa49ea3` (2026-04-15):
+```
+import { parseDataUrl } from './imageUtils';
+
+interface ImageContent {
+	type: 'image';
+	source: {
+		type: 'base64';
+		media_type: string;
+		data: string;
+	};
+}
+
+interface TextContent {
+	type: 'text';
+	text: string;
+}
+
+type MessageContent = ImageContent | TextContent;
+
+/**
+ * Build a stream-json message for Claude Code with images and text.
+ *
+ * Claude Code expects this format:
+ * {"type":"user","message":{"role":"user","content":[...]}}
+ *
+ * Content array should have images first (Claude conve…
+```
+
+**source** `src/main/process-manager/handlers/ExitHandler.ts@682a8a32250` (2026-04-15):
+```
+// src/main/process-manager/handlers/ExitHandler.ts
+
+import { EventEmitter } from 'events';
+import { logger } from '../../utils/logger';
+import { matchSshErrorPattern } from '../../parsers/error-patterns';
+import { aggregateModelUsage } from '../../parsers/usage-aggregator';
+import { cleanupTempFiles } from '../utils/imageUtils';
+import type { ManagedProcess, AgentError } from '../types';
+import type { DataBufferManager } from './DataBufferManager';
+
+interface ExitHandlerDependencies {
+	processe…
+```
+
+**source** `src/main/process-manager/runners/SshCommandRunner.ts@53d28b1` (2026-04-15):
+```
+// src/main/process-manager/runners/SshCommandRunner.ts
+
+import { spawn } from 'child_process';
+import { EventEmitter } from 'events';
+import { logger } from '../../utils/logger';
+import { matchSshErrorPattern } from '../../parsers/error-patterns';
+import { shellEscapeForDoubleQuotes } from '../../utils/shell-escape';
+import { getExpandedEnv, resolveSshPath } from '../../utils/cliDetection';
+import { expandTilde } from '../../../shared/pathUtils';
+import type { CommandResult } from '../types';
+i…
+```
+
+**source** `src/__tests__/main/process-manager/spawners/ChildProcessSpaw` (2026-04-15):
+```
+/**
+ * Tests for src/main/process-manager/spawners/ChildProcessSpawner.ts
+ *
+ * These tests verify the isStreamJsonMode detection logic which determines
+ * whether output should be processed as JSON lines or raw text.
+ */
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { EventEmitter } from 'events';
+
+// ── Mocks ──────────────────────────────────────────────────────────────────
+
+// Create mock spawn function at module level (before vi.mock hoisting)
+const mockSpawn = vi.f…
+```
+
+**git_commit** `32d7b7d7ea650b6a80472b78245d9a5e6fb77860` (2026-02-09 by pedram.amini@gmail.com):
+```
+commit 32d7b7d7ea650b6a80472b78245d9a5e6fb77860
+Author: Pedram Amini <pedram.amini@gmail.com>
+Date: 2026-02-09T05:07:38.000Z
+
+fix: escalate to SIGTERM when SIGINT fails to stop agent processes
+
+Claude Code --print mode may not immediately exit on SIGINT alone,
+causing the Stop button to show "Canceled by user" while the process
+continues running. Now escalates to SIGTERM after 2s if needed.
+
+Files…
+```
+
+**source** `src/main/process-manager/ProcessManager.ts@e1ebf4f756f4512d1` (2026-04-15):
+```
+// src/main/process-manager/ProcessManager.ts
+
+import { EventEmitter } from 'events';
+import type {
+	ProcessConfig,
+	ManagedProcess,
+	SpawnResult,
+	CommandResult,
+	ParsedEvent,
+	AgentOutputParser,
+} from './types';
+import { PtySpawner } from './spawners/PtySpawner';
+import { ChildProcessSpawner } from './spawners/ChildProcessSpawner';
+import { DataBufferManager } from './handlers/DataBufferManager';
+import { LocalCommandRunner } from './runners/LocalCommandRunner';
+import { SshCommandRunner } fr…
+```
+
+**git_commit** `3d593719fb32a54fc99fa1763b963a517c703814` (2026-02-03 by pedram.amini@gmail.com):
+```
+commit 3d593719fb32a54fc99fa1763b963a517c703814
+Author: Pedram Amini <pedram.amini@gmail.com>
+Date: 2026-02-03T15:34:16.000Z
+
+fix(ssh): use stdin-based execution to bypass shell escaping issues
+
+This is a complete rewrite of SSH remote command execution that eliminates
+all shell escaping issues by sending the entire script via stdin.
+
+Previously, the SSH command was built as:
+  ssh host '/bin/bash…
+```
+
+**source** `src/main/process-manager/types.ts@429b8afc79fb6e9e3edb86ab01` (2026-04-15):
+```
+import type { ChildProcess } from 'child_process';
+import type { IPty } from 'node-pty';
+import type { AgentOutputParser } from '../parsers';
+import type { AgentError } from '../../shared/types';
+
+/**
+ * Configuration for spawning a new process
+ */
+export interface ProcessConfig {
+	sessionId: string;
+	toolType: string;
+	cwd: string;
+	command: string;
+	args: string[];
+	requiresPty?: boolean;
+	prompt?: string;
+	shell?: string;
+	shellArgs?: string;
+	shellEnvVars?: Record<string, string>;
+	images?: …
+```
+
+**git_commit** `f0cbf2475ca23bd63c5406778377917e3118c002` (2026-01-16 by reachrazarauf@gmail.com):
+```
+commit f0cbf2475ca23bd63c5406778377917e3118c002
+Author: Raza Rauf <reachrazarauf@gmail.com>
+Date: 2026-01-16T22:35:48.000Z
+
+refactored main/process-manager.ts into manageable / scalable modules
+
+
+Files:
+src/main/process-manager.ts
+src/main/process-manager/ProcessManager.ts
+src/main/process-manager/constants.ts
+src/main/process-manager/handlers/DataBufferManager.ts
+src/main/process-manager/handlers…
+```
+
+**source** `src/main/process-manager/constants.ts@9e8ed74f76c912d8f1450f` (2026-04-15):
+```
+/**
+ * Maximum buffer size for stdout/stderr error detection buffers.
+ * Prevents memory exhaustion during extended process execution.
+ */
+export const MAX_BUFFER_SIZE = 100 * 1024; // 100KB
+
+/**
+ * Data buffer flush interval in milliseconds
+ */
+export const DATA_BUFFER_FLUSH_INTERVAL = 50;
+
+/**
+ * Data buffer size threshold for immediate flush
+ */
+export const DATA_BUFFER_SIZE_THRESHOLD = 8192; // 8KB
+
+/**
+ * Standard Unix paths for PATH environment variable
+ */
+export const STANDARD_UNIX_PATHS…
+```
+
+**source** `src/main/process-manager/index.ts@295910ebbf2dd78de8fa50c02b` (2026-04-15):
+```
+// Main class
+export { ProcessManager } from './ProcessManager';
+
+// Types - all exported for consumers
+export type {
+	ProcessConfig,
+	ManagedProcess,
+	SpawnResult,
+	CommandResult,
+	UsageStats,
+	UsageTotals,
+	ProcessManagerEvents,
+	ParsedEvent,
+	AgentOutputParser,
+	AgentError,
+	AgentErrorType,
+	SshRemoteConfig,
+} from './types';
+
+// Re-export parser utilities for backwards compatibility
+export { getOutputParser } from '../parsers';
+export type { ModelStats } from '../parsers/usage-aggregator';
+e…
+```
+
+**source** `src/__tests__/main/process-manager/utils/imageUtils.test.ts@` (2026-04-15):
+```
+import { describe, it, expect } from 'vitest';
+import { buildImagePromptPrefix } from '../../../../main/process-manager/utils/imageUtils';
+
+describe('imageUtils', () => {
+	describe('buildImagePromptPrefix', () => {
+		it('should return empty string for empty array', () => {
+			expect(buildImagePromptPrefix([])).toBe('');
+		});
+
+		it('should return prefix with single image path', () => {
+			const result = buildImagePromptPrefix(['/tmp/maestro-image-123-0.png']);
+			expect(result).toBe('[Attached i…
+```
+
+**source** `src/__tests__/main/process-manager/handlers/StderrHandler.te` (2026-04-15):
+```
+/**
+ * Tests for src/main/process-manager/handlers/StderrHandler.ts
+ *
+ * Covers stderr handling including:
+ * - SSH informational message filtering
+ * - Codex stdin mode response extraction
+ * - Error detection from stderr
+ */
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { EventEmitter } from 'events';
+
+// ── Mocks ──────────────────────────────────────────────────────────────────
+
+vi.mock('../../../../main/utils/logger', () => ({
+	logger: {
+		info: vi.fn(),
+		warn: vi…
+```
+
+**git_commit** `2fa8dd2c80711f0e85c1761b1c7f3fa50760b277` (2026-02-17 by jeffscottward@users.noreply.github.com):
+```
+commit 2fa8dd2c80711f0e85c1761b1c7f3fa50760b277
+Author: Jeff Scott Ward <jeffscottward@users.noreply.github.com>
+Date: 2026-02-17T16:12:05.000Z
+
+fix: use final codex turn result in wizard responses
+
+
+Files:
+src/__tests__/main/process-manager/handlers/StdoutHandler.test.ts
+src/main/process-manager/handlers/StdoutHandler.ts
+```
+
+**source** `src/main/process-manager/handlers/StdoutHandler.ts@de6736d94` (2026-04-15):
+```
+// src/main/process-manager/handlers/StdoutHandler.ts
+
+import { EventEmitter } from 'events';
+import { logger } from '../../utils/logger';
+import { appendToBuffer } from '../utils/bufferUtils';
+import { aggregateModelUsage, type ModelStats } from '../../parsers/usage-aggregator';
+import { matchSshErrorPattern } from '../../parsers/error-patterns';
+import type { ManagedProcess, UsageStats, UsageTotals, AgentError } from '../types';
+import type { DataBufferManager } from './DataBufferManager';
+
+in…
+```
+
+**git_commit** `2e4ff75cd546dddee928bb861e881afa58b11696` (2026-02-15 by ch.bleuel@me.com):
+```
+commit 2e4ff75cd546dddee928bb861e881afa58b11696
+Author: chr1syy <ch.bleuel@me.com>
+Date: 2026-02-15T09:35:22.000Z
+
+MAESTRO: feat: implement image-to-prompt embedding for Codex resume sessions
+
+When Codex resumes a session with `codex exec resume`, the -i flag is not
+supported. This adds a new imageResumeMode capability that triggers an
+alternative image handling path: images are saved to temp file…
+```
+
+**source** `src/main/process-manager/spawners/ChildProcessSpawner.ts@3fc` (2026-04-15):
+```
+// src/main/process-manager/spawners/ChildProcessSpawner.ts
+
+import { spawn } from 'child_process';
+import { EventEmitter } from 'events';
+import * as path from 'path';
+import * as fs from 'fs';
+import { logger } from '../../utils/logger';
+import { getOutputParser } from '../../parsers';
+import { getAgentCapabilities } from '../../agents';
+import type { ProcessConfig, ManagedProcess, SpawnResult } from '../types';
+import type { DataBufferManager } from '../handlers/DataBufferManager';
+import { S…
+```
+
+**source** `src/main/process-manager/utils/imageUtils.ts@0436f7295a7aa74` (2026-04-15):
+```
+import * as fs from 'fs';
+import * as fsPromises from 'fs/promises';
+import * as path from 'path';
+import * as os from 'os';
+import { logger } from '../../utils/logger';
+
+/**
+ * Parse a data URL and extract base64 data and media type
+ */
+export function parseDataUrl(dataUrl: string): { base64: string; mediaType: string } | null {
+	const match = dataUrl.match(/^data:(image\/[^;]+);base64,(.+)$/);
+	if (!match) return null;
+	return {
+		mediaType: match[1],
+		base64: match[2],
+	};
+}
+
+/**
+ * Save a b…
+```
+
+**git_commit** `67540c889b25e4ea837642e192ec0d57b104aa2e` (2026-02-12 by pedram.amini@gmail.com):
+```
+commit 67540c889b25e4ea837642e192ec0d57b104aa2e
+Author: Pedram Amini <pedram.amini@gmail.com>
+Date: 2026-02-12T07:05:32.000Z
+
+fix: process remaining jsonBuffer on stream-json process exit
+
+Short-lived stream-json processes (tab naming, batch ops) could lose
+their final result if it was the last line without a trailing newline.
+Flush jsonBuffer remainder at exit before emitting the exit event.
+Also…
+```
+
+**git_commit** `8de53cd84b2866785c3a47d297619744e19fe982` (2026-02-11 by reachrazarauf@gmail.com):
+```
+commit 8de53cd84b2866785c3a47d297619744e19fe982
+Author: Raza Rauf <reachrazarauf@gmail.com>
+Date: 2026-02-11T13:14:41.000Z
+
+refactor: complete agentStore Phases 2-3, extract ~1,850 lines from App.tsx
+
+Phase 2 — useAgentListeners hook:
+- Extract IPC listener useEffect (~1,520 lines) from App.tsx into
+  src/renderer/hooks/agent/useAgentListeners.ts
+- Covers onData, onUsage, onStderr, onExit, onAgent…
+```
+
+**source** `src/main/process-manager/utils/envBuilder.ts@d7472fcd377863e` (2026-04-15):
+```
+import * as os from 'os';
+import * as path from 'path';
+import { STANDARD_UNIX_PATHS } from '../constants';
+import { detectNodeVersionManagerBinPaths, buildExpandedPath } from '../../../shared/pathUtils';
+
+/**
+ * Build the base PATH for macOS/Linux with detected Node version manager paths.
+ */
+export function buildUnixBasePath(): string {
+	const versionManagerPaths = detectNodeVersionManagerBinPaths();
+
+	if (versionManagerPaths.length > 0) {
+		return versionManagerPaths.join(':') + ':' + STANDAR…
+```
+
+**git_commit** `3762b40a196b7bc6806b92e2fa9a5d4e3c93e10b` (2026-02-08 by ch.bleuel@me.com):
+```
+commit 3762b40a196b7bc6806b92e2fa9a5d4e3c93e10b
+Author: chr1syy <ch.bleuel@me.com>
+Date: 2026-02-08T19:09:34.000Z
+
+fix: address critical sendPromptViaStdinRaw dead code and consolidate Windows shell config
+
+CRITICAL FIX:
+- Promote sendPromptViaStdinRaw to its own top-level branch in ChildProcessSpawner
+  The raw stdin write was nested under isStreamJsonMode check, which is FALSE
+  when sendPromptV…
+```
+
+**source** `src/main/process-manager/utils/shellEscape.ts@13aa9fe22c46c3` (2026-04-15):
+```
+/**
+ * Shell argument escaping utilities for Windows cmd.exe and PowerShell.
+ *
+ * These functions handle escaping command line arguments to prevent injection
+ * and ensure proper argument passing when spawning processes via shell.
+ *
+ * References:
+ * - cmd.exe escaping: https://docs.microsoft.com/en-us/windows-server/administration/windows-commands/cmd
+ * - PowerShell escaping: https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_quoting_rules
+ *
+ * For prod…
+```
+
+**git_commit** `7e5ecb8b5ca8a51a24a81b1aab6dd12646893289` (2026-02-08 by ch.bleuel@me.com):
+```
+commit 7e5ecb8b5ca8a51a24a81b1aab6dd12646893289
+Author: chr1syy <ch.bleuel@me.com>
+Date: 2026-02-08T08:03:01.000Z
+
+fix: Windows shell selection and escaping for group chat and normal chat
+
+Fixes issues with shell selection and argument escaping on Windows for both
+group chat and normal chat modes:
+
+- Centralize Windows shell selection logic using getWindowsShellForAgentExecution()
+- Export shell e…
+```
+
+**source** `src/main/process-manager/utils/index.ts@88e23a6985e4870c3ca4` (2026-04-15):
+```
+export { appendToBuffer } from './bufferUtils';
+export { parseDataUrl, saveImageToTempFile, cleanupTempFiles } from './imageUtils';
+export { buildStreamJsonMessage } from './streamJsonBuilder';
+export { buildUnixBasePath, buildPtyTerminalEnv, buildChildProcessEnv } from './envBuilder';
+export { resolveShellPath, buildWrappedCommand, clearShellPathCache } from './pathResolver';
+export {
+	escapeCmdArg,
+	escapeCmdArgs,
+	escapePowerShellArg,
+	escapePowerShellArgs,
+	escapeArgsForShell,
+	isPowerShellS…
+```
+```
+
+</details>
+
+**Condition A (bare):**
+
+[gemini failed: spawnSync /bin/bash ETIMEDOUT]
+
+**Condition B (with context pack):**
+
+[gemini failed: Command failed: gemini -p "$(cat /tmp/engram-maestro-v3-1776337875006.txt)"
+Error when talking to Gemini API Full report available at: /tmp/gemini-client-error-Turn.run-sendMessageStream-2026-04-16T11-11-21-112Z.json TerminalQuotaError: You have exhausted your capacity on this model. Your quota will reset after 13h28m54s.
+    at classifyGoogleError (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:274494:18)
+    at retryWithBackoff (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:275105:31)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async GeminiChat.makeApiCallAndProcessStream (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:310999:28)
+    at async GeminiChat.streamWithRetries (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:310837:29)
+    at async Turn.run (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:311329:24)
+    at async GeminiClient.processTurn (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:315405:22)
+    at async GeminiClient.sendMessageStream (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:315518:14)
+    at async file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/gemini.js:10168:26
+    at async main (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/gemini.js:15201:5) {
+  cause: {
+    code: 429,
+    message: 'You have exhausted your capacity on this model. Your quota will reset after 13h28m54s.',
+    details: [ [Object], [Object] ]
+  },
+  retryDelayMs: 48534923.447259,
+  reason: 'QUOTA_EXHAUSTED'
+}
+An unexpected critical error occurred:[object Object]
+]
+
+---
+
+## Q7 [large] — Why does the group chat router use absence of @mention rather than stop tokens to determine when a participant is done?
+
+**Context pack:** 273 lines — includes Discussions section
+
+<details><summary>Full context pack</summary>
+
+```
+## Context pack
+> Query: Why does the group chat router use absence of @mention rather than stop tokens to determine when a participant is done?  Budget: 6000 tokens | Used: ~3503 | 50 results
+
+### Entities
+
+- `src/main/group-chat/group-chat-router.ts` **[module]** — score 1.000 | evidence: 2 episode(s)
+- `src/main/group-chat/group-chat-router.ts::SessionInfo` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::GetSessionsCallback` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::GetCustomEnvVarsCallback` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::GetAgentConfigCallback` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::getSessionsCallback` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::getCustomEnvVarsCallback` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::getAgentConfigCallback` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::sshStore` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::pendingParticipantResponses` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::groupChatReadOnlyState` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::getGroupChatReadOnlyState` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::setGroupChatReadOnlyState` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::getPendingParticipants` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::clearPendingParticipants` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::markParticipantResponded` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::setGetSessionsCallback` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::setGetCustomEnvVarsCallback` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::setGetAgentConfigCallback` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::setSshStore` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::extractMentions` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::extractAllMentions` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::routeUserMessage` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::routeModeratorResponse` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::routeAgentResponse` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::spawnModeratorSynthesis` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/main/group-chat/group-chat-router.ts::respawnParticipantWithRecovery` **[symbol]** — score 0.958 | evidence: 1 episode(s)
+- `src/__tests__/main/group-chat/group-chat-router.test.ts` **[module]** — score 0.919 | evidence: 2 episode(s)
+- `src/__tests__/main/group-chat/group-chat-router.test.ts::mockUserDataPath` **[symbol]** — score 0.884 | evidence: 1 episode(s)
+- `src/__tests__/main/group-chat/group-chat-router.test.ts::mockWrapSpawnWithSsh` **[symbol]** — score 0.884 | evidence: 1 episode(s)
+
+### Edges
+
+- src/__tests__/main/group-chat/group-chat-router.test.ts imports src/main/group-chat/group-chat-router.ts **[observed]** — score 1.000
+- src/main/group-chat/group-chat-router.ts defines SessionInfo **[observed]** — score 0.927
+- src/main/group-chat/group-chat-router.ts defines GetSessionsCallback **[observed]** — score 0.927
+- src/main/group-chat/group-chat-router.ts defines GetCustomEnvVarsCallback **[observed]** — score 0.927
+- src/main/group-chat/group-chat-router.ts defines GetAgentConfigCallback **[observed]** — score 0.927
+- src/main/group-chat/group-chat-router.ts defines getSessionsCallback **[observed]** — score 0.927
+- src/main/group-chat/group-chat-router.ts defines getCustomEnvVarsCallback **[observed]** — score 0.927
+- src/main/group-chat/group-chat-router.ts defines getAgentConfigCallback **[observed]** — score 0.927
+- src/main/group-chat/group-chat-router.ts defines sshStore **[observed]** — score 0.927
+- src/main/group-chat/group-chat-router.ts defines pendingParticipantResponses **[observed]** — score 0.927
+- src/main/group-chat/group-chat-router.ts defines groupChatReadOnlyState **[observed]** — score 0.927
+- src/main/group-chat/group-chat-router.ts defines getGroupChatReadOnlyState **[observed]** — score 0.927
+- src/main/group-chat/group-chat-router.ts defines setGroupChatReadOnlyState **[observed]** — score 0.927
+- src/main/group-chat/group-chat-router.ts defines getPendingParticipants **[observed]** — score 0.927
+- src/main/group-chat/group-chat-router.ts defines clearPendingParticipants **[observed]** — score 0.927
+- src/main/group-chat/group-chat-router.ts defines markParticipantResponded **[observed]** — score 0.927
+- src/main/group-chat/group-chat-router.ts defines setGetSessionsCallback **[observed]** — score 0.927
+- src/main/group-chat/group-chat-router.ts defines setGetCustomEnvVarsCallback **[observed]** — score 0.927
+- src/main/group-chat/group-chat-router.ts defines setGetAgentConfigCallback **[observed]** — score 0.927
+- src/main/group-chat/group-chat-router.ts defines setSshStore **[observed]** — score 0.927
+
+### Discussions
+_PR descriptions, issue discussions, and commit messages retrieved directly from the graph._
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/364` (2026-02-13 by pedramamini) — score 1.000:
+```
+PR #364: feat: CSV table rendering + fix: group chat write race & SSH spawn
+URL: https://github.com/RunMaestro/Maestro/pull/364
+State: closed
+Author: pedramamini
+Created: 2026-02-13T01:10:32Z
+
+## Summary
+- CSV and TSV files now render as themed, sortable tables instead of plain text in file preview
+- New `CsvTableRenderer` component with RFC-compliant CSV parsing, numeric column detection, click-to-sort headers, and row truncation
+- Edit mode toggle falls through to raw text editor for direct CSV editing
+- **Fix:** Serialize concurrent writes to group chat `metadata.json` to prevent file corruption from racing listeners
+- **Fix:** Add SSH wrapping for group chat participant spawns (user-mention auto-add + recovery respawn)
+- **Fix:** Group chat history panel layout — filter pills, activity graph, and entries now stack vertically instead of being squeezed into a single row
+
+## Group Chat History Panel Layout
+The filter pills and activity graph were crammed into a single flex row, causing the graph to be too narrow. Refactored to three distinct vertical sections:
+1. **Filter pills** — centered horizontally
+2. **Activity graph** — full-width on its own row
+3. **History entries** — scr…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/580` (2026-03-17 by pedramamini) — score 0.825:
+```
+PR #580: Polish: group chat mentions, batch resume/abort, git push PATH fix
+URL: https://github.com/RunMaestro/Maestro/pull/580
+State: closed
+Author: pedramamini
+Created: 2026-03-17T15:13:29Z
+
+## Summary
+
+- **feat:** Add @mention autocomplete to group chat prompt composer with auto-resize input
+- **feat:** Add Resume/Abort buttons to RightPanel batch progress when error-paused
+- **fix:** Enrich PATH for git push in `createPR` so Husky hooks find npm
+- **fix:** Correct misleading SSH-only comment on unconditional ANSI stripping
+- **fix:** Resolve `os.tmpdir` mock failure in session-storage tests
+- **chore:** Version bump to 0.15.3 + sync package-lock.json
+
+## Changed files
+
+- `src/renderer/components/PromptComposerModal.tsx` — @mention autocomplete UI
+- `src/renderer/components/GroupChatInput.tsx` — auto-resize input
+- `src/renderer/components/RightPanel.tsx` — Resume/Abort batch controls
+- `src/main/ipc/handlers/git.ts` — PATH enrichment for git push
+- `src/main/process-manager/handlers/StdoutHandler.ts` — comment fix
+- Tests updated for all new features
+
+## Test plan
+
+- [ ] Verify @mention autocomplete appears in group chat composer
+- [ ] Verify Resume/Abort buttons render during …
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/539` (2026-03-08 by openasocket) — score 0.794:
+```
+PR #539: fix: group chat SSH synthesis wrapping + structured logging
+URL: https://github.com/RunMaestro/Maestro/pull/539
+State: closed
+Author: openasocket
+Created: 2026-03-08T23:56:49Z
+
+## Summary
+- Add SSH wrapping to `spawnModeratorSynthesis()` — synthesis was the only spawn point missing SSH support, causing moderator initial spawn to run remotely but synthesis to run locally (TASK-M04)
+- Replace ~130 raw `console.log` calls in group-chat-router with structured `logger.debug/warn/error` — prevents sensitive data (args, session IDs) from bypassing log-level gating (TASK-M09)
+
+Cherry-picked from `feat/gemini-cli` audit fixes (TASK-M04, TASK-M09). Gemini-specific code (moderatorCwd, geminiNoSandbox, readOnlyCliEnforced) excluded — only shared infrastructure improvements.
+
+## Test plan
+- [x] 49 group-chat-router tests pass (2 new SSH synthesis wrapping tests)
+- [x] Zero `console.log` remaining in group-chat-router.ts
+- [x] 21,873 total tests pass (2 pre-existing failures in AgentSessionsModal unrelated)
+- [x] Lint clean (pre-existing EfficiencyTab.tsx errors unrelated — untracked file)
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+<!-- This is an auto-generated c…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/437` (2026-02-22 by openasocket) — score 0.775:
+```
+PR #437: fix: group chat process cleanup, Codex cost tracking, moderator @mention enforcement
+URL: https://github.com/RunMaestro/Maestro/pull/437
+State: closed
+Author: openasocket
+Created: 2026-02-22T07:28:25Z
+
+## Summary
+- **Process cleanup on delete**: `killModerator()` and `clearAllParticipantSessions()` silently failed because batch mode spawns processes with timestamp-suffixed session IDs while the active sessions map stores prefix-only IDs. Added `killByPrefix()` to `ProcessManager` — fixes zombie processes and the observed `y\n` flood after delete.
+- **Codex session ID + cost display**: Restored display-only synthetic session IDs (`codex-0-*`) so participant cards show an ID instead of "pending". Resume logic skips these prefixed IDs. Added OpenAI model pricing table (GPT-4o through GPT-5.3-codex) to calculate cost from token counts since Codex CLI doesn't report cost directly.
+- **Moderator @mention enforcement**: Added mandatory `## MANDATORY: Always @mention agents when delegating` section to moderator system prompt. Prevents the moderator from discussing agent tasks without actually routing messages via @mentions. Updated synthesis prompt for critical analysis and fusion…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/39` (2025-12-18 by pedramamini) — score 0.717:
+```
+PR #39: Group Chat Support!
+URL: https://github.com/RunMaestro/Maestro/pull/39
+State: closed
+Author: pedramamini
+Created: 2025-12-18T14:08:18Z
+
+This PR implements Group Chat, a feature that enables orchestrated multi-agent collaboration through a moderator-driven architecture. Users can create group chats that spawn a hidden "moderator" AI session running in read-only mode, which coordinates multiple participant AI agents (each with their own dedicated session) to work on tasks collaboratively. The backend (src/main/group-chat-*.ts) provides storage for chat metadata, a pipe-delimited chat log format, and image attachments, along with IPC handlers for message routing between the user, moderator, and participant agents. The frontend adds a Group Chats section to the left sidebar with create/rename/delete functionality, a full-width chat panel with color-coded messages by sender, @mention autocomplete for participants, a typing/working indicator based on state (idle/moderator-thinking/agent-working), and a right panel showing participant status cards with context usage, session IDs, and last activity. The feature includes keyboard shortcuts (Cmd+Shift+G for new group chat), Command P…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/435` (2026-02-21 by openasocket) — score 0.712:
+```
+PR #435: Add Gemini CLI as first-class agent
+URL: https://github.com/RunMaestro/Maestro/pull/435
+State: closed
+Author: openasocket
+Created: 2026-02-21T18:58:58Z
+
+## Summary
+
+- Adds Google Gemini CLI as a fully integrated agent in Maestro across all surfaces: type system, agent definitions, capabilities, output parser, session storage, error handling, group chat, CLI tooling, and UI
+- Achieves feature parity with Claude Code and Codex on 18/20 integration dimensions (image input and model discovery are Gemini CLI limitations, not Maestro gaps)
+- Includes 2,200+ lines of tests across 16 test files
+
+## Changes by area
+
+### Core agent plumbing (types, definitions, capabilities)
+- Added `gemini-cli` to `ToolType` union, `AGENT_DEFINITIONS`, and `AGENT_CAPABILITIES`
+- Configured all agent flags: `batchModeArgs` (`-y`), `jsonOutputArgs` (`--output-format stream-json`), `resumeArgs` (`--resume`), `modelArgs` (`-m`), `yoloModeArgs`, `workingDirArgs` (`--include-directories`)
+- Added `gemini-cli` to every `Record<ToolType>` map, hardcoded array, and `VALID_MODERATOR_AGENT_IDS`
+
+### Output parser (`gemini-output-parser.ts`)
+- Full NDJSON stream-json parser handling 6 event types: `init`, `mes…
+```
+
+### Evidence excerpts
+
+**git_commit** `5aeb3d16a9b54034f5f93a4c5e4b1b6e50e2da0e` (2026-02-13 by pedram.amini@gmail.com):
+```
+commit 5aeb3d16a9b54034f5f93a4c5e4b1b6e50e2da0e
+Author: Pedram Amini <pedram.amini@gmail.com>
+Date: 2026-02-13T02:50:33.000Z
+
+fix: add SSH wrapping for group chat participant spawns
+
+Two places in group-chat-router were spawning participants without SSH
+wrapping, causing ENOENT when the agent binary doesn't exist locally:
+
+1. User-mention auto-add (routeUserMessage) was missing sshRemoteConfig
+   …
+```
+
+**source** `src/main/group-chat/group-chat-router.ts@438aa4976aae546eda4` (2026-04-15):
+```
+/**
+ * @file group-chat-router.ts
+ * @description Message routing for Group Chat feature.
+ *
+ * Routes messages between:
+ * - User -> Moderator
+ * - Moderator -> Participants (via @mentions)
+ * - Participants -> Moderator
+ */
+
+import * as os from 'os';
+import {
+	GroupChatParticipant,
+	loadGroupChat,
+	updateParticipant,
+	addGroupChatHistoryEntry,
+	extractFirstSentence,
+	getGroupChatDir,
+} from './group-chat-storage';
+import { appendToLog, readLog } from './group-chat-log';
+import {
+	type GroupCha…
+```
+
+**git_commit** `dad93f657d84f752b09f82a8bf7c64b3e312cdcb` (2026-02-13 by pedram.amini@gmail.com):
+```
+commit dad93f657d84f752b09f82a8bf7c64b3e312cdcb
+Author: Pedram Amini <pedram.amini@gmail.com>
+Date: 2026-02-13T02:55:54.000Z
+
+test: add SSH remote execution tests for group chat router
+
+Verify that user-mention auto-add, moderator-mention participant spawn,
+and non-SSH sessions correctly handle (or skip) SSH wrapping via
+wrapSpawnWithSsh. Prevents regression of the missing sshRemoteConfig fix.
+
+Fi…
+```
+
+**source** `src/__tests__/main/group-chat/group-chat-router.test.ts@7d2f` (2026-04-15):
+```
+/**
+ * @file group-chat-router.test.ts
+ * @description Unit tests for the Group Chat message router.
+ *
+ * Tests cover:
+ * - Extracting @mentions (5.1, 5.2)
+ * - Routing user messages (5.3)
+ * - Routing moderator responses (5.4)
+ * - Routing agent responses (5.5)
+ * - Read-only mode propagation (5.6)
+ */
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import * as path from 'path';
+import * as os from 'os';
+import * as fs from 'fs/promises';
+
+// Mock Electron's app modu…
+```
+```
+
+</details>
+
+**Condition A (bare):**
+
+[gemini failed: Command failed: gemini -p "$(cat /tmp/engram-maestro-v3-1776337884036.txt)"
+Error when talking to Gemini API Full report available at: /tmp/gemini-client-error-Turn.run-sendMessageStream-2026-04-16T11-11-29-466Z.json TerminalQuotaError: You have exhausted your capacity on this model. Your quota will reset after 13h28m46s.
+    at classifyGoogleError (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:274494:18)
+    at retryWithBackoff (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:275105:31)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async GeminiChat.makeApiCallAndProcessStream (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:310999:28)
+    at async GeminiChat.streamWithRetries (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:310837:29)
+    at async Turn.run (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:311329:24)
+    at async GeminiClient.processTurn (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:315405:22)
+    at async GeminiClient.sendMessageStream (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:315518:14)
+    at async file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/gemini.js:10168:26
+    at async main (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/gemini.js:15201:5) {
+  cause: {
+    code: 429,
+    message: 'You have exhausted your capacity on this model. Your quota will reset after 13h28m46s.',
+    details: [ [Object], [Object] ]
+  },
+  retryDelayMs: 48526571.776527,
+  reason: 'QUOTA_EXHAUSTED'
+}
+An unexpected critical error occurred:[object Object]
+]
+
+**Condition B (with context pack):**
+
+[gemini failed: Command failed: gemini -p "$(cat /tmp/engram-maestro-v3-1776337889515.txt)"
+Error when talking to Gemini API Full report available at: /tmp/gemini-client-error-Turn.run-sendMessageStream-2026-04-16T11-11-38-176Z.json TerminalQuotaError: You have exhausted your capacity on this model. Your quota will reset after 13h28m37s.
+    at classifyGoogleError (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:274494:18)
+    at retryWithBackoff (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:275105:31)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async GeminiChat.makeApiCallAndProcessStream (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:310999:28)
+    at async GeminiChat.streamWithRetries (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:310837:29)
+    at async Turn.run (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:311329:24)
+    at async GeminiClient.processTurn (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:315405:22)
+    at async GeminiClient.sendMessageStream (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:315518:14)
+    at async file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/gemini.js:10168:26
+    at async main (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/gemini.js:15201:5) {
+  cause: {
+    code: 429,
+    message: 'You have exhausted your capacity on this model. Your quota will reset after 13h28m37s.',
+    details: [ [Object], [Object] ]
+  },
+  retryDelayMs: 48517885.925032996,
+  reason: 'QUOTA_EXHAUSTED'
+}
+An unexpected critical error occurred:[object Object]
+]
+
+---
+
+## Q8 [large] — Why is pendingParticipantResponses a module-level Map rather than persistent storage?
+
+**Context pack:** 362 lines — includes Discussions section
+
+<details><summary>Full context pack</summary>
+
+```
+## Context pack
+> Query: Why is pendingParticipantResponses a module-level Map rather than persistent storage?  Budget: 6000 tokens | Used: ~4028 | 50 results
+
+### Entities
+
+- `src/main/group-chat/group-chat-router.ts::pendingParticipantResponses` **[symbol]** — score 1.000 | evidence: 1 episode(s)
+- `https://github.com/RunMaestro/Maestro/issues/142` **[issue]** — score 0.707 | evidence: 1 episode(s)
+- `src/main/storage/claude-session-storage.ts` **[module]** — score 0.680 | evidence: 2 episode(s)
+- `src/main/storage/codex-session-storage.ts` **[module]** — score 0.680 | evidence: 2 episode(s)
+- `src/main/storage/opencode-session-storage.ts` **[module]** — score 0.680 | evidence: 2 episode(s)
+- `src/main/storage/factory-droid-session-storage.ts` **[module]** — score 0.655 | evidence: 2 episode(s)
+- `src/main/storage/claude-session-storage.ts::StoredOriginData` **[symbol]** — score 0.655 | evidence: 1 episode(s)
+- `src/main/storage/claude-session-storage.ts::ClaudeSessionOriginsData` **[symbol]** — score 0.655 | evidence: 1 episode(s)
+- `src/main/storage/claude-session-storage.ts::extractTextFromContent` **[symbol]** — score 0.655 | evidence: 1 episode(s)
+- `src/main/storage/claude-session-storage.ts::parseSessionContent` **[symbol]** — score 0.655 | evidence: 1 episode(s)
+- `src/main/storage/claude-session-storage.ts::parseSessionFile` **[symbol]** — score 0.655 | evidence: 1 episode(s)
+- `src/main/storage/claude-session-storage.ts::parseSessionFileRemote` **[symbol]** — score 0.655 | evidence: 1 episode(s)
+- `src/main/storage/claude-session-storage.ts::ClaudeSessionStorage` **[symbol]** — score 0.655 | evidence: 1 episode(s)
+- `src/main/storage/codex-session-storage.ts::getCodexSessionsDir` **[symbol]** — score 0.655 | evidence: 1 episode(s)
+- `src/main/storage/codex-session-storage.ts::CodexSessionMetadata` **[symbol]** — score 0.655 | evidence: 1 episode(s)
+- `src/main/storage/codex-session-storage.ts::CodexMessageContent` **[symbol]** — score 0.655 | evidence: 1 episode(s)
+- `src/main/storage/codex-session-storage.ts::extractSessionIdFromFilename` **[symbol]** — score 0.655 | evidence: 1 episode(s)
+- `src/main/storage/codex-session-storage.ts::extractTextFromContent` **[symbol]** — score 0.655 | evidence: 1 episode(s)
+- `src/main/storage/codex-session-storage.ts::isSystemContextMessage` **[symbol]** — score 0.655 | evidence: 1 episode(s)
+- `src/main/storage/codex-session-storage.ts::extractCwdFromText` **[symbol]** — score 0.655 | evidence: 1 episode(s)
+- `src/main/storage/codex-session-storage.ts::normalizeProjectPath` **[symbol]** — score 0.655 | evidence: 1 episode(s)
+- `src/main/storage/codex-session-storage.ts::isSessionForProject` **[symbol]** — score 0.655 | evidence: 1 episode(s)
+- `src/main/storage/codex-session-storage.ts::CodexSessionCacheEntry` **[symbol]** — score 0.655 | evidence: 1 episode(s)
+- `src/main/storage/codex-session-storage.ts::CodexSessionCache` **[symbol]** — score 0.655 | evidence: 1 episode(s)
+- `src/main/storage/codex-session-storage.ts::getCodexSessionCachePath` **[symbol]** — score 0.655 | evidence: 1 episode(s)
+- `src/main/storage/codex-session-storage.ts::loadCodexSessionCache` **[symbol]** — score 0.655 | evidence: 1 episode(s)
+- `src/main/storage/codex-session-storage.ts::saveCodexSessionCache` **[symbol]** — score 0.655 | evidence: 1 episode(s)
+- `src/main/storage/codex-session-storage.ts::parseSessionFile` **[symbol]** — score 0.655 | evidence: 1 episode(s)
+- `src/main/storage/codex-session-storage.ts::CodexSessionStorage` **[symbol]** — score 0.655 | evidence: 1 episode(s)
+- `src/main/storage/opencode-session-storage.ts::getOpenCodeStorageDir` **[symbol]** — score 0.655 | evidence: 1 episode(s)
+
+### Edges
+
+- src/main/group-chat/group-chat-router.ts defines pendingParticipantResponses **[observed]** — score 1.000
+- pendingParticipantResponses is defined in src/main/group-chat/group-chat-router.ts **[observed]** — score 0.937
+- src/main/storage/opencode-session-storage.ts defines OPENCODE_STORAGE_DIR **[observed]** — score 0.593
+- src/__tests__/main/storage/claude-session-storage.test.ts imports src/main/storage/claude-session-storage.ts **[observed]** — score 0.587
+- src/main/storage contains file src/main/storage/claude-session-storage.ts **[observed]** — score 0.583
+- src/main/storage contains file src/main/storage/codex-session-storage.ts **[observed]** — score 0.583
+- src/main/storage contains file src/main/storage/opencode-session-storage.ts **[observed]** — score 0.583
+- OPENCODE_STORAGE_DIR is defined in src/main/storage/opencode-session-storage.ts **[observed]** — score 0.574
+- src/main/storage contains file src/main/storage/factory-droid-session-storage.ts **[observed]** — score 0.574
+- src/main/storage/index.ts imports src/main/storage/claude-session-storage.ts **[observed]** — score 0.574
+- src/main/storage/index.ts imports src/main/storage/opencode-session-storage.ts **[observed]** — score 0.574
+- src/main/storage/index.ts imports src/main/storage/codex-session-storage.ts **[observed]** — score 0.574
+- src/main/storage/index.ts imports src/main/storage/factory-droid-session-storage.ts **[observed]** — score 0.565
+- src/main/storage/claude-session-storage.ts and src/main/storage/codex-session-storage.ts co-change frequently (5 shared commits) **[inferred]** — score 0.559
+- src/main/storage/claude-session-storage.ts and src/main/storage/opencode-session-storage.ts co-change frequently (5 shared commits) **[inferred]** — score 0.559
+- src/main/storage/codex-session-storage.ts and src/main/storage/opencode-session-storage.ts co-change frequently (6 shared commits) **[inferred]** — score 0.559
+- src/__tests__/main/storage contains file src/__tests__/main/storage/claude-session-storage.test.ts **[observed]** — score 0.556
+- src/main/storage/claude-session-storage.ts defines StoredOriginData **[observed]** — score 0.549
+- src/main/storage/claude-session-storage.ts defines ClaudeSessionOriginsData **[observed]** — score 0.549
+- src/main/storage/claude-session-storage.ts defines extractTextFromContent **[observed]** — score 0.549
+
+### Discussions
+_PR descriptions, issue discussions, and commit messages retrieved directly from the graph._
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/363` (2026-02-12 by reachrazamair) — score 1.000:
+```
+PR #363: refactor: added groupChatStore, operationStore, batchStore
+URL: https://github.com/RunMaestro/Maestro/pull/363
+State: closed
+Author: reachrazamair
+Created: 2026-02-12T23:26:55Z
+
+## Summary
+
+- Create 3 new Zustand stores (`groupChatStore`, `operationStore`, `batchStore`) replacing 2 React contexts and consolidating scattered module-level state
+- Delete `GroupChatContext.tsx` (339 lines) and `AutoRunContext.tsx` (182 lines), removing their providers from the component tree
+- Consolidate module-level `let` globals from 3 operation hooks (`useSummarizeAndContinue`, `useMergeSession`, `useSendToAgent`) into `operationStore`
+- Replace `useReducer` + manual ref-syncing pattern in `useBatchProcessor` with reactive store reads
+- Net reduction: −645 lines (4,225 added / 4,870 removed across 87 files), with 200 new store tests (91 batch + 54 operation + 55 group chat)
+- All 18,956 tests pass, TypeScript clean
+
+### App.tsx reduction
+
+App.tsx: **12,683 → 12,651 lines** (−32 lines in this PR). The line count reduction is modest because these stores primarily extracted state from context files and hooks rather than from App.tsx itself. However, the structural improvement is si…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/435` (2026-02-21 by openasocket) — score 0.967:
+```
+PR #435: Add Gemini CLI as first-class agent
+URL: https://github.com/RunMaestro/Maestro/pull/435
+State: closed
+Author: openasocket
+Created: 2026-02-21T18:58:58Z
+
+## Summary
+
+- Adds Google Gemini CLI as a fully integrated agent in Maestro across all surfaces: type system, agent definitions, capabilities, output parser, session storage, error handling, group chat, CLI tooling, and UI
+- Achieves feature parity with Claude Code and Codex on 18/20 integration dimensions (image input and model discovery are Gemini CLI limitations, not Maestro gaps)
+- Includes 2,200+ lines of tests across 16 test files
+
+## Changes by area
+
+### Core agent plumbing (types, definitions, capabilities)
+- Added `gemini-cli` to `ToolType` union, `AGENT_DEFINITIONS`, and `AGENT_CAPABILITIES`
+- Configured all agent flags: `batchModeArgs` (`-y`), `jsonOutputArgs` (`--output-format stream-json`), `resumeArgs` (`--resume`), `modelArgs` (`-m`), `yoloModeArgs`, `workingDirArgs` (`--include-directories`)
+- Added `gemini-cli` to every `Record<ToolType>` map, hardcoded array, and `VALID_MODERATOR_AGENT_IDS`
+
+### Output parser (`gemini-output-parser.ts`)
+- Full NDJSON stream-json parser handling 6 event types: `init`, `mes…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/555` (2026-03-11 by jeffscottward) — score 0.943:
+```
+PR #555: fix: use namespace import for os in main constants
+URL: https://github.com/RunMaestro/Maestro/pull/555
+State: closed
+Author: jeffscottward
+Created: 2026-03-11T19:52:49Z
+
+## Summary
+- switch `src/main/constants.ts` from a default `os` import to a namespace import
+- align the file with the Node builtin import pattern already used in the main process
+- fix the Node 22 Vitest SSR failure on `DEMO_DATA_PATH` (`default.tmpdir is not a function`)
+
+## Verification
+- `npx vitest run src/__tests__/main/agents/session-storage.test.ts`
+- `npx -p node@22 node node_modules/vitest/vitest.mjs run src/__tests__/main/agents/session-storage.test.ts`
+- `npx -p node@22 node node_modules/vitest/vitest.mjs run src/__tests__/main/constants.test.ts`
+
+<!-- This is an auto-generated comment: release notes by coderabbit.ai -->
+## Summary by CodeRabbit
+
+* **Refactor**
+  * Standardized internal module import style for consistency; no functional changes.
+
+* **Tests**
+  * Updated unit test assertions to validate resulting state rather than specific call behavior.
+
+---
+
+Note: Internal improvements only; no visible impact to end-user functionality.
+<!-- end of auto-generated comment: release notes by coder…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/224` (2026-01-22 by reachrazamair) — score 0.612:
+```
+PR #224: refactor: modularize preload.ts into domain-specific modules with tests
+URL: https://github.com/RunMaestro/Maestro/pull/224
+State: closed
+Author: reachrazamair
+Created: 2026-01-22T15:38:06Z
+
+## Summary
+
+- Refactored monolithic preload.ts (3,761 lines) into 21 domain-specific modules
+- Added comprehensive test coverage with 20 new test files (~5,700 lines)
+- Established clean module boundaries with typed factory functions
+
+## Key Gains
+
+### Maintainability
+
+- Single 3,761-line file → 21 focused modules averaging ~180 lines each
+- Each module owns one domain: agents.ts, git.ts, process.ts, settings.ts, etc.
+- Clear separation of concerns makes code easier to navigate and modify
+
+### Testability
+
+- From 0 → 5,700+ lines of dedicated test coverage
+- Each module can be tested in isolation via factory functions
+- Mocking is straightforward with clear API boundaries
+
+### Type Safety
+
+- All types are co-located with their implementations and re-exported from index
+- External consumers import from ./preload with full TypeScript support
+- API contracts are explicit and documented
+
+### Team Scalability
+
+- Multiple developers can work on different modules w…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/428` (2026-02-20 by chr1syy) — score 0.603:
+```
+PR #428: fix: replace JS resize detection with CSS container queries for header
+URL: https://github.com/RunMaestro/Maestro/pull/428
+State: closed
+Author: chr1syy
+Created: 2026-02-20T09:45:35Z
+
+The header bar elements were overlapping on smaller screens and not properly restoring when the window was resized larger. The JavaScript- based ResizeObserver with threshold detection was unreliable.
+
+This commit replaces the JS approach with CSS container queries:
+- Add header-container class with container-type: inline-size
+- Use @container queries to progressively hide elements at breakpoints
+- Remove panelWidth state, ResizeObserver, and related variables
+- Add CSS classes to header elements for container query targeting
+- Support header-auto-mode modifier for when AUTO button is visible
+
+Benefits:
+- Instant response to size changes (no state update delays)
+- No bugs with threshold detection or resize event batching
+- Reduced React re-renders (elements always in DOM, CSS controls visibility)
+- Simpler code (~100 lines of JS removed)
+
+Fixes #420
+
+Session: 64f29ed8-30fe-4b59-a4d3-f6bf87e2d3d6
+
+<!-- This is an auto-generated comment: release notes by coderabbit.ai -->
+## Su…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/510` (2026-03-04 by reachrazamair) — score 0.603:
+```
+PR #510: refactor: decompose SessionList.tsx into focused sub-components and hooks
+URL: https://github.com/RunMaestro/Maestro/pull/510
+State: closed
+Author: reachrazamair
+Created: 2026-03-04T01:01:48Z
+
+## Summary
+
+Decomposes the 1,998-line `SessionList.tsx` monolith into a directory of focused, independently testable modules — reducing the orchestrator shell to **1,216 lines (−39%)**. This follows the same decomposition pattern used for `SettingsModal.tsx` (3,649 → 601 lines).
+
+### Extracted Hooks (2)
+
+| Hook | Location | Purpose |
+|------|----------|---------|
+| `useSessionCategories` | `hooks/session/useSessionCategories.ts` | Worktree hierarchy maps, session filtering by name/tab, categorization (bookmarked, grouped, ungrouped, flat), and sorting |
+| `useSessionFilterMode` | `hooks/session/useSessionFilterMode.ts` | Filter open/close state machine — saves/restores group collapse states and bookmarks when entering/exiting filter mode, auto-expands groups containing matches |
+
+### Extracted Components (4)
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `LiveOverlayPanel` | `SessionList/LiveOverlayPanel.tsx` | LIVE mode overlay: QR code, tunn…
+```
+
+### Evidence excerpts
+
+**source** `src/main/group-chat/group-chat-router.ts@438aa4976aae546eda4` (2026-04-15):
+```
+/**
+ * @file group-chat-router.ts
+ * @description Message routing for Group Chat feature.
+ *
+ * Routes messages between:
+ * - User -> Moderator
+ * - Moderator -> Participants (via @mentions)
+ * - Participants -> Moderator
+ */
+
+import * as os from 'os';
+import {
+	GroupChatParticipant,
+	loadGroupChat,
+	updateParticipant,
+	addGroupChatHistoryEntry,
+	extractFirstSentence,
+	getGroupChatDir,
+} from './group-chat-storage';
+import { appendToLog, readLog } from './group-chat-log';
+import {
+	type GroupCha…
+```
+
+**github_issue** `https://github.com/RunMaestro/Maestro/issues/142` (2026-01-03 by sudo-eugene):
+```
+Issue #142: Issue: Command Terminal Lacks Support for Persistent/Long-Running Processes
+URL: https://github.com/RunMaestro/Maestro/issues/142
+State: closed
+Author: sudo-eugene
+Created: 2026-01-03T07:48:30Z
+
+The Command Terminal doesn't properly support long-running processes like `npm run dev`, `docker-compose up`, or `tail -f`. There's no clear way to terminate these processes, and their continuous output creates excessive noise in the message-style interface.
+
+I checked the documentation at do…
+```
+
+**git_commit** `11d0c672e82d518b29cd8fb30a813bb3b4cb54a1` (2026-02-08 by pedram.amini@gmail.com):
+```
+commit 11d0c672e82d518b29cd8fb30a813bb3b4cb54a1
+Author: Pedram Amini <pedram.amini@gmail.com>
+Date: 2026-02-08T17:33:33.000Z
+
+fix: add Sentry captureException to swallowed errors across main process
+
+Error handlers in group chat, history, agent detector, and all session
+storage implementations were logging errors locally but never reporting
+to Sentry. Added captureException calls alongside existin…
+```
+
+**source** `src/main/storage/claude-session-storage.ts@d7c9dfcfe1eb4dbfd` (2026-04-15):
+```
+/**
+ * Claude Code Session Storage Implementation
+ *
+ * This module implements the AgentSessionStorage interface for Claude Code.
+ * Claude Code stores sessions as JSONL files in ~/.claude/projects/<encoded-path>/
+ *
+ * File structure:
+ * - Each session is a .jsonl file named <session-id>.jsonl
+ * - Each line is a JSON object with type, timestamp, message, etc.
+ * - User and assistant messages contain the actual conversation
+ * - Result messages contain token usage and cost information
+ */
+
+impo…
+```
+
+**source** `src/main/storage/codex-session-storage.ts@8aebee1bf4f5d785ae` (2026-04-15):
+```
+/**
+ * Codex CLI Session Storage Implementation
+ *
+ * This module implements the AgentSessionStorage interface for OpenAI Codex CLI.
+ * Codex stores sessions as JSONL files in ~/.codex/sessions/YYYY/MM/DD/
+ *
+ * File structure:
+ * - Each session is a .jsonl file named rollout-<timestamp>-<uuid>.jsonl
+ * - First line contains session metadata (id, timestamp, git info)
+ * - Subsequent lines contain message entries
+ *
+ * Session format (from Codex --json output):
+ * ```json
+ * // First line: sessio…
+```
+
+**source** `src/main/storage/opencode-session-storage.ts@5bf21a77509f296` (2026-04-15):
+```
+/**
+ * OpenCode Session Storage Implementation
+ *
+ * This module implements the AgentSessionStorage interface for OpenCode.
+ * OpenCode stores sessions as JSON files in ~/.local/share/opencode/storage/
+ *
+ * Directory structure:
+ * - project/     - Project metadata (SHA1 hash of path as ID)
+ * - session/{projectID}/ - Session metadata per project
+ * - message/{sessionID}/ - Messages per session
+ * - part/{messageID}/    - Message parts (text, tool, reasoning)
+ *
+ * Session IDs: Format is `ses_{b…
+```
+
+**source** `src/main/storage/factory-droid-session-storage.ts@fe24df1ce6` (2026-04-15):
+```
+/**
+ * Factory Droid Session Storage Implementation
+ *
+ * This module implements the AgentSessionStorage interface for Factory Droid.
+ * Factory Droid stores sessions as JSONL files in ~/.factory/sessions/
+ *
+ * Directory structure:
+ * - ~/.factory/sessions/<encoded-project-path>/<uuid>.jsonl - Message history
+ * - ~/.factory/sessions/<encoded-project-path>/<uuid>.settings.json - Session metadata
+ *
+ * Path encoding: Project paths have `/` replaced with `-`
+ * Example: /Users/octavia/myproject -…
+```
+```
+
+</details>
+
+**Condition A (bare):**
+
+[gemini failed: Command failed: gemini -p "$(cat /tmp/engram-maestro-v3-1776337901321.txt)"
+Error when talking to Gemini API Full report available at: /tmp/gemini-client-error-Turn.run-sendMessageStream-2026-04-16T11-11-46-359Z.json TerminalQuotaError: You have exhausted your capacity on this model. Your quota will reset after 13h28m29s.
+    at classifyGoogleError (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:274494:18)
+    at retryWithBackoff (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:275105:31)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async GeminiChat.makeApiCallAndProcessStream (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:310999:28)
+    at async GeminiChat.streamWithRetries (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:310837:29)
+    at async Turn.run (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:311329:24)
+    at async GeminiClient.processTurn (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:315405:22)
+    at async GeminiClient.sendMessageStream (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:315518:14)
+    at async file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/gemini.js:10168:26
+    at async main (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/gemini.js:15201:5) {
+  cause: {
+    code: 429,
+    message: 'You have exhausted your capacity on this model. Your quota will reset after 13h28m29s.',
+    details: [ [Object], [Object] ]
+  },
+  retryDelayMs: 48509676.811761,
+  reason: 'QUOTA_EXHAUSTED'
+}
+An unexpected critical error occurred:[object Object]
+]
+
+**Condition B (with context pack):**
+
+[gemini failed: Command failed: gemini -p "$(cat /tmp/engram-maestro-v3-1776337906434.txt)"
+Error when talking to Gemini API Full report available at: /tmp/gemini-client-error-Turn.run-sendMessageStream-2026-04-16T11-11-54-327Z.json TerminalQuotaError: You have exhausted your capacity on this model. Your quota will reset after 13h28m21s.
+    at classifyGoogleError (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:274494:18)
+    at retryWithBackoff (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:275105:31)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async GeminiChat.makeApiCallAndProcessStream (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:310999:28)
+    at async GeminiChat.streamWithRetries (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:310837:29)
+    at async Turn.run (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:311329:24)
+    at async GeminiClient.processTurn (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:315405:22)
+    at async GeminiClient.sendMessageStream (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:315518:14)
+    at async file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/gemini.js:10168:26
+    at async main (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/gemini.js:15201:5) {
+  cause: {
+    code: 429,
+    message: 'You have exhausted your capacity on this model. Your quota will reset after 13h28m21s.',
+    details: [ [Object], [Object] ]
+  },
+  retryDelayMs: 48501736.788327,
+  reason: 'QUOTA_EXHAUSTED'
+}
+An unexpected critical error occurred:[object Object]
+]
+
+---
+
+## Q9 [large] — Why does Maestro define theme colors in TypeScript rather than CSS custom properties?
+
+**Context pack:** 636 lines — includes Discussions section
+
+<details><summary>Full context pack</summary>
+
+```
+## Context pack
+> Query: Why does Maestro define theme colors in TypeScript rather than CSS custom properties?  Budget: 6000 tokens | Used: ~5891 | 49 results (1 truncated by budget)
+
+### Entities
+
+- `src/shared/theme-types.ts::Theme` **[symbol]** — score 1.000 | evidence: 1 episode(s)
+- `https://github.com/RunMaestro/Maestro/issues/522` **[issue]** — score 0.919 | evidence: 1 episode(s)
+- `src/cli/output/formatter.ts::colors` **[symbol]** — score 0.881 | evidence: 1 episode(s)
+- `src/renderer/utils/theme.tsx` **[module]** — score 0.792 | evidence: 2 episode(s)
+- `src/shared/theme-types.ts` **[module]** — score 0.792 | evidence: 2 episode(s)
+- `src/renderer/utils/theme.ts` **[module]** — score 0.792 | evidence: 1 episode(s)
+- `src/shared/theme-types.ts::ThemeId` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/shared/theme-types.ts::ThemeMode` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/shared/theme-types.ts::ThemeColors` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/shared/theme-types.ts::isValidThemeId` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/renderer/utils/theme.tsx::getContextColor` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/renderer/utils/theme.tsx::getStatusColor` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `src/renderer/utils/theme.tsx::getFileIcon` **[symbol]** — score 0.743 | evidence: 1 episode(s)
+- `https://github.com/RunMaestro/Maestro/issues/650` **[issue]** — score 0.736 | evidence: 1 episode(s)
+- `https://github.com/RunMaestro/Maestro/issues/644` **[issue]** — score 0.736 | evidence: 1 episode(s)
+- `src/__tests__/renderer/utils/theme.test.tsx` **[module]** — score 0.701 | evidence: 2 episode(s)
+- `src/__tests__/shared/theme-types.test.ts` **[module]** — score 0.701 | evidence: 2 episode(s)
+- `src/__tests__/renderer/utils/theme.test.tsx::mockTheme` **[symbol]** — score 0.662 | evidence: 1 episode(s)
+- `src/__tests__/renderer/utils/theme.test.tsx::alternativeTheme` **[symbol]** — score 0.662 | evidence: 1 episode(s)
+- `src/__tests__/renderer/components/UsageDashboard/SourceDistributionChart.test.tsx::theme` **[symbol]** — score 0.628 | evidence: 1 episode(s)
+- `src/__tests__/renderer/components/UsageDashboard/ActivityHeatmap.test.tsx::theme` **[symbol]** — score 0.628 | evidence: 1 episode(s)
+- `src/__tests__/renderer/components/UsageDashboard/AutoRunStats.test.tsx::theme` **[symbol]** — score 0.628 | evidence: 1 episode(s)
+- `src/__tests__/renderer/components/UsageDashboard/AgentComparisonChart.test.tsx::theme` **[symbol]** — score 0.628 | evidence: 1 episode(s)
+- `src/__tests__/renderer/components/UsageDashboard/SummaryCards.test.tsx::theme` **[symbol]** — score 0.628 | evidence: 1 episode(s)
+- `src/__tests__/renderer/components/UsageDashboard/DurationTrendsChart.test.tsx::theme` **[symbol]** — score 0.628 | evidence: 1 episode(s)
+- `src/__tests__/renderer/components/UsageDashboard/chart-performance.test.tsx::theme` **[symbol]** — score 0.597 | evidence: 1 episode(s)
+- `src/__tests__/renderer/components/UsageDashboard/colorblind-palette.test.tsx::theme` **[symbol]** — score 0.597 | evidence: 1 episode(s)
+- `symphony@maestro.dev` **[person]** — score 0.453 | evidence: 1 episode(s)
+- `build/maestro-circle-bckgrnd.icon/Assets/maestro-bckgrnd-1 2.svg` **[module]** — score 0.443 | evidence: 1 episode(s)
+- `build/maestro-circle-bckgrnd.icon/Assets/maestro-bckgrnd-2 2.svg` **[module]** — score 0.443 | evidence: 1 episode(s)
+
+### Edges
+
+- src/shared/themes.ts defines DEFAULT_CUSTOM_THEME_COLORS **[observed]** — score 1.000
+- DEFAULT_CUSTOM_THEME_COLORS is defined in src/shared/themes.ts **[observed]** — score 0.935
+- src/cli/output/formatter.ts defines colors **[observed]** — score 0.606
+- src/shared/theme-types.ts defines Theme **[observed]** — score 0.599
+- src/renderer/components/SymphonyModal.tsx defines STATUS_COLORS **[observed]** — score 0.584
+- src/renderer/components/FirstRunCelebration.tsx defines CONFETTI_COLORS **[observed]** — score 0.584
+- src/renderer/utils/confetti.ts defines DEFAULT_COLORS **[observed]** — score 0.584
+- Theme is defined in src/shared/theme-types.ts **[observed]** — score 0.572
+- src/renderer/components/UsageDashboard/AgentUsageChart.tsx defines AGENT_COLORS **[observed]** — score 0.564
+- src/renderer/components/LogViewer.tsx defines LOG_LEVEL_COLORS **[observed]** — score 0.564
+- src/renderer/components/PlaygroundPanel.tsx defines DEFAULT_CONFETTI_COLORS **[observed]** — score 0.564
+- src/renderer/constants/colorblindPalettes.ts defines COLORBLIND_LINE_COLORS **[observed]** — score 0.564
+- colors is defined in src/cli/output/formatter.ts **[observed]** — score 0.564
+- STATUS_COLORS is defined in src/renderer/components/SymphonyModal.tsx **[observed]** — score 0.545
+- CONFETTI_COLORS is defined in src/renderer/components/FirstRunCelebration.tsx **[observed]** — score 0.545
+- DEFAULT_COLORS is defined in src/renderer/utils/confetti.ts **[observed]** — score 0.545
+- src/__tests__/renderer/constants/themes.test.ts defines REQUIRED_COLORS **[observed]** — score 0.545
+- AGENT_COLORS is defined in src/renderer/components/UsageDashboard/AgentUsageChart.tsx **[observed]** — score 0.527
+- LOG_LEVEL_COLORS is defined in src/renderer/components/LogViewer.tsx **[observed]** — score 0.527
+
+### Discussions
+_PR descriptions, issue discussions, and commit messages retrieved directly from the graph._
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/608` (2026-03-24 by reachrazamair) — score 1.000:
+```
+PR #608: fix(cue): theme conformity, context menu dismiss, and drag stability
+URL: https://github.com/RunMaestro/Maestro/pull/608
+State: closed
+Author: reachrazamair
+Created: 2026-03-24T21:17:08Z
+
+## Summary
+- Replace ~100 hardcoded color values across 28 Cue components with theme-aware equivalents (`theme.colors.*`), ensuring the pipeline editor, config panels, dashboard, and context menus adapt to all app themes (light, dark, vibe)
+- Fix `PipelineContextMenu` not closing on click-outside or Escape — now uses `useClickOutside` + `useContextMenuPosition` hooks matching the `NodeContextMenu` pattern
+- Fix `CueSettingsPanel` missing click-outside and Escape dismiss behavior
+- Fix node drag in "All Pipelines" view — extract `computePipelineYOffsets` and stabilize offsets based on pipeline structure rather than bounding boxes, eliminating the feedback loop where dragging shifted all pipelines below
+
+## Test plan
+- 25 new tests across 4 new and 3 updated test files (theme conformity, dismiss behavior, offset computation)
+- Full suite: 23,785 tests pass, 0 failures
+- TypeScript compiles cleanly
+- ESLint passes
+- Manual: switch between github-light, dracula, and maestros-choice…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/368` (2026-02-15 by openasocket) — score 0.715:
+```
+PR #368: fix: replace hardcoded color values with theme tokens for accessibility
+URL: https://github.com/RunMaestro/Maestro/pull/368
+State: closed
+Author: openasocket
+Created: 2026-02-15T01:04:24Z
+
+## Summary
+
+- Replaces hardcoded color values (`#fff`, `#000`, `#ffffff`, `white`) with proper theme tokens across 15 renderer component files
+- Ensures WCAG 2.1 contrast compliance for all themes, including high-contrast and custom themes like dre-synth
+- No visual change for default themes — tokens already resolve to appropriate values
+
+## Problem
+
+Multiple components used hardcoded white (`#fff`, `white`, `#ffffff`) or black (`#000`, `#000000`) for text on accent-colored or status-colored backgrounds. This approach:
+
+1. **Breaks accessibility** on themes where the accent color is light (e.g., teal/cyan), since white-on-light fails WCAG AA contrast ratios (< 4.5:1)
+2. **Bypasses the theme system** — custom and high-contrast themes can't control foreground colors for these elements
+3. **Assumes dark mode** — the `theme.mode === 'light' ? '#fff' : '#000'` pattern is a fragile heuristic that doesn't account for themes with non-standard luminance relationships
+
+## Solution
+
+All hardcoded v…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/369` (2026-02-15 by openasocket) — score 0.711:
+```
+PR #369: feat: extend theme system with semantic color tokens and replace hardcoded values
+URL: https://github.com/RunMaestro/Maestro/pull/369
+State: closed
+Author: openasocket
+Created: 2026-02-15T01:29:32Z
+
+## Summary
+
+- Replaces hardcoded color values (`#fff`, `#000`, `#ffffff`, `white`) with proper theme tokens across 15 renderer component files
+- Extends `ThemeColors` interface with 17 new semantic tokens for status foregrounds, dimmed backgrounds, git diff colors, overlays, hover/active states, and shadows
+- Populates all 17 theme definitions with palette-appropriate values for each new token
+- Ensures WCAG 2.1 contrast compliance for all themes, including high-contrast and custom themes
+
+## Problem
+
+1. **Hardcoded foreground colors**: Multiple components used `#fff`/`#000`/`white` for text on accent-colored backgrounds, breaking accessibility on themes where the accent color is light
+2. **Missing semantic tokens**: The theme system had only 13 tokens — no `info` color, no foreground-on-status tokens, no dimmed status backgrounds, no git diff colors, no overlay/hover/shadow tokens. Components were forced to hardcode `rgba(239, 68, 68, 0.15)`, `rgba(0, 0, 0, 0.6)`, etc.
+
+## Sol…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/551` (2026-03-11 by openasocket) — score 0.688:
+```
+PR #551: fix: WCAG-compliant theme token system (retargeted from #370)
+URL: https://github.com/RunMaestro/Maestro/pull/551
+State: closed
+Author: openasocket
+Created: 2026-03-11T04:11:47Z
+
+## Summary
+- Retarget of PR #370 (`fix/theme-integration`) from `main` to `0.16.0-RC`
+- Adds WCAG-compliant theme token system with ThemeColors expanded to 30 required fields
+- Sectioned CustomThemeBuilder UI for all color categories (backgrounds, typography, accent, status, git diff, overlays)
+- All 16 built-in themes updated with complete color tokens (info, foregrounds, dims, diff, overlay, interactive states)
+- ANSI terminal palettes preserved per-theme
+
+## Conflict Resolution
+Resolved 13 merge conflicts via squash-merge approach:
+- **Theme infrastructure** (`theme-types.ts`, `themes.ts`, `CustomThemeBuilder.tsx`): PR's expanded token system preserved
+- **Component files**: RC's structural additions kept; hardcoded colors retained for RC-modified components (tokenization can follow up)
+- **Settings/types**: RC's latest features preserved (globalStats, encore features, etc.)
+- Fixed 4 test expectations for test/component color mismatch
+
+## Test Plan
+- [x] TypeScript compiles clean (`npx tsc --n…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/204` (2026-01-17 by ksylvan) — score 0.659:
+```
+PR #204: Add local manifest feature for custom playbooks
+URL: https://github.com/RunMaestro/Maestro/pull/204
+State: closed
+Author: ksylvan
+Created: 2026-01-17T20:29:00Z
+
+# Add local manifest feature for custom playbooks
+
+## Summary
+
+This PR introduces a new "local manifest" feature that allows users to define custom or work-in-progress playbooks stored locally on their filesystem. These local playbooks can override official ones from the GitHub repository or be added as new entries, enabling private, organization-specific automation without requiring public sharing. The implementation includes manifest merging, hot reload for development, and UI indicators to distinguish local playbooks.
+
+## Related Issues
+
+Closes #203 
+
+## Screenshots
+
+The Category view with the "Local" badge:
+
+<img width="936" height="722" alt="image" src="https://github.com/user-attachments/assets/23c87f6d-2b2a-4f05-998a-f0eb75c0de17" />
+
+The local playbook view:
+
+<img width="911" height="1009" alt="image" src="https://github.com/user-attachments/assets/b9b92063-3f9e-4e78-aedc-a4cc862e42e5" />
+
+
+## Files Changed
+
+- **docs/examples/local-manifest.json** (new file): Provides a sample JSON st…
+```
+
+**github_pr** `https://github.com/RunMaestro/Maestro/pull/224` (2026-01-22 by reachrazamair) — score 0.572:
+```
+PR #224: refactor: modularize preload.ts into domain-specific modules with tests
+URL: https://github.com/RunMaestro/Maestro/pull/224
+State: closed
+Author: reachrazamair
+Created: 2026-01-22T15:38:06Z
+
+## Summary
+
+- Refactored monolithic preload.ts (3,761 lines) into 21 domain-specific modules
+- Added comprehensive test coverage with 20 new test files (~5,700 lines)
+- Established clean module boundaries with typed factory functions
+
+## Key Gains
+
+### Maintainability
+
+- Single 3,761-line file → 21 focused modules averaging ~180 lines each
+- Each module owns one domain: agents.ts, git.ts, process.ts, settings.ts, etc.
+- Clear separation of concerns makes code easier to navigate and modify
+
+### Testability
+
+- From 0 → 5,700+ lines of dedicated test coverage
+- Each module can be tested in isolation via factory functions
+- Mocking is straightforward with clear API boundaries
+
+### Type Safety
+
+- All types are co-located with their implementations and re-exported from index
+- External consumers import from ./preload with full TypeScript support
+- API contracts are explicit and documented
+
+### Team Scalability
+
+- Multiple developers can work on different modules w…
+```
+
+### Evidence excerpts
+
+**source** `src/shared/theme-types.ts@e9ef346a5c961003f02d5f695e6e4118df` (2026-04-15):
+```
+/**
+ * Shared theme type definitions for Maestro
+ *
+ * This file contains theme types used across:
+ * - Main process (Electron)
+ * - Renderer process (Desktop React app)
+ * - Web interface (Mobile and Desktop web builds)
+ *
+ * Keep this file dependency-free to ensure it can be imported anywhere.
+ */
+
+/**
+ * Available theme identifiers
+ */
+export type ThemeId =
+	| 'dracula'
+	| 'monokai'
+	| 'github-light'
+	| 'solarized-light'
+	| 'nord'
+	| 'tokyo-night'
+	| 'one-light'
+	| 'gruvbox-light'
+	| 'catppuc…
+```
+
+**github_issue** `https://github.com/RunMaestro/Maestro/issues/522` (2026-03-06 by Ashraf-Ali-aa):
+```
+Issue #522: Feature Request: TypeScript-Native LLM Guard for Input/Output Protection
+URL: https://github.com/RunMaestro/Maestro/issues/522
+State: closed
+Author: Ashraf-Ali-aa
+Created: 2026-03-06T17:53:21Z
+
+### Summary
+
+Build a TypeScript-native security scanning library (inspired by [LLM Guard](https://github.com/protectai/llm-guard)) that Maestro can use directly to provide input sanitization, output validation, PII protection, prompt injection detection, and secrets scanning across all managed…
+```
+
+**source** `src/cli/output/formatter.ts@9b60207d21bfe2890a111abfd2f822b1` (2026-04-15):
+```
+// Human-readable output formatter for CLI
+// Provides beautiful, colored terminal output
+
+// ANSI color codes
+const colors = {
+	reset: '\x1b[0m',
+	bold: '\x1b[1m',
+	dim: '\x1b[2m',
+
+	// Foreground colors
+	black: '\x1b[30m',
+	red: '\x1b[31m',
+	green: '\x1b[32m',
+	yellow: '\x1b[33m',
+	blue: '\x1b[34m',
+	magenta: '\x1b[35m',
+	cyan: '\x1b[36m',
+	white: '\x1b[37m',
+	gray: '\x1b[90m',
+
+	// Bright foreground colors
+	brightRed: '\x1b[91m',
+	brightGreen: '\x1b[92m',
+	brightYellow: '\x1b[93m',
+	brightBlu…
+```
+
+**git_commit** `8de53cd84b2866785c3a47d297619744e19fe982` (2026-02-11 by reachrazarauf@gmail.com):
+```
+commit 8de53cd84b2866785c3a47d297619744e19fe982
+Author: Raza Rauf <reachrazarauf@gmail.com>
+Date: 2026-02-11T13:14:41.000Z
+
+refactor: complete agentStore Phases 2-3, extract ~1,850 lines from App.tsx
+
+Phase 2 — useAgentListeners hook:
+- Extract IPC listener useEffect (~1,520 lines) from App.tsx into
+  src/renderer/hooks/agent/useAgentListeners.ts
+- Covers onData, onUsage, onStderr, onExit, onAgent…
+```
+
+**source** `src/renderer/utils/theme.tsx@93e0e56124ab681d3cdda64b5b32ac8` (2026-04-15):
+```
+import { FilePlus, Trash2, FileCode, FileText } from 'lucide-react';
+import type { Theme, SessionState, FileChangeType } from '../types';
+
+// Re-export formatActiveTime from formatters for backwards compatibility
+export { formatActiveTime } from './formatters';
+
+// Get color based on context usage percentage.
+// Thresholds default to 60/80 but can be overridden to match user's context warning settings.
+export const getContextColor = (
+	usage: number,
+	theme: Theme,
+	yellowThreshold = 60,
+	redThr…
+```
+
+**git_commit** `231fe2fd8884318019bfaf4bd74a5dd48f7f8525` (2026-01-19 by reachrazarauf@gmail.com):
+```
+commit 231fe2fd8884318019bfaf4bd74a5dd48f7f8525
+Author: Raza Rauf <reachrazarauf@gmail.com>
+Date: 2026-01-19T21:21:36.000Z
+
+chore: format entire codebase with prettier
+
+Run `npm run format` across all TypeScript/TSX files
+for consistent code formatting throughout the project.
+
+Files:
+src/__tests__/cli/commands/list-agents.test.ts
+src/__tests__/cli/commands/list-groups.test.ts
+src/__tests__/cli/com…
+```
+
+**git_commit** `e542d27fb896869b457161f3881aee8b58e5232e` (2025-11-24 by pedram.amini@gmail.com):
+```
+commit e542d27fb896869b457161f3881aee8b58e5232e
+Author: Pedram Amini <pedram.amini@gmail.com>
+Date: 2025-11-24T04:44:55.000Z
+
+refactor: extract right panel components (Round 2 - 160 line reduction)
+
+Created three new components to modularize right panel:
+- FileExplorerPanel.tsx - File tree rendering with filtering and navigation
+- HistoryPanel.tsx - Work log timeline display
+- RightPanel.tsx - Wra…
+```
+
+**github_issue** `https://github.com/RunMaestro/Maestro/issues/650` (2026-03-27 by Ashraf-Ali-aa):
+```
+Issue #650: [Mobile App] Dynamic Theme Support with Desktop Sync
+URL: https://github.com/RunMaestro/Maestro/issues/650
+State: closed
+Author: Ashraf-Ali-aa
+Created: 2026-03-27T21:43:04Z
+
+## Overview
+
+Implement dynamic theme support in the mobile app that syncs with the desktop Maestro theme system, providing visual consistency across platforms.
+
+## Theme System Details
+
+Maestro has 17 built-in themes in `src/shared/themes.ts`:
+
+### Dark Themes (6)
+- Dracula
+- Monokai
+- Nord
+- Tokyo Night
+- Catppu…
+```
+
+**github_issue** `https://github.com/RunMaestro/Maestro/issues/644` (2026-03-27 by Ashraf-Ali-aa):
+```
+Issue #644: [Mobile App] Dynamic Theme Support with Desktop Sync
+URL: https://github.com/RunMaestro/Maestro/issues/644
+State: closed
+Author: Ashraf-Ali-aa
+Created: 2026-03-27T21:39:38Z
+
+## Summary
+
+Implement dynamic theme support in the mobile app that syncs with Maestro desktop themes. Users should see the same color scheme on mobile as they have configured on desktop.
+
+## Theme System Requirements
+
+Match desktop Maestro theme system:
+- **25+ built-in themes** from `src/shared/themes.ts`
+- **Da…
+```
+
+**git_commit** `7506aad7eae0e5640ab974506c4960aea1412a1e` (2026-02-09 by pedram.amini@gmail.com):
+```
+commit 7506aad7eae0e5640ab974506c4960aea1412a1e
+Author: Pedram Amini <pedram.amini@gmail.com>
+Date: 2026-02-09T03:35:00.000Z
+
+fix: sync context window bar colors with user's warning threshold settings
+
+The header context bar used hardcoded 60/80% thresholds while the bottom
+warning sash used configurable thresholds from settings, causing color
+mismatches (e.g., green bar at top but yellow warning …
+```
+
+**source** `src/__tests__/renderer/utils/theme.test.tsx@085a34b89b2b7d5f` (2026-04-15):
+```
+/**
+ * Tests for src/renderer/utils/theme.tsx
+ *
+ * Tests theme-related utility functions:
+ * - getContextColor: Returns color based on context usage percentage
+ * - getStatusColor: Returns color based on session state
+ * - formatActiveTime: Formats milliseconds to display string
+ * - getFileIcon: Returns file icon based on change type
+ */
+
+import { describe, it, expect } from 'vitest';
+import { render } from '@testing-library/react';
+import {
+	getContextColor,
+	getStatusColor,
+	formatActiveTime…
+```
+
+**source** `src/__tests__/shared/theme-types.test.ts@a9454482a6a70dd5ad4` (2026-04-15):
+```
+/**
+ * Tests for src/shared/theme-types.ts
+ *
+ * Tests the isValidThemeId type guard function.
+ */
+
+import { describe, it, expect } from 'vitest';
+import { isValidThemeId, type ThemeId } from '../../shared/theme-types';
+
+describe('isValidThemeId', () => {
+	// Sample of valid theme IDs (not exhaustive - that would couple tests to implementation)
+	const sampleValidIds = ['dracula', 'monokai', 'github-light', 'nord', 'pedurple'];
+
+	it('should return true for valid theme IDs', () => {
+		for (const i…
+```
+
+**source** `src/__tests__/renderer/components/UsageDashboard/SourceDistr` (2026-04-15):
+```
+/**
+ * Tests for SourceDistributionChart component
+ *
+ * Verifies:
+ * - Renders donut/pie chart showing Interactive vs Auto breakdown
+ * - Toggle between count-based and duration-based views
+ * - Center label shows total
+ * - Legend with percentages
+ * - Theme-aware colors (accent for interactive, secondary for auto)
+ * - Tooltip shows details on hover
+ * - Handles empty data gracefully
+ */
+
+import { describe, it, expect } from 'vitest';
+import { render, screen, fireEvent } from '@testing-librar…
+```
+
+**source** `src/__tests__/renderer/components/UsageDashboard/ActivityHea` (2026-04-15):
+```
+/**
+ * Tests for ActivityHeatmap component
+ *
+ * Verifies:
+ * - Renders GitHub-style contribution grid
+ * - Displays correct day labels (Sun-Sat)
+ * - Shows color intensity based on count/duration
+ * - Toggle between count and duration modes
+ * - Tooltip shows date and values on hover
+ * - Handles empty data gracefully
+ * - Applies theme colors correctly
+ */
+
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent, within } from '@testing-library/react';
+import Reac…
+```
+
+**source** `src/__tests__/renderer/components/UsageDashboard/AutoRunStat` (2026-04-15):
+```
+/**
+ * Tests for AutoRunStats component
+ *
+ * Verifies:
+ * - Renders all six metric cards correctly
+ * - Displays formatted values (numbers, durations, percentages)
+ * - Shows mini bar chart for tasks over time
+ * - Handles loading, error, and empty states
+ * - Applies theme colors properly
+ * - Calculates derived metrics correctly (avg tasks/session, success rate)
+ * - Tooltip shows on hover
+ */
+
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, …
+```
+
+**source** `src/__tests__/renderer/components/UsageDashboard/AgentCompar` (2026-04-15):
+```
+/**
+ * Tests for AgentComparisonChart component
+ *
+ * Verifies:
+ * - Renders horizontal bar chart comparing agent usage
+ * - Shows correct agent names and values
+ * - Toggle between count and duration modes
+ * - Bars sorted by value descending
+ * - Distinct colors per agent
+ * - Percentage labels on bars
+ * - Tooltip shows details on hover
+ * - Handles empty data gracefully
+ * - Applies theme colors correctly
+ */
+
+import { describe, it, expect } from 'vitest';
+import { render, screen, fireEvent …
+```
+
+**source** `src/__tests__/renderer/components/UsageDashboard/SummaryCard` (2026-04-15):
+```
+/**
+ * Tests for SummaryCards component
+ *
+ * Verifies:
+ * - Renders all ten metric cards correctly
+ * - Displays formatted values (numbers, durations)
+ * - Shows correct icons for each metric
+ * - Applies theme colors properly
+ * - Handles edge cases (empty data, zero values)
+ * - Computes derived metrics correctly (most active agent, interactive ratio)
+ */
+
+import { describe, it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import React from 'react';
+import …
+```
+
+**source** `src/__tests__/renderer/components/UsageDashboard/DurationTre` (2026-04-15):
+```
+/**
+ * Tests for DurationTrendsChart component
+ *
+ * Verifies:
+ * - Renders line chart correctly
+ * - X-axis shows time labels (grouped by day/week)
+ * - Y-axis shows duration labels
+ * - Smoothing toggle works correctly
+ * - Tooltip shows exact values on hover
+ * - Handles empty data gracefully
+ * - Applies theme colors correctly
+ */
+
+import { describe, it, expect } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import React from 'react';
+import { DurationTre…
+```
+
+**source** `src/__tests__/renderer/components/UsageDashboard/chart-perfo` (2026-04-15):
+```
+/**
+ * Performance tests for Usage Dashboard custom chart implementations
+ *
+ * IMPORTANT: This codebase uses CUSTOM SVG charts, NOT the Recharts library.
+ * Despite Recharts being listed in package.json, it is never imported or used.
+ * All charts (DurationTrendsChart, ActivityHeatmap, AgentComparisonChart, SourceDistributionChart)
+ * are implemented with custom SVG/div elements for maximum control and performance.
+ *
+ * These tests verify:
+ * - Large dataset handling (365+ data points for year…
+```
+
+**source** `src/__tests__/renderer/components/UsageDashboard/colorblind-` (2026-04-15):
+```
+/**
+ * Tests for colorblind-friendly palette feature across Usage Dashboard charts
+ *
+ * Verifies:
+ * - Colorblind palette constants are properly defined
+ * - Charts use colorblind palette when colorBlindMode is enabled
+ * - Standard palette is used when colorBlindMode is disabled
+ * - All chart components accept colorBlindMode prop
+ */
+
+import { describe, it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import React from 'react';
+import { AgentComparisonChart…
+```
+
+**git_commit** `a0ae50676268ef0348363d1daba591bb556b56c4` (2026-02-06 by symphony@maestro.dev):
+```
+commit a0ae50676268ef0348363d1daba591bb556b56c4
+Author: Symphony <symphony@maestro.dev>
+Date: 2026-02-06T00:08:26.000Z
+
+MAESTRO: Add comprehensive tests for UnifiedHistoryTab component
+
+Verifies Director's Notes modal unified history: data fetching/aggregation,
+filter toggles (AUTO/USER), activity graph integration, keyboard navigation,
+detail modal open/close/navigation, agent name display, and e…
+```
+
+**git_commit** `f3499ab7f01462fd614cbe0063d07c8690bd2d9a` (2025-12-30 by pedram.amini@gmail.com):
+```
+commit f3499ab7f01462fd614cbe0063d07c8690bd2d9a
+Author: Pedram Amini <pedram.amini@gmail.com>
+Date: 2025-12-30T10:41:36.000Z
+
+POST "https://api.openai.com/v1/responses": 400 Bad Request {     "message": "Invalid 'input[0].content': string too long. Expected a string with maximum length 10485760, but got a string with length 11952519 instead.",     "type": "invalid_request_error",     "param": "inp…
+```
+```
+
+</details>
+
+**Condition A (bare):**
+
+[gemini failed: Command failed: gemini -p "$(cat /tmp/engram-maestro-v3-1776337917290.txt)"
+Error when talking to Gemini API Full report available at: /tmp/gemini-client-error-Turn.run-sendMessageStream-2026-04-16T11-12-03-187Z.json TerminalQuotaError: You have exhausted your capacity on this model. Your quota will reset after 13h28m12s.
+    at classifyGoogleError (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:274494:18)
+    at retryWithBackoff (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:275105:31)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async GeminiChat.makeApiCallAndProcessStream (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:310999:28)
+    at async GeminiChat.streamWithRetries (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:310837:29)
+    at async Turn.run (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:311329:24)
+    at async GeminiClient.processTurn (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:315405:22)
+    at async GeminiClient.sendMessageStream (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:315518:14)
+    at async file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/gemini.js:10168:26
+    at async main (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/gemini.js:15201:5) {
+  cause: {
+    code: 429,
+    message: 'You have exhausted your capacity on this model. Your quota will reset after 13h28m12s.',
+    details: [ [Object], [Object] ]
+  },
+  retryDelayMs: 48492952.611331,
+  reason: 'QUOTA_EXHAUSTED'
+}
+An unexpected critical error occurred:[object Object]
+]
+
+**Condition B (with context pack):**
+
+[gemini failed: Command failed: gemini -p "$(cat /tmp/engram-maestro-v3-1776337923265.txt)"
+Error when talking to Gemini API Full report available at: /tmp/gemini-client-error-Turn.run-sendMessageStream-2026-04-16T11-12-09-004Z.json TerminalQuotaError: You have exhausted your capacity on this model. Your quota will reset after 13h28m7s.
+    at classifyGoogleError (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:274494:18)
+    at retryWithBackoff (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:275105:31)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async GeminiChat.makeApiCallAndProcessStream (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:310999:28)
+    at async GeminiChat.streamWithRetries (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:310837:29)
+    at async Turn.run (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:311329:24)
+    at async GeminiClient.processTurn (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:315405:22)
+    at async GeminiClient.sendMessageStream (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/chunk-ZTFHMKKJ.js:315518:14)
+    at async file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/gemini.js:10168:26
+    at async main (file:///home/rnwolfe/.local/share/mise/installs/node/22.22.2/lib/node_modules/@google/gemini-cli/bundle/gemini.js:15201:5) {
+  cause: {
+    code: 429,
+    message: 'You have exhausted your capacity on this model. Your quota will reset after 13h28m7s.',
+    details: [ [Object], [Object] ]
+  },
+  retryDelayMs: 48487039.676576,
+  reason: 'QUOTA_EXHAUSTED'
+}
+An unexpected critical error occurred:[object Object]
+]
