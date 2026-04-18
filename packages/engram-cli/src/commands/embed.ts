@@ -562,6 +562,8 @@ Examples:
   engram embed --status`,
     )
     .action(async (opts: EmbedOpts) => {
+      intro("engram embed");
+
       const modeCount = [
         opts.reindex,
         opts.fill,
@@ -589,8 +591,6 @@ Examples:
         );
         process.exit(1);
       }
-
-      intro("engram embed");
 
       const dbPath = path.resolve(opts.db);
       let graph: ReturnType<typeof openGraph>;
