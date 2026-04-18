@@ -167,6 +167,10 @@ interface ContextOpts {
   /** Minimum normalized confidence (0.0–1.0) for a discussion hit to be included. */
   minConfidence: number;
   verbose: boolean;
+  /** Hard cap on entities included, applied before the token budget loop. */
+  maxEntities?: number;
+  /** Hard cap on edges included, applied before the token budget loop. */
+  maxEdges?: number;
 }
 
 interface EnrichedEntity {
@@ -989,7 +993,12 @@ async function assembleContextPack(
       : []),
   ];
 
-  for (const row of entityRowsToProcess) {
+  const cappedEntityRows =
+    opts.maxEntities !== undefined
+      ? entityRowsToProcess.slice(0, opts.maxEntities)
+      : entityRowsToProcess;
+
+  for (const row of cappedEntityRows) {
     if (budgetExceeded()) {
       truncated++;
       continue;
@@ -1051,10 +1060,13 @@ async function assembleContextPack(
   }
 
   // Process edge results.
-  const edgeMinRank = Math.min(...edgeRows.map((r) => r.rank), 0);
+  const cappedEdgeRows =
+    opts.maxEdges !== undefined ? edgeRows.slice(0, opts.maxEdges) : edgeRows;
+
+  const edgeMinRank = Math.min(...cappedEdgeRows.map((r) => r.rank), 0);
   const edgeRankRange = Math.abs(edgeMinRank) || 1;
 
-  for (const row of edgeRows) {
+  for (const row of cappedEdgeRows) {
     if (budgetExceeded()) {
       truncated++;
       continue;
@@ -1174,11 +1186,15 @@ async function assembleContextPack(
   // search cannot derive. We add them to the edge section after FTS edges.
   const seenEdgeIds = new Set(edges.map((e) => e.result_id));
   const foundEntityIds = entities.map((e) => e.result_id);
+  const structuralLimit =
+    opts.maxEdges !== undefined
+      ? Math.max(0, opts.maxEdges - edges.length)
+      : 15;
   const structuralRows = fetchStructuralEdges(
     graph,
     foundEntityIds,
     seenEdgeIds,
-    15,
+    structuralLimit,
   );
   for (const row of structuralRows) {
     if (budgetExceeded()) {
@@ -1245,6 +1261,8 @@ interface ContextCommandOpts {
   db: string;
   minConfidence: string;
   verbose: boolean;
+  maxEntities?: string;
+  maxEdges?: string;
 }
 
 export function registerContext(program: Command): void {
@@ -1266,6 +1284,14 @@ export function registerContext(program: Command): void {
       "emit diagnostic notes (e.g. sparse-results hint) to stderr",
       false,
     )
+    .option(
+      "--max-entities <n>",
+      "hard cap on entities included regardless of token budget (default: uncapped)",
+    )
+    .option(
+      "--max-edges <n>",
+      "hard cap on edges included regardless of token budget (default: uncapped)",
+    )
     .addHelpText(
       "after",
       `
@@ -1276,6 +1302,12 @@ Examples:
   # Larger budget for complex queries
   engram context "why was X refactored" --token-budget 16000
 
+  # Limit to exactly 5 entities
+  engram context "auth middleware" --max-entities 5
+
+  # Limit both entities and edges
+  engram context "database schema" --max-entities 5 --max-edges 3
+
   # JSON output for programmatic use
   engram context "database schema" --format json
 
@@ -1283,6 +1315,9 @@ When to use:
   Call before modifying unfamiliar code, answering "why is this written
   this way?", or making multi-file changes. Output is Markdown by default
   for direct injection into CLAUDE.md or agent system prompts.
+
+  Use --max-entities / --max-edges when you need predictable output sizing
+  regardless of token budget (e.g. when injecting into a fixed-size prompt).
 
 See also:
   engram companion   Write a reusable agent prompt fragment
@@ -1316,6 +1351,24 @@ See also:
         process.exit(1);
       }
 
+      let maxEntities: number | undefined;
+      if (opts.maxEntities !== undefined) {
+        maxEntities = parseInt(opts.maxEntities, 10);
+        if (Number.isNaN(maxEntities) || maxEntities < 1) {
+          console.error("Error: --max-entities must be a positive integer");
+          process.exit(1);
+        }
+      }
+
+      let maxEdges: number | undefined;
+      if (opts.maxEdges !== undefined) {
+        maxEdges = parseInt(opts.maxEdges, 10);
+        if (Number.isNaN(maxEdges) || maxEdges < 1) {
+          console.error("Error: --max-edges must be a positive integer");
+          process.exit(1);
+        }
+      }
+
       let graph: EngramGraph | undefined;
       try {
         graph = openGraph(dbPath);
@@ -1332,6 +1385,8 @@ See also:
           format: opts.format as "md" | "json",
           minConfidence,
           verbose: opts.verbose,
+          maxEntities,
+          maxEdges,
         });
 
         if (opts.format === "json") {
