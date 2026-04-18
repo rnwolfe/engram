@@ -224,14 +224,19 @@ function collectEmbedding(graph: EngramGraph): EmbeddingSection {
     provider = "google";
   } else if (aiProvider === "openai") {
     provider = "openai";
-  } else if (aiProvider === "null" || aiProvider === "none") {
+  } else if (aiProvider === "none") {
     provider = "none";
   } else {
-    // Auto-detect from stored model name heuristics
+    // ENGRAM_AI_PROVIDER not set ("null") or unrecognised — auto-detect from stored model + available API keys
     const modelName = stored?.model ?? "";
-    if (modelName.startsWith("nomic") || modelName.startsWith("mxbai")) {
+    if (modelName.startsWith("nomic") || modelName.startsWith("mxbai") || modelName.startsWith("all-minilm")) {
       provider = "ollama";
       providerEndpoint = ollamaEndpoint;
+    } else if (
+      (modelName.startsWith("gemini-") || modelName === "text-embedding-004" || modelName.startsWith("models/")) &&
+      (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY)
+    ) {
+      provider = "google";
     } else {
       provider = "none";
     }
@@ -480,7 +485,9 @@ function printHuman(status: StatusOutput, noVerify: boolean): void {
   if (embedding.provider === "ollama") {
     providerLine = `ollama @ ${embedding.providerEndpoint}${reachIcon(embedding.reachability)}`;
   } else if (embedding.provider === "none") {
-    providerLine = "none (set ENGRAM_AI_PROVIDER)";
+    providerLine = embedding.model
+      ? "none (set ENGRAM_AI_PROVIDER or the matching API key)"
+      : "none (set ENGRAM_AI_PROVIDER)";
   } else {
     providerLine = `${embedding.provider}${reachIcon(embedding.reachability)}`;
   }
@@ -492,6 +499,18 @@ function printHuman(status: StatusOutput, noVerify: boolean): void {
     `  Coverage:        entities ${ec.withEmbedding}/${ec.total} (${pct(ec.withEmbedding, ec.total)})` +
       `  ·  episodes ${epc.withEmbedding}/${epc.total} (${pct(epc.withEmbedding, epc.total)})`,
   );
+  const missingEntities = ec.total - ec.withEmbedding;
+  const missingEpisodes = epc.total - epc.withEmbedding;
+  if (missingEntities > 0 || missingEpisodes > 0) {
+    const parts: string[] = [];
+    if (missingEntities > 0) parts.push(`${missingEntities} entities`);
+    if (missingEpisodes > 0) parts.push(`${missingEpisodes} episodes`);
+    const hint =
+      embedding.provider === "none"
+        ? `set ENGRAM_AI_PROVIDER, then run engram embed --fill`
+        : `run engram embed --fill to fill the gap`;
+    console.log(`  Gap:             ${parts.join(", ")} missing — ${hint}`);
+  }
   console.log();
 
   // Generation
