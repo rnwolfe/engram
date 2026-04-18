@@ -11,7 +11,12 @@ import type {
   OwnershipReport,
   OwnershipRiskEntry,
 } from "engram-core";
-import { closeGraph, getOwnershipReport, openGraph } from "engram-core";
+import {
+  closeGraph,
+  getOwnershipReport,
+  openGraph,
+  resolveDbPath,
+} from "engram-core";
 
 interface OwnershipOpts {
   limit: string;
@@ -135,7 +140,7 @@ See also:
   engram stats     quick count of graph contents`,
     )
     .action((opts: OwnershipOpts) => {
-      const dbPath = path.resolve(opts.db);
+      const dbPath = resolveDbPath(path.resolve(opts.db));
       const limit = parseInt(opts.limit, 10);
       const minConfidence = parseFloat(opts.minConfidence);
       const format = opts.format;

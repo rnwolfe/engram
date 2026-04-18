@@ -1,10 +1,16 @@
 /**
- * Tests for the .engram format lifecycle: createGraph, openGraph, closeGraph.
+ * Tests for the .engram format lifecycle: createGraph, openGraph, closeGraph, resolveDbPath.
  */
 
 import { Database } from "bun:sqlite";
 import { afterEach, describe, expect, it } from "bun:test";
-import { existsSync, unlinkSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -12,6 +18,7 @@ import {
   createGraph,
   EngramFormatError,
   openGraph,
+  resolveDbPath,
 } from "../../src/format/index.js";
 import { ENGINE_VERSION, FORMAT_VERSION } from "../../src/index.js";
 
@@ -437,5 +444,55 @@ describe("FTS5 triggers", () => {
 
     expect(hits.length).toBeGreaterThan(0);
     closeGraph(graph);
+  });
+});
+
+describe("resolveDbPath", () => {
+  let tmpDir: string;
+
+  afterEach(() => {
+    if (tmpDir && existsSync(tmpDir)) {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns <input>/engram.db when input is a directory", () => {
+    tmpDir = mkdtempSync(join(tmpdir(), "engram-test-resolve-dir-"));
+    const result = resolveDbPath(tmpDir);
+    expect(result).toBe(join(tmpDir, "engram.db"));
+  });
+
+  it("returns <input>/engram.db when input does not exist (new DB)", () => {
+    const nonExistent = join(
+      tmpdir(),
+      `engram-test-noexist-${crypto.randomUUID()}`,
+    );
+    const result = resolveDbPath(nonExistent);
+    expect(result).toBe(join(nonExistent, "engram.db"));
+  });
+
+  it("returns input as-is and emits deprecation warning for flat file", () => {
+    tmpDir = mkdtempSync(join(tmpdir(), "engram-test-resolve-flat-"));
+    const flatFile = join(tmpDir, "mydb.engram");
+    writeFileSync(flatFile, "");
+
+    const stderrWrites: string[] = [];
+    const originalWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (
+      chunk: string | Uint8Array,
+      ..._args: unknown[]
+    ) => {
+      if (typeof chunk === "string") stderrWrites.push(chunk);
+      return true;
+    };
+
+    try {
+      const result = resolveDbPath(flatFile);
+      expect(result).toBe(flatFile);
+      expect(stderrWrites.some((w) => w.includes("warning:"))).toBe(true);
+      expect(stderrWrites.some((w) => w.includes("flat file"))).toBe(true);
+    } finally {
+      process.stderr.write = originalWrite;
+    }
   });
 });

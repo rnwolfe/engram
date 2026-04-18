@@ -28,6 +28,7 @@ import {
   ProjectionFrontmatterError,
   ProjectionInputMissingError,
   project,
+  resolveDbPath,
 } from "engram-core";
 
 interface ProjectOpts {
@@ -274,7 +275,7 @@ See also:
         throw err;
       }
 
-      const dbPath = path.resolve(opts.db);
+      const dbPath = resolveDbPath(path.resolve(opts.db));
 
       // ── Open graph ──────────────────────────────────────────────────────────
       let graph: EngramGraph | undefined;

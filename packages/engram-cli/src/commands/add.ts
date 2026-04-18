@@ -9,7 +9,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { Command } from "commander";
 import type { EngramGraph } from "engram-core";
-import { addEpisode, closeGraph, openGraph } from "engram-core";
+import { addEpisode, closeGraph, openGraph, resolveDbPath } from "engram-core";
 
 interface AddOpts {
   file?: string;
@@ -41,7 +41,7 @@ See also:
   engram verify       check graph integrity after manual additions`,
     )
     .action((content: string | undefined, opts: AddOpts) => {
-      const dbPath = path.resolve(opts.db);
+      const dbPath = resolveDbPath(path.resolve(opts.db));
 
       let episodeContent: string;
 

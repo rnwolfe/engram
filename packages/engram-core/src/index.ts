@@ -59,6 +59,7 @@ export {
   EngramFormatError,
   migrate_0_1_0_to_0_2_0,
   openGraph,
+  resolveDbPath,
   SCHEMA_DDL,
   verifyGraph,
 } from "./format/index.js";

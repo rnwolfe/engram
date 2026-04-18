@@ -8,7 +8,7 @@
 import * as path from "node:path";
 import type { Command } from "commander";
 import type { EngramGraph } from "engram-core";
-import { closeGraph, openGraph } from "engram-core";
+import { closeGraph, openGraph, resolveDbPath } from "engram-core";
 
 interface VerifyOpts {
   db: string;
@@ -42,7 +42,7 @@ See also:
   engram decay   surface stale or orphaned knowledge`,
     )
     .action((opts: VerifyOpts) => {
-      const dbPath = path.resolve(opts.db);
+      const dbPath = resolveDbPath(path.resolve(opts.db));
 
       let graph: EngramGraph | undefined;
       try {

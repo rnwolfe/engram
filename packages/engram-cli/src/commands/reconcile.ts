@@ -14,7 +14,13 @@ import * as path from "node:path";
 import { intro, log, outro, spinner } from "@clack/prompts";
 import type { Command } from "commander";
 import type { EngramGraph } from "engram-core";
-import { closeGraph, createGenerator, openGraph, reconcile } from "engram-core";
+import {
+  closeGraph,
+  createGenerator,
+  openGraph,
+  reconcile,
+  resolveDbPath,
+} from "engram-core";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -92,7 +98,7 @@ See also:
 
       // ── Reset cursor (no other flags required) ──────────────────────────────
       if (opts.resetCursor) {
-        const dbPath = path.resolve(opts.db);
+        const dbPath = resolveDbPath(path.resolve(opts.db));
         let graph: EngramGraph | undefined;
         try {
           graph = openGraph(dbPath);
@@ -167,7 +173,7 @@ See also:
       }
 
       // ── Open graph ──────────────────────────────────────────────────────────
-      const dbPath = path.resolve(opts.db);
+      const dbPath = resolveDbPath(path.resolve(opts.db));
       let graph: EngramGraph | undefined;
       try {
         graph = openGraph(dbPath);
