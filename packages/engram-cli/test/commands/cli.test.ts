@@ -7,7 +7,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { Command } from "commander";
-import { addEntity, addEpisode, createGraph } from "engram-core";
+import { addEdge, addEntity, addEpisode, createGraph } from "engram-core";
 import { registerAdd } from "../../src/commands/add.js";
 import { registerDecay } from "../../src/commands/decay.js";
 import { registerExport } from "../../src/commands/export.js";
@@ -636,6 +636,183 @@ describe("engram show", () => {
       const output = logs.join("\n");
       expect(output).toContain("TestModule");
       expect(output).toContain(entity.id);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("engram history", () => {
+  function makeDbWithEdge(dbPath: string) {
+    const graph = createGraph(dbPath);
+    const ep = addEpisode(graph, {
+      source_type: "manual",
+      content: "history test episode",
+      timestamp: new Date().toISOString(),
+    });
+    const ev = [{ episode_id: ep.id, extractor: "test", confidence: 1 }];
+    const e1 = addEntity(
+      graph,
+      { canonical_name: "Alpha", entity_type: "module" },
+      ev,
+    );
+    const e2 = addEntity(
+      graph,
+      { canonical_name: "Beta", entity_type: "module" },
+      ev,
+    );
+    addEdge(
+      graph,
+      {
+        source_id: e1.id,
+        target_id: e2.id,
+        relation_type: "depends_on",
+        edge_kind: "observed",
+        fact: "Alpha depends on Beta",
+      },
+      ev,
+    );
+    graph.db.close();
+    return { e1, e2 };
+  }
+
+  it("default text output is unchanged", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      const { e1 } = makeDbWithEdge(dbPath);
+      const program = makeProgram();
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => logs.push(args.join(" "));
+      try {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "history",
+          e1.id,
+          "--db",
+          dbPath,
+        ]);
+      } finally {
+        console.log = origLog;
+      }
+      const output = logs.join("\n");
+      expect(output).toContain("History:");
+      expect(output).toContain("Alpha");
+      expect(output).toContain("fact(s)");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("--format json emits full temporal fields for single entity", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      const { e1 } = makeDbWithEdge(dbPath);
+      const program = makeProgram();
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => logs.push(args.join(" "));
+      try {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "history",
+          e1.id,
+          "--format",
+          "json",
+          "--db",
+          dbPath,
+        ]);
+      } finally {
+        console.log = origLog;
+      }
+      const parsed = JSON.parse(logs.join("\n"));
+      expect(parsed.entity1).toBe("Alpha");
+      expect(parsed.entity2).toBeNull();
+      expect(Array.isArray(parsed.edges)).toBe(true);
+      expect(parsed.edges.length).toBeGreaterThanOrEqual(1);
+      const edge = parsed.edges[0];
+      expect(typeof edge.id).toBe("string");
+      expect(typeof edge.fact).toBe("string");
+      expect(typeof edge.edge_kind).toBe("string");
+      expect(typeof edge.relation_type).toBe("string");
+      expect("valid_from" in edge).toBe(true);
+      expect("valid_until" in edge).toBe(true);
+      expect("invalidated_at" in edge).toBe(true);
+      expect("superseded_by" in edge).toBe(true);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("--format json emits pairwise edge history", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      const { e1, e2 } = makeDbWithEdge(dbPath);
+      const program = makeProgram();
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => logs.push(args.join(" "));
+      try {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "history",
+          e1.id,
+          e2.id,
+          "--format",
+          "json",
+          "--db",
+          dbPath,
+        ]);
+      } finally {
+        console.log = origLog;
+      }
+      const parsed = JSON.parse(logs.join("\n"));
+      expect(parsed.entity1).toBe("Alpha");
+      expect(parsed.entity2).toBe("Beta");
+      expect(Array.isArray(parsed.edges)).toBe(true);
+      expect(parsed.edges.length).toBeGreaterThanOrEqual(1);
+      expect(parsed.edges[0].fact).toContain("Alpha");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("exits 1 on invalid --format value", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      createGraph(dbPath).db.close();
+      const program = makeProgram();
+      const errors: string[] = [];
+      const origErr = console.error;
+      console.error = (...args: unknown[]) => errors.push(args.join(" "));
+      let exitCode: number | undefined;
+      const origExit = process.exit;
+      process.exit = (code?: number) => {
+        exitCode = code;
+        throw new Error(`process.exit(${code})`);
+      };
+      try {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "history",
+          "anything",
+          "--format",
+          "xml",
+          "--db",
+          dbPath,
+        ]);
+      } catch {
+        // expected — process.exit throws
+      } finally {
+        console.error = origErr;
+        process.exit = origExit;
+      }
+      expect(exitCode).toBe(1);
+      expect(errors.join("\n")).toContain("--format must be 'text' or 'json'");
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
