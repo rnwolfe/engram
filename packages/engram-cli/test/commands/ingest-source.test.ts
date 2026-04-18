@@ -185,6 +185,46 @@ describe("engram ingest source", () => {
     expect(activeEpisodeCount()).toBe(countAfterFirst);
   }, 15_000);
 
+  test("--dry-run exits 1 when parse errors occur", async () => {
+    writeFile("src/bad.ts", "export function (@@@@) {}");
+
+    const { exitCode, output } = await runIngestSource([
+      path.join(tmpDir, "src"),
+      "--dry-run",
+      "--db",
+      dbPath,
+    ]);
+
+    expect(output).toContain("Errors:");
+    expect(exitCode).toBe(1);
+  }, 15_000);
+
+  test("--dry-run exits 0 on a clean run with no errors", async () => {
+    writeFile("src/a.ts", "export const a = 1;");
+
+    const { exitCode } = await runIngestSource([
+      path.join(tmpDir, "src"),
+      "--dry-run",
+      "--db",
+      dbPath,
+    ]);
+
+    expect(exitCode).toBeUndefined();
+  }, 15_000);
+
+  test("real ingest exits 0 even with per-file parse errors", async () => {
+    writeFile("src/a.ts", "export const a = 1;");
+    writeFile("src/bad.ts", "export function (@@@@) {}");
+
+    const { exitCode } = await runIngestSource([
+      path.join(tmpDir, "src"),
+      "--db",
+      dbPath,
+    ]);
+
+    expect(exitCode).toBeUndefined();
+  }, 15_000);
+
   test("summary block always shows counts", async () => {
     writeFile("src/a.ts", "export const a = 1;");
 

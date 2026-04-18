@@ -284,6 +284,8 @@ See also:
       const s = opts.verbose ? undefined : spinner();
       if (s) s.start(`Scanning ${resolvedSource}`);
 
+      let dryRunHadErrors = false;
+
       try {
         const result = await ingestSource(graph, {
           root: resolvedSource,
@@ -320,6 +322,9 @@ See also:
             errLines.push(`  … and ${result.errors.length - 10} more`);
           }
           log.warn(`Per-file errors (not fatal):\n${errLines.join("\n")}`);
+          if (opts.dryRun) {
+            dryRunHadErrors = true;
+          }
         }
       } catch (err) {
         if (s) s.stop("Source ingestion failed");
@@ -332,6 +337,10 @@ See also:
 
       closeGraph(graph);
       outro("Done");
+
+      if (dryRunHadErrors) {
+        process.exit(1);
+      }
     });
 
   // ingest enrich github
