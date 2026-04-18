@@ -208,6 +208,82 @@ describe("engram stats", () => {
 });
 
 describe("engram search", () => {
+  it("exits 1 on invalid --format value without opening the graph", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      createGraph(dbPath).db.close();
+      const program = makeProgram();
+      const errors: string[] = [];
+      const origErr = console.error;
+      console.error = (...args: unknown[]) => errors.push(args.join(" "));
+      let exitCode: number | undefined;
+      const origExit = process.exit;
+      process.exit = (code?: number) => {
+        exitCode = code;
+        throw new Error(`process.exit(${code})`);
+      };
+      try {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "search",
+          "query",
+          "--format",
+          "bad",
+          "--db",
+          dbPath,
+        ]);
+      } catch {
+        // expected — process.exit throws
+      } finally {
+        console.error = origErr;
+        process.exit = origExit;
+      }
+      expect(exitCode).toBe(1);
+      expect(errors.join("\n")).toContain("--format must be 'text' or 'json'");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("exits 1 on invalid --limit value", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      createGraph(dbPath).db.close();
+      const program = makeProgram();
+      const errors: string[] = [];
+      const origErr = console.error;
+      console.error = (...args: unknown[]) => errors.push(args.join(" "));
+      let exitCode: number | undefined;
+      const origExit = process.exit;
+      process.exit = (code?: number) => {
+        exitCode = code;
+        throw new Error(`process.exit(${code})`);
+      };
+      try {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "search",
+          "query",
+          "--limit",
+          "0",
+          "--db",
+          dbPath,
+        ]);
+      } catch {
+        // expected — process.exit throws
+      } finally {
+        console.error = origErr;
+        process.exit = origExit;
+      }
+      expect(exitCode).toBe(1);
+      expect(errors.join("\n")).toContain("--limit must be a positive integer");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
   it("outputs text (no JSON) by default on empty graph", async () => {
     const { tmpDir, dbPath } = tmpDb();
     try {
