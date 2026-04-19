@@ -9,6 +9,7 @@ import { createHash } from "node:crypto";
 import type { EngramGraph } from "../format/index.js";
 import { ENGINE_VERSION } from "../format/version.js";
 import { addEpisode } from "../graph/episodes.js";
+import { EPISODE_SOURCE_TYPES } from "../vocab/index.js";
 import type { IngestResult } from "./git.js";
 
 // ---------------------------------------------------------------------------
@@ -69,7 +70,7 @@ export async function ingestText(
       .query<{ id: string }, [string, string]>(
         "SELECT id FROM episodes WHERE source_type = ? AND source_ref = ?",
       )
-      .get("manual", opts.source_ref);
+      .get(EPISODE_SOURCE_TYPES.MANUAL, opts.source_ref);
 
     if (existing) {
       counts.episodesSkipped++;
@@ -80,7 +81,7 @@ export async function ingestText(
   // Callers who want strict dedup should provide source_ref.
 
   addEpisode(graph, {
-    source_type: "manual",
+    source_type: EPISODE_SOURCE_TYPES.MANUAL,
     source_ref: opts.source_ref,
     content,
     actor: opts.actor,
