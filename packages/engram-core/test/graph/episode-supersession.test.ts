@@ -210,6 +210,39 @@ describe("supersedeEpisode transaction atomicity", () => {
     expect(getEpisode(graph, replacement.id)).not.toBeNull();
     expect(getEpisode(graph, prior.id)?.superseded_by).toBe(replacement.id);
   });
+
+  test("UPDATE is rolled back when INSERT fails due to unique constraint collision", () => {
+    const prior = addEpisode(graph, {
+      source_type: "git",
+      source_ref: "ref-rollback",
+      content: "original",
+      timestamp: "2024-01-01T00:00:00Z",
+    });
+
+    // Insert a competing non-superseded episode with the same (source_type, source_ref)
+    // as the one supersedeEpisode will try to INSERT. This causes the INSERT to fail
+    // with a unique constraint violation after the UPDATE has already run in the same
+    // transaction, so the whole transaction must be rolled back.
+    graph.db.run(
+      `INSERT INTO episodes (id, source_type, source_ref, content, content_hash, status, timestamp, ingested_at, extractor_version)
+       VALUES ('competing-id', 'git', 'ref-rollback-v2', 'other', 'deadbeef', 'active', datetime('now'), datetime('now'), '0.0.0')`,
+    );
+
+    // supersedeEpisode should throw because a non-superseded episode already exists
+    // for (git, ref-rollback-v2)
+    expect(() =>
+      supersedeEpisode(graph, prior.id, {
+        source_type: "git",
+        source_ref: "ref-rollback-v2",
+        content: "collision attempt",
+        timestamp: "2024-01-02T00:00:00Z",
+      }),
+    ).toThrow();
+
+    // The prior's superseded_by must remain NULL — the UPDATE was rolled back
+    const updatedPrior = getEpisode(graph, prior.id);
+    expect(updatedPrior?.superseded_by).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
