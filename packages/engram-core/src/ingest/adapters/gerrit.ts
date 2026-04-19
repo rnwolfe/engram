@@ -24,7 +24,12 @@ import {
   INGESTION_SOURCE_TYPES,
   RELATION_TYPES,
 } from "../../vocab/index.js";
-import type { EnrichmentAdapter, EnrichOpts } from "../adapter.js";
+import type {
+  AuthCredential,
+  EnrichmentAdapter,
+  EnrichOpts,
+  ScopeSchema,
+} from "../adapter.js";
 import { EnrichmentAdapterError } from "../adapter.js";
 import type { IngestResult } from "../git.js";
 
@@ -457,12 +462,22 @@ function ingestChange(
 // GerritAdapter
 // ---------------------------------------------------------------------------
 
+const GERRIT_SCOPE_SCHEMA: ScopeSchema = {
+  description:
+    "Gerrit project name (e.g. 'chromium/src'). Slash-separated path components are allowed.",
+  validate(scope: string): string | null {
+    if (!scope) return "scope is required";
+    if (!/^[\w/.-]+$/.test(scope))
+      return `expected a Gerrit project name (e.g. 'myorg/myproject'), got: '${scope}'`;
+    return null;
+  },
+};
+
 export class GerritAdapter implements EnrichmentAdapter {
   name = "gerrit";
   kind = "enrichment";
-  /** @experimental */
-  supportsAuth: string[] = ["token", "none"];
-  /** @experimental */
+  supportedAuth: AuthCredential["kind"][] = ["basic", "bearer", "none"];
+  scopeSchema: ScopeSchema = GERRIT_SCOPE_SCHEMA;
   supportsCursor = true;
 
   private fetchFn: FetchFn;
@@ -472,17 +487,33 @@ export class GerritAdapter implements EnrichmentAdapter {
   }
 
   async enrich(graph: EngramGraph, opts: EnrichOpts): Promise<IngestResult> {
-    const project = opts.repo;
+    // v2 fields take precedence; fall back to deprecated v1 fields
+    const project = opts.scope ?? opts.repo;
     if (!project) {
       throw new Error(
-        "GerritAdapter: opts.repo is required (Gerrit project name)",
+        "GerritAdapter: opts.scope is required (Gerrit project name)",
       );
     }
 
     const endpoint = (
       opts.endpoint ?? "https://gerrit-review.googlesource.com"
     ).replace(/\/$/, "");
-    const token = opts.token;
+
+    // Resolve token from v2 auth credential or deprecated v1 token field.
+    // Gerrit uses HTTP Basic auth: "user:password" encoded.
+    let token: string | undefined;
+    const auth = opts.auth;
+    if (auth) {
+      if (auth.kind === "basic") {
+        token = `${auth.username}:${auth.secret}`;
+      } else if (auth.kind === "bearer") {
+        token = auth.token;
+      }
+      // 'none' → token remains undefined
+    } else if (opts.token) {
+      token = opts.token;
+    }
+
     const sourceScope = `${endpoint}/${project}`;
 
     const runId = opts.dryRun ? "" : createIngestionRun(graph, sourceScope).id;

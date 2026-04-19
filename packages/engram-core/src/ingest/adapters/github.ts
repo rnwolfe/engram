@@ -20,7 +20,12 @@ import {
   INGESTION_SOURCE_TYPES,
   RELATION_TYPES,
 } from "../../vocab/index.js";
-import type { EnrichmentAdapter, EnrichOpts } from "../adapter.js";
+import type {
+  AuthCredential,
+  EnrichmentAdapter,
+  EnrichOpts,
+  ScopeSchema,
+} from "../adapter.js";
 import { EnrichmentAdapterError } from "../adapter.js";
 import { BUILT_IN_PATTERNS, resolveReferences } from "../cross-ref/index.js";
 import type { IngestResult } from "../git.js";
@@ -532,12 +537,21 @@ function ingestIssue(
 // GitHubAdapter
 // ---------------------------------------------------------------------------
 
+const GITHUB_SCOPE_SCHEMA: ScopeSchema = {
+  description: "Repository in 'owner/repo' format (e.g. 'acme/my-repo')",
+  validate(scope: string): string | null {
+    if (!scope) return "scope is required";
+    if (!REPO_RE.test(scope))
+      return `expected 'owner/repo' format, got: '${scope}'`;
+    return null;
+  },
+};
+
 export class GitHubAdapter implements EnrichmentAdapter {
   name = "github";
   kind = "enrichment";
-  /** @experimental */
-  supportsAuth: string[] = ["token", "none"];
-  /** @experimental */
+  supportedAuth: AuthCredential["kind"][] = ["bearer", "none"];
+  scopeSchema: ScopeSchema = GITHUB_SCOPE_SCHEMA;
   supportsCursor = true;
 
   /**
@@ -551,14 +565,30 @@ export class GitHubAdapter implements EnrichmentAdapter {
   }
 
   async enrich(graph: EngramGraph, opts: EnrichOpts): Promise<IngestResult> {
-    const repo = opts.repo;
+    // v2 fields take precedence; fall back to deprecated v1 fields
+    const repo = opts.scope ?? opts.repo;
     if (!repo) {
-      throw new Error("GitHubAdapter: opts.repo is required (owner/repo)");
+      throw new Error(
+        "GitHubAdapter: opts.scope is required (owner/repo format)",
+      );
     }
     validateRepo(repo);
 
     const endpoint = opts.endpoint ?? "https://api.github.com";
-    const token = opts.token;
+
+    // Resolve token from v2 auth credential or deprecated v1 token field
+    let token: string | undefined;
+    const auth = opts.auth;
+    if (auth) {
+      if (auth.kind === "bearer") {
+        token = auth.token;
+      } else if (auth.kind === "oauth2") {
+        token = auth.token;
+      }
+      // 'none' → token remains undefined
+    } else if (opts.token) {
+      token = opts.token;
+    }
 
     const run = createIngestionRun(graph, repo);
     const runId = run.id;

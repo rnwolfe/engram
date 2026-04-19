@@ -36,8 +36,11 @@ describe("EnrichmentAdapter contract — runtime shape", () => {
     assertAdapterShape(a, "GitHubAdapter");
     expect(a.name).toBe("github");
     expect(a.kind).toBe("enrichment");
-    expect(Array.isArray(a.supportsAuth)).toBe(true);
-    expect(a.supportsAuth).toContain("token");
+    expect(Array.isArray(a.supportedAuth)).toBe(true);
+    expect(a.supportedAuth).toContain("bearer");
+    expect(a.supportedAuth).toContain("none");
+    expect(typeof a.scopeSchema).toBe("object");
+    expect(typeof a.scopeSchema.validate).toBe("function");
     expect(a.supportsCursor).toBe(true);
   });
 
@@ -46,8 +49,10 @@ describe("EnrichmentAdapter contract — runtime shape", () => {
     assertAdapterShape(a, "GerritAdapter");
     expect(a.name).toBe("gerrit");
     expect(a.kind).toBe("enrichment");
-    expect(Array.isArray(a.supportsAuth)).toBe(true);
-    expect(a.supportsAuth).toContain("none");
+    expect(Array.isArray(a.supportedAuth)).toBe(true);
+    expect(a.supportedAuth).toContain("none");
+    expect(typeof a.scopeSchema).toBe("object");
+    expect(typeof a.scopeSchema.validate).toBe("function");
     expect(a.supportsCursor).toBe(true);
   });
 });

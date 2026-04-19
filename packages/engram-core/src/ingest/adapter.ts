@@ -3,9 +3,12 @@
  *
  * ## Contract axes
  *
- * **Auth**: Adapters declare which auth schemes they support via `supportsAuth`.
- * Credentials (tokens, OAuth) are always passed through `EnrichOpts` at call time
- * and MUST never be written into the graph.
+ * **Auth**: Adapters declare which auth schemes they support via `supportedAuth`.
+ * Credentials are always passed through `EnrichOpts.auth` at call time and MUST
+ * never be written into the graph.
+ *
+ * **Scope**: Adapters declare a `scopeSchema` with a description and validator.
+ * The CLI calls `scopeSchema.validate()` before opening the graph.
  *
  * **Pagination / cursor semantics**: Adapters that support resume from a prior
  * run declare `supportsCursor: true`. The cursor value is an opaque string stored
@@ -33,6 +36,56 @@ import type { EngramGraph } from "../format/index.js";
 import type { IngestResult } from "./git.js";
 
 // ---------------------------------------------------------------------------
+// Auth credential union (v2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Typed credential passed to `enrich()` via `opts.auth`.
+ * Adapters declare which kinds they accept via `supportedAuth`.
+ * NEVER store these in the graph.
+ * @stable
+ */
+export type AuthCredential =
+  | { kind: "none" }
+  | { kind: "bearer"; token: string }
+  | { kind: "basic"; username: string; secret: string }
+  | { kind: "service_account"; keyJson: string }
+  | {
+      kind: "oauth2";
+      token: string;
+      scopes: string[];
+      /**
+       * Optional refresh callback. When the adapter receives a 401/403 and
+       * `refresh` is present, it MUST call `refresh()` once, swap the returned
+       * token in, and retry. If the retry fails too, throw `auth_failure`.
+       * Adapters without a refresh callback surface `auth_failure` immediately.
+       */
+      refresh?: () => Promise<string>;
+    };
+
+// ---------------------------------------------------------------------------
+// Scope schema
+// ---------------------------------------------------------------------------
+
+/**
+ * Per-adapter scope validator. The CLI calls `validate()` before `enrich()`.
+ * @stable
+ */
+export interface ScopeSchema {
+  /**
+   * Human-readable description of the expected scope format.
+   * Shown to users on validation failure.
+   */
+  description: string;
+
+  /**
+   * Validate the scope string. Returns `null` on success, or an error message
+   * string on failure (no stack traces — plain English only).
+   */
+  validate(scope: string): string | null;
+}
+
+// ---------------------------------------------------------------------------
 // Progress reporting
 // ---------------------------------------------------------------------------
 
@@ -57,10 +110,17 @@ export interface EnrichProgress {
 
 export interface EnrichOpts {
   /**
-   * Auth token for the remote API. NEVER stored in the graph.
-   * Optional — omit for public repositories (unauthenticated, 60 req/hr).
-   * Required for private repositories.
+   * Typed auth credential constructed by the CLI from flags/env.
+   * Replaces the legacy `token` field. NEVER stored in the graph.
    * @stable
+   */
+  auth?: AuthCredential;
+
+  /**
+   * Auth token for the remote API. NEVER stored in the graph.
+   * @deprecated Use `auth: { kind: 'bearer', token }` instead.
+   * Accepted for one minor version for backwards-compat; normalised to `auth`
+   * by adapters when `auth` is absent.
    */
   token?: string;
 
@@ -77,10 +137,27 @@ export interface EnrichOpts {
   endpoint?: string;
 
   /**
-   * Repository or project identifier (format is adapter-specific, e.g. 'owner/repo' for GitHub).
+   * Adapter-specific scope identifier (e.g. 'owner/repo' for GitHub,
+   * project name for Gerrit). Replaces the legacy `repo` field.
+   * Validated against `adapter.scopeSchema` before `enrich()` is called.
    * @stable
    */
+  scope?: string;
+
+  /**
+   * Repository or project identifier.
+   * @deprecated Use `scope` instead.
+   * Normalised to `scope` by adapters when `scope` is absent.
+   */
   repo?: string;
+
+  /**
+   * Opaque resume cursor from the previous run. Adapters read their own
+   * cursor from `ingestion_runs` — this field is reserved for future use
+   * where the caller wants to force a specific resume point.
+   * @experimental
+   */
+  cursor?: string;
 
   /**
    * When true, the adapter MUST skip all writes and return a result describing
@@ -116,11 +193,18 @@ export interface EnrichmentAdapter {
   kind: string;
 
   /**
-   * List of auth schemes the adapter supports.
-   * Values: 'token' | 'oauth' | 'none'.
-   * @experimental
+   * Auth kinds this adapter accepts.
+   * Values: 'none' | 'bearer' | 'basic' | 'service_account' | 'oauth2'.
+   * @stable
    */
-  supportsAuth?: string[];
+  supportedAuth: AuthCredential["kind"][];
+
+  /**
+   * Scope format description and validator.
+   * The CLI calls `scopeSchema.validate(scope)` before `enrich()`.
+   * @stable
+   */
+  scopeSchema: ScopeSchema;
 
   /**
    * Whether the adapter supports resume from a stored cursor.

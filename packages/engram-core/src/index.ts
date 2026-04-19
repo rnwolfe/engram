@@ -138,9 +138,11 @@ export {
   supersedeProjection,
 } from "./graph/index.js";
 export type {
+  AuthCredential,
   EnrichmentAdapter,
   EnrichOpts,
   EnrichProgress,
+  ScopeSchema,
 } from "./ingest/adapter.js";
 export { EnrichmentAdapterError } from "./ingest/adapter.js";
 export { GerritAdapter } from "./ingest/adapters/gerrit.js";
