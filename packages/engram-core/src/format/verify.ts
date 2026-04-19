@@ -5,13 +5,12 @@
  * valid = true means no error-severity violations (warnings are acceptable).
  */
 
-import {
-  ENTITY_TYPES,
-  EPISODE_SOURCE_TYPES,
-  INGESTION_SOURCE_TYPES,
-  RELATION_TYPES,
-} from "../vocab/index.js";
 import type { EngramGraph } from "./graph.js";
+import {
+  checkEpisodeDanglingSupersededBy,
+  checkEpisodeFanIn,
+  checkVocab,
+} from "./verify-episodes.js";
 import { FORMAT_VERSION, MIN_READABLE_VERSION } from "./version.js";
 
 function compareSemver(a: string, b: string): number {
@@ -395,87 +394,6 @@ function checkActiveEdgeOverlaps(graph: EngramGraph): Violation[] {
   }));
 }
 
-const KNOWN_ENTITY_TYPES = new Set(Object.values(ENTITY_TYPES));
-const KNOWN_EPISODE_SOURCE_TYPES = new Set(Object.values(EPISODE_SOURCE_TYPES));
-const KNOWN_INGESTION_SOURCE_TYPES = new Set(
-  Object.values(INGESTION_SOURCE_TYPES),
-);
-const KNOWN_RELATION_TYPES = new Set(Object.values(RELATION_TYPES));
-
-function checkVocab(graph: EngramGraph): Violation[] {
-  const violations: Violation[] = [];
-
-  // entities.entity_type
-  const entityRows = graph.db
-    .query<{ id: string; entity_type: string }, []>(
-      "SELECT id, entity_type FROM entities",
-    )
-    .all();
-  for (const row of entityRows) {
-    if (!KNOWN_ENTITY_TYPES.has(row.entity_type)) {
-      violations.push({
-        check: "checkVocab",
-        entity_or_edge_id: row.id,
-        message: `Entity '${row.id}' has unknown entity_type '${row.entity_type}' (not in ENTITY_TYPES registry)`,
-        severity: "warning",
-      });
-    }
-  }
-
-  // episodes.source_type
-  const episodeRows = graph.db
-    .query<{ id: string; source_type: string }, []>(
-      "SELECT id, source_type FROM episodes WHERE status != 'redacted'",
-    )
-    .all();
-  for (const row of episodeRows) {
-    if (!KNOWN_EPISODE_SOURCE_TYPES.has(row.source_type)) {
-      violations.push({
-        check: "checkVocab",
-        entity_or_edge_id: row.id,
-        message: `Episode '${row.id}' has unknown source_type '${row.source_type}' (not in EPISODE_SOURCE_TYPES registry)`,
-        severity: "warning",
-      });
-    }
-  }
-
-  // ingestion_runs.source_type
-  const runRows = graph.db
-    .query<{ id: string; source_type: string }, []>(
-      "SELECT id, source_type FROM ingestion_runs",
-    )
-    .all();
-  for (const row of runRows) {
-    if (!KNOWN_INGESTION_SOURCE_TYPES.has(row.source_type)) {
-      violations.push({
-        check: "checkVocab",
-        entity_or_edge_id: row.id,
-        message: `IngestionRun '${row.id}' has unknown source_type '${row.source_type}' (not in INGESTION_SOURCE_TYPES registry)`,
-        severity: "warning",
-      });
-    }
-  }
-
-  // edges.relation_type
-  const edgeRows = graph.db
-    .query<{ id: string; relation_type: string }, []>(
-      "SELECT id, relation_type FROM edges WHERE invalidated_at IS NULL",
-    )
-    .all();
-  for (const row of edgeRows) {
-    if (!KNOWN_RELATION_TYPES.has(row.relation_type)) {
-      violations.push({
-        check: "checkVocab",
-        entity_or_edge_id: row.id,
-        message: `Edge '${row.id}' has unknown relation_type '${row.relation_type}' (not in RELATION_TYPES registry)`,
-        severity: "warning",
-      });
-    }
-  }
-
-  return violations;
-}
-
 /**
  * Runs all integrity checks against the graph and returns a VerifyResult.
  * valid is true when there are no error-severity violations.
@@ -492,6 +410,8 @@ export function verifyGraph(
   }
   violations.push(...checkEntityEvidence(graph));
   violations.push(...checkEdgeEvidence(graph));
+  violations.push(...checkEpisodeFanIn(graph));
+  violations.push(...checkEpisodeDanglingSupersededBy(graph));
   violations.push(...checkSupersededByRefs(graph));
   violations.push(...checkAliasEpisodeRefs(graph));
   violations.push(...checkEvidenceEpisodeRefs(graph));

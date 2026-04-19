@@ -117,6 +117,7 @@ export {
   findEdges,
   findEntities,
   findSimilar,
+  getCurrentEpisode,
   getEdge,
   getEmbeddingModel,
   getEntity,
@@ -135,6 +136,7 @@ export {
   setEmbeddingModel,
   softRefresh,
   storeEmbedding,
+  supersedeEpisode,
   supersedeProjection,
 } from "./graph/index.js";
 export type {

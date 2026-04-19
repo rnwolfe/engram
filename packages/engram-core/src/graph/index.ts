@@ -34,7 +34,12 @@ export type {
 } from "./entities.js";
 export { addEntity, findEntities, getEntity } from "./entities.js";
 export type { Episode, EpisodeInput } from "./episodes.js";
-export { addEpisode, getEpisode } from "./episodes.js";
+export {
+  addEpisode,
+  getCurrentEpisode,
+  getEpisode,
+  supersedeEpisode,
+} from "./episodes.js";
 export {
   EdgeNotFoundError,
   EntityNotFoundError,
