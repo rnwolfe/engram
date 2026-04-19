@@ -14,6 +14,7 @@ import { registerIngest } from "./commands/ingest.js";
 import { registerInit } from "./commands/init.js";
 import { registerMaintenance } from "./commands/maintenance.js";
 import { registerOwnership } from "./commands/ownership.js";
+import { registerPlugin } from "./commands/plugin.js";
 import { registerProject } from "./commands/project.js";
 import { registerReconcile } from "./commands/reconcile.js";
 import { registerSearch } from "./commands/search.js";
@@ -63,5 +64,6 @@ registerVerify(program);
 registerMaintenance(program);
 registerReconcile(program);
 registerVisualize(program);
+registerPlugin(program);
 
 program.parse();
