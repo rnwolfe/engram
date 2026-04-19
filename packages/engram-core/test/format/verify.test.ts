@@ -15,6 +15,7 @@ import {
   createGraph,
   verifyGraph,
 } from "../../src/index.js";
+import { ENTITY_TYPES, EPISODE_SOURCE_TYPES } from "../../src/vocab/index.js";
 
 let graph: EngramGraph;
 
@@ -482,5 +483,125 @@ describe("VerifyResult.valid", () => {
 
     const result = verifyGraph(graph);
     expect(result.valid).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// verifyGraph strict mode — vocab registry checks
+// ---------------------------------------------------------------------------
+
+describe("verifyGraph — strict mode vocab checks", () => {
+  test("no violations on a clean graph with registry values", () => {
+    const ep = makeEpisode(graph);
+    makeEntity(graph, ep);
+    const result = verifyGraph(graph, { strict: true });
+    const vocabViolations = result.violations.filter(
+      (v) => v.check === "checkVocab",
+    );
+    expect(vocabViolations).toHaveLength(0);
+  });
+
+  test("flags unknown entity_type as warning in strict mode", () => {
+    const ep = makeEpisode(graph);
+    const entity = makeEntity(graph, ep);
+    graph.db.run(
+      "UPDATE entities SET entity_type = 'legacy_thing' WHERE id = ?",
+      [entity.id],
+    );
+
+    const result = verifyGraph(graph, { strict: true });
+    const v = result.violations.find(
+      (v) => v.check === "checkVocab" && v.entity_or_edge_id === entity.id,
+    );
+    expect(v).toBeDefined();
+    expect(v?.severity).toBe("warning");
+    expect(v?.message).toContain("legacy_thing");
+    expect(v?.message).toContain("ENTITY_TYPES");
+  });
+
+  test("flags unknown episode source_type as warning in strict mode", () => {
+    const ep = makeEpisode(graph);
+    graph.db.run(
+      "UPDATE episodes SET source_type = 'unknown_source' WHERE id = ?",
+      [ep.id],
+    );
+
+    const result = verifyGraph(graph, { strict: true });
+    const v = result.violations.find(
+      (v) => v.check === "checkVocab" && v.entity_or_edge_id === ep.id,
+    );
+    expect(v).toBeDefined();
+    expect(v?.severity).toBe("warning");
+    expect(v?.message).toContain("unknown_source");
+  });
+
+  test("flags unknown relation_type as warning in strict mode", () => {
+    const ep = makeEpisode(graph);
+    const a = makeEntity(graph, ep);
+    const b = makeEntity(graph, ep);
+    const edge = makeEdge(graph, a.id, b.id, ep);
+    graph.db.run("UPDATE edges SET relation_type = 'custom_rel' WHERE id = ?", [
+      edge.id,
+    ]);
+
+    const result = verifyGraph(graph, { strict: true });
+    const v = result.violations.find(
+      (v) => v.check === "checkVocab" && v.entity_or_edge_id === edge.id,
+    );
+    expect(v).toBeDefined();
+    expect(v?.severity).toBe("warning");
+    expect(v?.message).toContain("custom_rel");
+  });
+
+  test("flags unknown ingestion_runs source_type as warning in strict mode", () => {
+    const runId = ulid();
+    graph.db.run(
+      `INSERT INTO ingestion_runs (id, source_type, source_scope, started_at, completed_at, extractor_version, episodes_created, entities_created, edges_created, status)
+       VALUES (?, 'unknown_ingest_type', 'test-scope', ?, ?, '1.0.0', 0, 0, 0, 'completed')`,
+      [runId, now(), now()],
+    );
+
+    const result = verifyGraph(graph, { strict: true });
+    const v = result.violations.find(
+      (v) => v.check === "checkVocab" && v.entity_or_edge_id === runId,
+    );
+    expect(v).toBeDefined();
+    expect(v?.severity).toBe("warning");
+    expect(v?.message).toContain("unknown_ingest_type");
+  });
+
+  test("non-strict mode does not flag unknown vocab values", () => {
+    const ep = makeEpisode(graph);
+    const entity = makeEntity(graph, ep);
+    graph.db.run(
+      "UPDATE entities SET entity_type = 'legacy_thing' WHERE id = ?",
+      [entity.id],
+    );
+
+    const result = verifyGraph(graph);
+    const vocabViolations = result.violations.filter(
+      (v) => v.check === "checkVocab",
+    );
+    expect(vocabViolations).toHaveLength(0);
+  });
+
+  test("strict mode is backward compatible — existing registry values produce no warnings", () => {
+    const ep = addEpisode(graph, {
+      source_type: EPISODE_SOURCE_TYPES.GIT_COMMIT,
+      source_ref: ulid(),
+      content: "commit content",
+      timestamp: new Date().toISOString(),
+    });
+    addEntity(
+      graph,
+      { canonical_name: "alice@example.com", entity_type: ENTITY_TYPES.PERSON },
+      [{ episode_id: ep.id, extractor: "test", confidence: 1.0 }],
+    );
+
+    const result = verifyGraph(graph, { strict: true });
+    const vocabViolations = result.violations.filter(
+      (v) => v.check === "checkVocab",
+    );
+    expect(vocabViolations).toHaveLength(0);
   });
 });

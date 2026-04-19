@@ -102,6 +102,8 @@ The `.engram` file is a SQLite database with this entity model:
 
 **Hard invariant**: every entity and edge must have at least one evidence link. No floating knowledge without provenance.
 
+**Vocabulary**: `entity_type`, `episodes.source_type`, `ingestion_runs.source_type`, and `relation_type` values are defined in `packages/engram-core/src/vocab/`. All adapters MUST import from there — never inline string literals. See `docs/internal/specs/vocabulary.md`.
+
 ### Temporal Model
 
 - All timestamps are ISO8601 UTC
@@ -142,7 +144,7 @@ This distinction is critical for trust. Never present inferred edges as observed
 
 Two layers:
 1. **VCS layer (universal)**: git commits, blame, co-change analysis. No API tokens needed. Produces the structural graph.
-2. **Enrichment adapters (pluggable)**: GitHub PRs/issues, future Gerrit/Jira/etc. Each implements `EnrichmentAdapter` interface.
+2. **Enrichment adapters (pluggable)**: GitHub PRs/issues, future Gerrit/Jira/etc. Each implements `EnrichmentAdapter` interface. New adapters must import `entity_type`, `source_type`, and `relation_type` values from `packages/engram-core/src/vocab/`.
 
 Ingestion is idempotent:
 - Episode dedup via `(source_type, source_ref)` unique index
@@ -271,4 +273,7 @@ When creating a PR that implements a GitHub issue:
 | `packages/engram-core/src/ingest/adapter.ts` | EnrichmentAdapter interface |
 | `docs/internal/specs/adapter-aliases.md` | Adapter shorthand alias convention (required for cross-source ref resolution) |
 | `docs/internal/specs/cross-source-references.md` | Cross-source reference resolver architecture |
+| `docs/internal/specs/vocabulary.md` | Controlled vocabulary registries — entity_type, source_type, relation_type |
+| `packages/engram-core/src/vocab/` | Vocabulary registry module (ENTITY_TYPES, EPISODE_SOURCE_TYPES, RELATION_TYPES, etc.) |
+| `packages/engram-core/src/format/verify.ts` | Graph integrity checker; supports `{ strict: true }` for vocab validation |
 | `packages/engram-core/src/ingest/source/` | Source code ingestion — walks working tree, parses TS/JS with tree-sitter, creates file/module/symbol entities |

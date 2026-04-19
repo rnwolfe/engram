@@ -14,6 +14,12 @@ import { addEntityAlias, resolveEntity } from "../../graph/aliases.js";
 import { addEdge } from "../../graph/edges.js";
 import { addEntity, type EvidenceInput } from "../../graph/entities.js";
 import { addEpisode } from "../../graph/episodes.js";
+import {
+  ENTITY_TYPES,
+  EPISODE_SOURCE_TYPES,
+  INGESTION_SOURCE_TYPES,
+  RELATION_TYPES,
+} from "../../vocab/index.js";
 import type { EnrichmentAdapter, EnrichOpts } from "../adapter.js";
 import { EnrichmentAdapterError } from "../adapter.js";
 import { BUILT_IN_PATTERNS, resolveReferences } from "../cross-ref/index.js";
@@ -86,7 +92,7 @@ function validateRepo(repo: string): void {
 // ingestion_runs helpers
 // ---------------------------------------------------------------------------
 
-const SOURCE_TYPE = "github";
+const SOURCE_TYPE = INGESTION_SOURCE_TYPES.GITHUB;
 
 function createIngestionRun(
   graph: EngramGraph,
@@ -277,7 +283,7 @@ function getOrCreatePerson(
   episodeId: string,
   counts: { entitiesCreated: number; entitiesResolved: number },
 ): string {
-  const existing = resolveEntity(graph, login, "person");
+  const existing = resolveEntity(graph, login, ENTITY_TYPES.PERSON);
 
   if (existing) {
     counts.entitiesResolved++;
@@ -286,7 +292,7 @@ function getOrCreatePerson(
 
   const entity = addEntity(
     graph,
-    { canonical_name: login, entity_type: "person" },
+    { canonical_name: login, entity_type: ENTITY_TYPES.PERSON },
     [{ episode_id: episodeId, extractor: EXTRACTOR, confidence: 1.0 }],
   );
 
@@ -329,7 +335,7 @@ function ingestPR(
     .query<{ id: string }, [string, string]>(
       "SELECT id FROM episodes WHERE source_type = ? AND source_ref = ?",
     )
-    .get("github_pr", pr.html_url);
+    .get(EPISODE_SOURCE_TYPES.GITHUB_PR, pr.html_url);
 
   if (existingEpisode) {
     counts.episodesSkipped++;
@@ -337,7 +343,7 @@ function ingestPR(
   }
 
   const episode = addEpisode(graph, {
-    source_type: "github_pr",
+    source_type: EPISODE_SOURCE_TYPES.GITHUB_PR,
     source_ref: pr.html_url,
     content,
     actor: pr.user?.login ?? undefined,
@@ -360,13 +366,13 @@ function ingestPR(
   ];
 
   // Create PR entity and register shorthand aliases for cross-ref resolution
-  let prEntity = resolveEntity(graph, pr.html_url, "pull_request");
+  let prEntity = resolveEntity(graph, pr.html_url, ENTITY_TYPES.PULL_REQUEST);
   if (!prEntity) {
     prEntity = addEntity(
       graph,
       {
         canonical_name: pr.html_url,
-        entity_type: "pull_request",
+        entity_type: ENTITY_TYPES.PULL_REQUEST,
         summary: pr.title,
       },
       evidence,
@@ -408,7 +414,7 @@ function ingestPR(
          WHERE source_id = ? AND target_id = ? AND relation_type = ?
            AND edge_kind = ? AND invalidated_at IS NULL LIMIT 1`,
       )
-      .get(reviewerId, authorId, "reviewed_by", "observed");
+      .get(reviewerId, authorId, RELATION_TYPES.REVIEWED_BY, "observed");
 
     if (!existing) {
       addEdge(
@@ -416,7 +422,7 @@ function ingestPR(
         {
           source_id: reviewerId,
           target_id: authorId,
-          relation_type: "reviewed_by",
+          relation_type: RELATION_TYPES.REVIEWED_BY,
           edge_kind: "observed",
           fact: `${reviewer.login} reviewed PR #${pr.number} by ${pr.user.login}`,
           valid_from: pr.created_at,
@@ -452,7 +458,7 @@ function ingestIssue(
     .query<{ id: string }, [string, string]>(
       "SELECT id FROM episodes WHERE source_type = ? AND source_ref = ?",
     )
-    .get("github_issue", issue.html_url);
+    .get(EPISODE_SOURCE_TYPES.GITHUB_ISSUE, issue.html_url);
 
   if (existingEpisode) {
     counts.episodesSkipped++;
@@ -472,7 +478,7 @@ function ingestIssue(
     .trim();
 
   const episode = addEpisode(graph, {
-    source_type: "github_issue",
+    source_type: EPISODE_SOURCE_TYPES.GITHUB_ISSUE,
     source_ref: issue.html_url,
     content,
     actor: issue.user?.login ?? undefined,
@@ -495,13 +501,13 @@ function ingestIssue(
   ];
 
   // Resolve or create issue entity for reference edges
-  let issueEntity = resolveEntity(graph, issue.html_url, "issue");
+  let issueEntity = resolveEntity(graph, issue.html_url, ENTITY_TYPES.ISSUE);
   if (!issueEntity) {
     issueEntity = addEntity(
       graph,
       {
         canonical_name: issue.html_url,
-        entity_type: "issue",
+        entity_type: ENTITY_TYPES.ISSUE,
         summary: issue.title,
       },
       evidence,

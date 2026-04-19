@@ -14,6 +14,7 @@ import { generateEpisodeEmbeddings } from "../ai/utils.js";
 import type { EngramGraph } from "../format/index.js";
 import { ENGINE_VERSION } from "../format/version.js";
 import { addEpisode } from "../graph/episodes.js";
+import { EPISODE_SOURCE_TYPES } from "../vocab/index.js";
 import type { IngestResult } from "./git.js";
 
 // ---------------------------------------------------------------------------
@@ -139,7 +140,7 @@ export async function ingestMarkdown(
       .query<{ id: string }, [string, string]>(
         "SELECT id FROM episodes WHERE source_type = ? AND source_ref = ?",
       )
-      .get("document", absolutePath);
+      .get(EPISODE_SOURCE_TYPES.DOCUMENT, absolutePath);
 
     if (existing) {
       counts.episodesSkipped++;
@@ -151,7 +152,7 @@ export async function ingestMarkdown(
     const timestamp = stat.mtime.toISOString();
 
     const episode = addEpisode(graph, {
-      source_type: "document",
+      source_type: EPISODE_SOURCE_TYPES.DOCUMENT,
       source_ref: absolutePath,
       content,
       actor: opts.actor,

@@ -49,6 +49,7 @@ export {
 export type {
   CreateOpts,
   EngramGraph,
+  VerifyOpts,
   VerifyResult,
   Violation,
   ViolationSeverity,
@@ -201,5 +202,16 @@ export {
   getSnapshot,
   supersedeEdge,
 } from "./temporal/index.js";
-export type { RelationType } from "./vocab/relation-types.js";
-export { RELATION_TYPES } from "./vocab/relation-types.js";
+export type {
+  EntityType,
+  EpisodeSourceType,
+  IngestionSourceType,
+  RelationType,
+} from "./vocab/index.js";
+export {
+  ENTITY_TYPES,
+  EPISODE_SOURCE_TYPES,
+  INGESTION_SOURCE_TYPES,
+  INGESTION_TO_EPISODE_SOURCES,
+  RELATION_TYPES,
+} from "./vocab/index.js";

@@ -21,6 +21,12 @@ import { addEdge } from "../graph/edges.js";
 import { addEntity, type EvidenceInput } from "../graph/entities.js";
 import { addEpisode } from "../graph/episodes.js";
 import { supersedeEdge } from "../temporal/supersession.js";
+import {
+  ENTITY_TYPES,
+  EPISODE_SOURCE_TYPES,
+  INGESTION_SOURCE_TYPES,
+  RELATION_TYPES,
+} from "../vocab/index.js";
 import { BUILT_IN_PATTERNS, resolveReferences } from "./cross-ref/index.js";
 import { parseGitLog, recencyWeight } from "./git-parse.js";
 
@@ -119,7 +125,7 @@ function createIngestionRun(
     )
     .run(
       id,
-      "git_commit",
+      INGESTION_SOURCE_TYPES.GIT,
       sourceScope,
       now,
       ENGINE_VERSION,
@@ -166,12 +172,12 @@ function failIngestionRun(
 
 function getLastCursor(graph: EngramGraph, sourceScope: string): string | null {
   const row = graph.db
-    .query<{ cursor: string | null }, [string]>(
+    .query<{ cursor: string | null }, [string, string]>(
       `SELECT cursor FROM ingestion_runs
-       WHERE source_type = 'git_commit' AND source_scope = ? AND status = 'completed'
+       WHERE source_type = ? AND source_scope = ? AND status = 'completed'
        ORDER BY completed_at DESC LIMIT 1`,
     )
-    .get(sourceScope);
+    .get(INGESTION_SOURCE_TYPES.GIT, sourceScope);
 
   return row?.cursor ?? null;
 }
@@ -276,8 +282,8 @@ function getOrCreatePerson(
 ): string {
   // Try canonical name (email) first, then name
   const existing =
-    resolveEntity(graph, email, "person") ??
-    resolveEntity(graph, name, "person");
+    resolveEntity(graph, email, ENTITY_TYPES.PERSON) ??
+    resolveEntity(graph, name, ENTITY_TYPES.PERSON);
 
   if (existing) {
     counts.entitiesResolved++;
@@ -288,7 +294,7 @@ function getOrCreatePerson(
     graph,
     {
       canonical_name: email,
-      entity_type: "person",
+      entity_type: ENTITY_TYPES.PERSON,
       summary: name !== email ? name : undefined,
     },
     [{ episode_id: episodeId, extractor: EXTRACTOR, confidence: 1.0 }],
@@ -309,7 +315,7 @@ function getOrCreateModule(
     newEntityIds: Set<string>;
   },
 ): string {
-  const existing = resolveEntity(graph, filePath, "module");
+  const existing = resolveEntity(graph, filePath, ENTITY_TYPES.MODULE);
 
   if (existing) {
     counts.entitiesResolved++;
@@ -320,7 +326,7 @@ function getOrCreateModule(
     graph,
     {
       canonical_name: filePath,
-      entity_type: "module",
+      entity_type: ENTITY_TYPES.MODULE,
     },
     [{ episode_id: episodeId, extractor: EXTRACTOR, confidence: 1.0 }],
   );
@@ -432,7 +438,7 @@ export async function ingestGitRepo(
         .query<{ id: string }, [string, string]>(
           "SELECT id FROM episodes WHERE source_type = ? AND source_ref = ?",
         )
-        .get("git_commit", commit.sha);
+        .get(EPISODE_SOURCE_TYPES.GIT_COMMIT, commit.sha);
 
       let episodeId: string;
       if (episodeBefore) {
@@ -453,7 +459,7 @@ export async function ingestGitRepo(
           .trim();
 
         const episode = addEpisode(graph, {
-          source_type: "git_commit",
+          source_type: EPISODE_SOURCE_TYPES.GIT_COMMIT,
           source_ref: commit.sha,
           content,
           actor: commit.authorEmail,
@@ -480,13 +486,13 @@ export async function ingestGitRepo(
       ];
 
       // Create commit entity and register 7-char short-SHA alias for cross-ref resolution
-      let commitEntity = resolveEntity(graph, commit.sha, "commit");
+      let commitEntity = resolveEntity(graph, commit.sha, ENTITY_TYPES.COMMIT);
       if (!commitEntity) {
         commitEntity = addEntity(
           graph,
           {
             canonical_name: commit.sha,
-            entity_type: "commit",
+            entity_type: ENTITY_TYPES.COMMIT,
             summary: commit.subject,
           },
           evidence,
@@ -534,7 +540,7 @@ export async function ingestGitRepo(
              WHERE source_id = ? AND target_id = ? AND relation_type = ?
                AND edge_kind = ? AND invalidated_at IS NULL LIMIT 1`,
           )
-          .get(fileId, authorId, "authored_by", "observed");
+          .get(fileId, authorId, RELATION_TYPES.AUTHORED_BY, "observed");
 
         if (!existingAuthoredBy) {
           addEdge(
@@ -542,7 +548,7 @@ export async function ingestGitRepo(
             {
               source_id: fileId,
               target_id: authorId,
-              relation_type: "authored_by",
+              relation_type: RELATION_TYPES.AUTHORED_BY,
               edge_kind: "observed",
               fact: `${filePath} was authored/modified by ${commit.authorEmail} in commit ${commit.sha.slice(0, 8)}`,
               valid_from: timestamp,
@@ -614,7 +620,7 @@ export async function ingestGitRepo(
            WHERE source_id = ? AND target_id = ? AND relation_type = ?
              AND edge_kind = ? AND invalidated_at IS NULL LIMIT 1`,
         )
-        .get(entityA, entityB, "co_changes_with", "inferred");
+        .get(entityA, entityB, RELATION_TYPES.CO_CHANGES_WITH, "inferred");
 
       const existingBA = graph.db
         .query<{ id: string }, [string, string, string, string]>(
@@ -622,7 +628,7 @@ export async function ingestGitRepo(
            WHERE source_id = ? AND target_id = ? AND relation_type = ?
              AND edge_kind = ? AND invalidated_at IS NULL LIMIT 1`,
         )
-        .get(entityB, entityA, "co_changes_with", "inferred");
+        .get(entityB, entityA, RELATION_TYPES.CO_CHANGES_WITH, "inferred");
 
       if (!existingAB && !existingBA) {
         addEdge(
@@ -630,7 +636,7 @@ export async function ingestGitRepo(
           {
             source_id: entityA,
             target_id: entityB,
-            relation_type: "co_changes_with",
+            relation_type: RELATION_TYPES.CO_CHANGES_WITH,
             edge_kind: "inferred",
             fact: `${fileA} and ${fileB} co-change frequently (${count} shared commits)`,
             weight: Math.min(count / 10, 1.0),
@@ -713,7 +719,7 @@ export async function ingestGitRepo(
            WHERE source_id = ? AND relation_type = ? AND edge_kind = ?
              AND invalidated_at IS NULL LIMIT 1`,
         )
-        .get(fileId, "likely_owner_of", "inferred");
+        .get(fileId, RELATION_TYPES.LIKELY_OWNER_OF, "inferred");
 
       if (existing) {
         if (existing.target_id !== ownerId) {
@@ -724,7 +730,7 @@ export async function ingestGitRepo(
             {
               source_id: fileId,
               target_id: ownerId,
-              relation_type: "likely_owner_of",
+              relation_type: RELATION_TYPES.LIKELY_OWNER_OF,
               edge_kind: "inferred",
               fact: `${filePath} is likely owned by ${topEmail} (recency-weighted score: ${topScore.toFixed(3)})`,
               confidence: Math.min(topScore, 1.0),
@@ -741,7 +747,7 @@ export async function ingestGitRepo(
           {
             source_id: fileId,
             target_id: ownerId,
-            relation_type: "likely_owner_of",
+            relation_type: RELATION_TYPES.LIKELY_OWNER_OF,
             edge_kind: "inferred",
             fact: `${filePath} is likely owned by ${topEmail} (recency-weighted score: ${topScore.toFixed(3)})`,
             confidence: Math.min(topScore, 1.0),

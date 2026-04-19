@@ -15,12 +15,18 @@ import { addEdge } from "../../graph/edges.js";
 import type { EvidenceInput } from "../../graph/entities.js";
 import { addEntity, findEntities } from "../../graph/entities.js";
 import { addEpisode } from "../../graph/episodes.js";
+import {
+  ENTITY_TYPES,
+  EPISODE_SOURCE_TYPES,
+  INGESTION_SOURCE_TYPES,
+  RELATION_TYPES,
+} from "../../vocab/index.js";
 import type { ExtractedFile } from "./extractors/typescript.js";
 import { extractTypeScript, resolveImport } from "./extractors/typescript.js";
 import { languageForPath, SourceParser } from "./parser.js";
 import { walk } from "./walker.js";
 
-const SOURCE_TYPE = "source";
+const SOURCE_TYPE = INGESTION_SOURCE_TYPES.SOURCE;
 const EXTRACTOR = "source/typescript";
 
 // ---------------------------------------------------------------------------
@@ -151,14 +157,14 @@ function findActiveEpisodeForPath(
   const prefix = `${relPath}@`;
   return (
     graph.db
-      .query<{ id: string; source_ref: string }, [number, string]>(
+      .query<{ id: string; source_ref: string }, [string, number, string]>(
         `SELECT id, source_ref FROM episodes
-         WHERE source_type = 'source'
+         WHERE source_type = ?
            AND status = 'active'
            AND SUBSTR(source_ref, 1, ?) = ?
          LIMIT 1`,
       )
-      .get(prefix.length, prefix) ?? null
+      .get(EPISODE_SOURCE_TYPES.SOURCE_FILE, prefix.length, prefix) ?? null
   );
 }
 
@@ -228,7 +234,7 @@ export async function ingestSource(
           .query<{ id: string }, [string, string]>(
             `SELECT id FROM episodes WHERE source_type = ? AND source_ref = ? LIMIT 1`,
           )
-          .get(SOURCE_TYPE, sourceRef);
+          .get(EPISODE_SOURCE_TYPES.SOURCE_FILE, sourceRef);
         if (existing) {
           result.filesSkipped++;
           visitedRelPaths.add(relPath);
@@ -310,7 +316,7 @@ export async function ingestSource(
         // Upsert file entity
         const { id, created: fileCreated } = upsertEntity(
           graph,
-          { canonical_name: relPath, entity_type: "file" },
+          { canonical_name: relPath, entity_type: ENTITY_TYPES.FILE },
           ev,
         );
         fileEntityId = id;
@@ -321,7 +327,7 @@ export async function ingestSource(
           const symName = `${relPath}::${sym.name}`;
           const { id: symEntityId, created: symCreated } = upsertEntity(
             graph,
-            { canonical_name: symName, entity_type: "symbol" },
+            { canonical_name: symName, entity_type: ENTITY_TYPES.SYMBOL },
             ev,
           );
           if (symCreated) result.entitiesCreated++;
@@ -331,7 +337,7 @@ export async function ingestSource(
             {
               source_id: fileEntityId,
               target_id: symEntityId,
-              relation_type: "contains",
+              relation_type: RELATION_TYPES.CONTAINS,
               edge_kind: "observed",
               fact: `${relPath} defines ${sym.name}`,
             },
@@ -344,7 +350,7 @@ export async function ingestSource(
             {
               source_id: symEntityId,
               target_id: fileEntityId,
-              relation_type: "defined_in",
+              relation_type: RELATION_TYPES.DEFINED_IN,
               edge_kind: "observed",
               fact: `${sym.name} is defined in ${relPath}`,
             },
@@ -403,7 +409,7 @@ export async function ingestSource(
       ];
       const { id, created: modCreated } = upsertEntity(
         graph,
-        { canonical_name: dirPath, entity_type: "module" },
+        { canonical_name: dirPath, entity_type: ENTITY_TYPES.MODULE },
         ev,
       );
       modEntityId = id;
@@ -436,7 +442,7 @@ export async function ingestSource(
             {
               source_id: parentModId,
               target_id: modEntityId,
-              relation_type: "contains",
+              relation_type: RELATION_TYPES.CONTAINS,
               edge_kind: "observed",
               fact: `${parentDir} contains module ${dirPath}`,
             },
@@ -473,7 +479,7 @@ export async function ingestSource(
         {
           source_id: modEntityId,
           target_id: fileEntityId,
-          relation_type: "contains",
+          relation_type: RELATION_TYPES.CONTAINS,
           edge_kind: "observed",
           fact: `${normalizedDir} contains file ${relPath}`,
         },
@@ -513,7 +519,7 @@ export async function ingestSource(
           {
             source_id: fromEntityId,
             target_id: toEntityId,
-            relation_type: "imports",
+            relation_type: RELATION_TYPES.IMPORTS,
             edge_kind: "observed",
             fact: `${relPath} imports ${resolved}`,
           },
@@ -533,13 +539,13 @@ export async function ingestSource(
 
   if (!dryRun) {
     const sweepCandidates = graph.db
-      .query<{ id: string; source_ref: string }, [string]>(
+      .query<{ id: string; source_ref: string }, [string, string]>(
         `SELECT id, source_ref FROM episodes
-         WHERE source_type = 'source'
+         WHERE source_type = ?
            AND status = 'active'
            AND json_extract(metadata, '$.walk_root') = ?`,
       )
-      .all(absRoot);
+      .all(EPISODE_SOURCE_TYPES.SOURCE_FILE, absRoot);
 
     for (const ep of sweepCandidates) {
       if (!ep.source_ref) continue;
@@ -556,13 +562,13 @@ export async function ingestSource(
   } else {
     // dryRun: count what would be archived without writing
     const sweepCandidates = graph.db
-      .query<{ source_ref: string }, [string]>(
+      .query<{ source_ref: string }, [string, string]>(
         `SELECT source_ref FROM episodes
-         WHERE source_type = 'source'
+         WHERE source_type = ?
            AND status = 'active'
            AND json_extract(metadata, '$.walk_root') = ?`,
       )
-      .all(absRoot);
+      .all(EPISODE_SOURCE_TYPES.SOURCE_FILE, absRoot);
 
     for (const ep of sweepCandidates) {
       if (!ep.source_ref) continue;
