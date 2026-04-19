@@ -241,19 +241,35 @@ This index applies to *all* rows where `source_ref IS NOT NULL`, regardless of
 `superseded_by`. Two rows with the same `(source_type, source_ref)` will both be covered
 by this index — so a superseded episode and its successor would collide.
 
-To resolve this, the unique index should be tightened to only non-superseded episodes:
+To resolve this, the unique index must be replaced with a narrower partial index that
+only covers non-superseded episodes. Because `ADDITIVE_DDL` only supports `IF NOT EXISTS`
+and cannot drop existing indexes, this requires a two-step migration handled at database
+open time:
 
 ```sql
--- Drop and replace the existing unique index
-DROP INDEX idx_episodes_identity;
-CREATE UNIQUE INDEX idx_episodes_identity
+-- Step 1: add the column (additive, safe)
+ALTER TABLE episodes ADD COLUMN superseded_by TEXT REFERENCES episodes(id);
+
+-- Step 2: replace the unique index (requires dropping the old one)
+-- Guard: only if the old index still exists
+DROP INDEX IF EXISTS idx_episodes_identity;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_episodes_identity
   ON episodes(source_type, source_ref)
-  WHERE source_ref IS NOT NULL AND superseded_by IS NULL;
+  WHERE superseded_by IS NULL;
 ```
 
-This preserves the idempotency invariant for the current episode while allowing historical
-revisions to coexist. The implementation should apply this index replacement in the same
-migration step as the column addition.
+Both steps are applied at database open time and are safe to re-run on any database:
+
+- **Step 1** is idempotent via a column-existence check before executing the `ALTER TABLE`
+  (SQLite returns an error if the column already exists; the migration layer catches and
+  ignores that specific error).
+- **Step 2** is idempotent via `DROP INDEX IF EXISTS` (no-op if already dropped) followed
+  by `CREATE UNIQUE INDEX IF NOT EXISTS` (no-op if already created with the same name).
+
+Existing databases open correctly because both guards make the steps safe to re-run.
+The new predicate (`WHERE superseded_by IS NULL`) preserves the idempotency invariant for
+the current (non-superseded) episode while allowing historical revisions with the same
+`(source_type, source_ref)` to coexist.
 
 ---
 
@@ -329,19 +345,19 @@ The graph layer exposes a new function alongside the existing `addEpisode()`:
 /**
  * Create a new episode revision and atomically supersede the prior one.
  *
- * @param priorId   - ID of the current (non-superseded) episode to supersede
- * @param newEpisode - New episode data (source_type, source_ref, content, ...)
- * @returns The newly created episode ID
+ * @param priorEpisodeId   - ID of the current (non-superseded) episode to supersede
+ * @param newEpisodeInput  - New episode data (source_type, source_ref, content, ...)
+ * @returns The newly created Episode object
  *
- * @throws if priorId does not exist
- * @throws if priorId is already superseded (superseded_by IS NOT NULL)
+ * @throws if priorEpisodeId does not exist
+ * @throws if priorEpisodeId is already superseded (superseded_by IS NOT NULL)
  * @throws if a non-superseded episode already exists for the same (source_type, source_ref)
  */
 function supersedeEpisode(
   graph: EngramGraph,
-  priorId: string,
-  newEpisode: EpisodeInput,
-): string;
+  priorEpisodeId: string,
+  newEpisodeInput: EpisodeInput,
+): Episode;
 ```
 
 The implementation wraps both the INSERT and the UPDATE in a single SQLite transaction
