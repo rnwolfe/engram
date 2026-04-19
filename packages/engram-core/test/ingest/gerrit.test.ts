@@ -6,7 +6,12 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { resolveEntity } from "../../src/graph/aliases.js";
-import { closeGraph, createGraph, type EngramGraph } from "../../src/index.js";
+import {
+  closeGraph,
+  createGraph,
+  type EngramGraph,
+  verifyGraph,
+} from "../../src/index.js";
 import { GerritAdapter } from "../../src/ingest/adapters/gerrit.js";
 
 // ---------------------------------------------------------------------------
@@ -111,6 +116,7 @@ describe("GerritAdapter — basic ingestion", () => {
 
     expect(episode).toBeTruthy();
     expect(episode?.source_type).toBe("gerrit_change");
+    expect(verifyGraph(graph).valid).toBe(true);
   });
 
   test("creates person entity for change owner", async () => {
@@ -332,5 +338,13 @@ describe("GerritAdapter — validation", () => {
       )
       .all();
     expect(episodes.length).toBe(0);
+
+    // No ingestion_runs created — cursor must not be poisoned
+    const runs = graph.db
+      .query<{ id: string }, []>(
+        "SELECT id FROM ingestion_runs WHERE source_type = 'gerrit'",
+      )
+      .all();
+    expect(runs.length).toBe(0);
   });
 });

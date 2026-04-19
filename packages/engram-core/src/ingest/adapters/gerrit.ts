@@ -277,6 +277,18 @@ function getOrCreatePerson(
     [{ episode_id: episodeId, extractor: EXTRACTOR, confidence: 1.0 }],
   );
 
+  // Register secondary identifiers as aliases so cross-source lookups succeed
+  const secondaryIds = [account.email, account.username, account.name].filter(
+    (v): v is string => v != null && v !== identifier,
+  );
+  for (const alias of secondaryIds) {
+    addEntityAlias(graph, {
+      entity_id: entity.id,
+      alias,
+      episode_id: episodeId,
+    });
+  }
+
   counts.entitiesCreated++;
   return entity.id;
 }
@@ -378,6 +390,32 @@ function ingestChange(
 
   const ownerId = getOrCreatePerson(graph, change.owner, episodeId, counts);
 
+  // authored_by edge: change entity → owner
+  const existingAuthoredEdge = graph.db
+    .query<{ id: string }, [string, string, string, string]>(
+      `SELECT id FROM edges
+       WHERE source_id = ? AND target_id = ? AND relation_type = ?
+         AND edge_kind = ? AND invalidated_at IS NULL LIMIT 1`,
+    )
+    .get(changeEntity.id, ownerId, RELATION_TYPES.AUTHORED_BY, "observed");
+
+  if (!existingAuthoredEdge) {
+    addEdge(
+      graph,
+      {
+        source_id: changeEntity.id,
+        target_id: ownerId,
+        relation_type: RELATION_TYPES.AUTHORED_BY,
+        edge_kind: "observed",
+        fact: `CL/${change._number} authored by ${accountIdentifier(change.owner)}`,
+        valid_from: change.created,
+        confidence: 1.0,
+      },
+      evidence,
+    );
+    counts.edgesCreated++;
+  }
+
   // reviewed_by edges: each reviewer → owner
   const reviewers = change.reviewers?.REVIEWER ?? [];
   for (const reviewer of reviewers) {
@@ -447,8 +485,7 @@ export class GerritAdapter implements EnrichmentAdapter {
     const token = opts.token;
     const sourceScope = `${endpoint}/${project}`;
 
-    const run = createIngestionRun(graph, sourceScope);
-    const runId = run.id;
+    const runId = opts.dryRun ? "" : createIngestionRun(graph, sourceScope).id;
 
     const totals: IngestResult = {
       episodesCreated: 0,
@@ -461,11 +498,13 @@ export class GerritAdapter implements EnrichmentAdapter {
     };
 
     try {
-      let offset = getLastOffset(graph, sourceScope);
+      let offset = opts.dryRun ? 0 : getLastOffset(graph, sourceScope);
       let hasMore = true;
 
       while (hasMore) {
-        const query = encodeURIComponent(`project:${project}`);
+        let q = `project:${project}`;
+        if (opts.since) q += ` after:${opts.since}`;
+        const query = encodeURIComponent(q);
         const path =
           `/changes/?q=${query}&start=${offset}` +
           `&limit=${PAGE_SIZE}&o=DETAILED_ACCOUNTS`;
@@ -505,17 +544,21 @@ export class GerritAdapter implements EnrichmentAdapter {
         });
       }
 
-      const cursor = offset > 0 ? String(offset) : null;
-      completeIngestionRun(graph, runId, cursor, {
-        episodes: totals.episodesCreated,
-        entities: totals.entitiesCreated,
-        edges: totals.edgesCreated,
-      });
+      if (!opts.dryRun) {
+        const cursor = offset > 0 ? String(offset) : null;
+        completeIngestionRun(graph, runId, cursor, {
+          episodes: totals.episodesCreated,
+          entities: totals.entitiesCreated,
+          edges: totals.edgesCreated,
+        });
+      }
 
       return { ...totals, runId };
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      failIngestionRun(graph, runId, msg);
+      if (!opts.dryRun && runId) {
+        const msg = err instanceof Error ? err.message : String(err);
+        failIngestionRun(graph, runId, msg);
+      }
       throw err;
     }
   }
