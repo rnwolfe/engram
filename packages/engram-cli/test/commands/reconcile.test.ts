@@ -244,7 +244,7 @@ describe("reconcile assess phase", () => {
     expect(output).toContain("dry-run");
   });
 
-  it("assess phase with a stale projection fails with NullGenerator (no AI configured)", async () => {
+  it("assess phase records a reconciliation run with a stale projection using --dry-run", async () => {
     // Create a projection then make it stale
     const ep = addEpisode(graph, {
       source_type: "manual",
@@ -267,20 +267,37 @@ describe("reconcile assess phase", () => {
       )
       .run(ep.id);
 
-    closeGraph(graph);
-
-    // CLI uses NullGenerator which throws on assess() for stale projections
+    // Run with max-cost 0 so we hit budget exhaustion before any assess() LLM call
+    // This avoids making real API calls in the test environment while verifying the
+    // CLI can open a stale-projection graph, record a run, and exit 0.
     const { exitCode, output } = await runCommand([
       "reconcile",
       "--phase",
       "assess",
+      "--max-cost",
+      "0",
       "--dry-run",
       "--db",
       dbPath,
     ]);
 
-    expect(exitCode).toBe(1);
-    expect(output).toContain("Reconciliation failed");
+    expect(exitCode).toBe(0);
+    // Budget=0 with stale projection → partial run
+    expect(output.toLowerCase()).toMatch(/partial|budget exhausted/);
+
+    // Verify a reconciliation_runs row was recorded
+    const g = openGraph(dbPath);
+    try {
+      const runs = g.db
+        .query<{ status: string; dry_run: number }, []>(
+          "SELECT status, dry_run FROM reconciliation_runs ORDER BY started_at DESC",
+        )
+        .all();
+      expect(runs.length).toBeGreaterThanOrEqual(1);
+      expect(runs[0].dry_run).toBe(1);
+    } finally {
+      g.db.close();
+    }
   });
 });
 
