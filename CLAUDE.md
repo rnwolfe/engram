@@ -144,7 +144,14 @@ This distinction is critical for trust. Never present inferred edges as observed
 
 Two layers:
 1. **VCS layer (universal)**: git commits, blame, co-change analysis. No API tokens needed. Produces the structural graph.
-2. **Enrichment adapters (pluggable)**: GitHub PRs/issues, future Gerrit/Jira/etc. Each implements `EnrichmentAdapter` interface. New adapters must import `entity_type`, `source_type`, and `relation_type` values from `packages/engram-core/src/vocab/`.
+2. **Enrichment adapters (pluggable)**: GitHub PRs/issues, Gerrit, future Jira/etc. Each implements `EnrichmentAdapter` interface (v2). New adapters must import `entity_type`, `source_type`, and `relation_type` values from `packages/engram-core/src/vocab/`.
+
+**Adapter contract v2 — key conventions:**
+- **Auth**: Use `AuthCredential` union (`bearer`, `basic`, `service_account`, `oauth2`, `none`) via `opts.auth`. Declare accepted kinds in `supportedAuth: AuthCredential['kind'][]`. Use `assertAuthKind()` helper before processing.
+- **Scope**: Declare `scopeSchema: ScopeSchema` with a description and `validate()` method. Pass scope via `opts.scope` (replaces deprecated `opts.repo`).
+- **Cursors**: Use `readIsoCursor()`, `readNumericCursor()`, and `writeCursor()` from `packages/engram-core/src/ingest/cursor.ts` — never inline cursor SQL.
+- **Compat shim**: Call `applyCompatShim(opts)` at the start of `enrich()` to automatically map deprecated `opts.token`/`opts.repo` to v2 fields with a one-shot warning.
+- See `docs/internal/specs/adapter-contract.md` for full contract documentation.
 
 Ingestion is idempotent:
 - Episode dedup via `(source_type, source_ref)` unique index
@@ -270,7 +277,9 @@ When creating a PR that implements a GitHub issue:
 | `packages/engram-core/src/ai/kinds/` | Built-in projection kind catalog files (YAML). User overrides via `$XDG_CONFIG_HOME/engram/kinds/` (fallback `~/.config/engram/kinds/`). |
 | `packages/engram-core/src/ai/kinds.ts` | Kind catalog loader — `loadKindCatalog()`, `KindEntry`, `KindCatalog` |
 | `packages/engram-core/src/ingest/git.ts` | Git VCS ingestion (the "money command" engine) |
-| `packages/engram-core/src/ingest/adapter.ts` | EnrichmentAdapter interface |
+| `packages/engram-core/src/ingest/adapter.ts` | EnrichmentAdapter interface (v2) — AuthCredential, ScopeSchema, applyCompatShim, assertAuthKind |
+| `packages/engram-core/src/ingest/cursor.ts` | Cursor helpers — readIsoCursor, readNumericCursor, writeCursor |
+| `docs/internal/specs/adapter-contract.md` | Full adapter contract v2 documentation — auth, scope, cursors, migration |
 | `docs/internal/specs/adapter-aliases.md` | Adapter shorthand alias convention (required for cross-source ref resolution) |
 | `docs/internal/specs/cross-source-references.md` | Cross-source reference resolver architecture |
 | `docs/internal/specs/vocabulary.md` | Controlled vocabulary registries — entity_type, source_type, relation_type |

@@ -393,7 +393,7 @@ describe("GitHubAdapter — Validation", () => {
   test("throws if repo is missing", async () => {
     const adapter = new GitHubAdapter(makeFetch({}));
     await expect(adapter.enrich(graph, { token: TEST_TOKEN })).rejects.toThrow(
-      "opts.repo is required",
+      "opts.scope is required",
     );
   });
 

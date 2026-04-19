@@ -138,13 +138,26 @@ export {
   supersedeProjection,
 } from "./graph/index.js";
 export type {
+  AuthCredential,
   EnrichmentAdapter,
   EnrichOpts,
   EnrichProgress,
+  ScopeSchema,
 } from "./ingest/adapter.js";
-export { EnrichmentAdapterError } from "./ingest/adapter.js";
-export { GerritAdapter } from "./ingest/adapters/gerrit.js";
-export { GitHubAdapter, GitHubAuthError } from "./ingest/adapters/github.js";
+export {
+  applyCompatShim,
+  assertAuthKind,
+  EnrichmentAdapterError,
+} from "./ingest/adapter.js";
+export {
+  GerritAdapter,
+  gerritScopeSchema,
+} from "./ingest/adapters/gerrit.js";
+export {
+  GitHubAdapter,
+  GitHubAuthError,
+  githubScopeSchema,
+} from "./ingest/adapters/github.js";
 export type {
   PluginReferencePattern,
   ReferencePattern,
@@ -156,6 +169,11 @@ export {
   drainUnresolved,
   resolveReferences,
 } from "./ingest/cross-ref/index.js";
+export {
+  readIsoCursor,
+  readNumericCursor,
+  writeCursor,
+} from "./ingest/cursor.js";
 export type { GitIngestOpts, IngestResult } from "./ingest/git.js";
 export { ingestGitRepo } from "./ingest/git.js";
 export type { MarkdownIngestOpts } from "./ingest/markdown.js";

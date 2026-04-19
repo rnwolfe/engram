@@ -285,7 +285,7 @@ describe("GerritAdapter — validation", () => {
     const adapter = new GerritAdapter(makeFetch({}));
     await expect(
       adapter.enrich(graph, { token: TEST_TOKEN, endpoint: TEST_ENDPOINT }),
-    ).rejects.toThrow("opts.repo is required");
+    ).rejects.toThrow("opts.scope is required");
   });
 
   test("uses custom endpoint", async () => {
