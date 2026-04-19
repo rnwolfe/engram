@@ -132,12 +132,10 @@ export function loadExecutablePlugin(
       stdio: ["pipe", "pipe", "pipe"],
     });
 
-    const stderrLines: string[] = [];
     child.stderr?.on("data", (chunk: Buffer) => {
       const lines = chunk.toString().split("\n").filter(Boolean);
       for (const line of lines) {
         console.debug(`[plugin:${manifest.name}] ${line}`);
-        stderrLines.push(line);
       }
     });
 
@@ -145,14 +143,29 @@ export function loadExecutablePlugin(
       child.stdin?.write(`${JSON.stringify(obj)}\n`);
     }
 
+    const MAX_LINE_BYTES = 10 * 1024 * 1024; // 10 MB
+
     return new Promise<IngestResult>((resolve, reject) => {
       let buffer = "";
       let handshakeDone = false;
       let settled = false;
 
+      const timeoutHandle = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        child.kill();
+        reject(
+          new EnrichmentAdapterError(
+            "data_error",
+            "plugin timed out after 60s without completing",
+          ),
+        );
+      }, 60_000);
+
       function fail(err: Error): void {
         if (settled) return;
         settled = true;
+        clearTimeout(timeoutHandle);
         try {
           child.kill();
         } catch {}
@@ -162,6 +175,7 @@ export function loadExecutablePlugin(
       function done(): void {
         if (settled) return;
         settled = true;
+        clearTimeout(timeoutHandle);
         try {
           child.stdin?.end();
         } catch {}
@@ -194,6 +208,19 @@ export function loadExecutablePlugin(
 
       child.stdout?.on("data", (chunk: Buffer) => {
         buffer += chunk.toString();
+        if (buffer.length > MAX_LINE_BYTES) {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeoutHandle);
+          child.kill();
+          reject(
+            new EnrichmentAdapterError(
+              "data_error",
+              "plugin stdout line exceeded 10 MB limit",
+            ),
+          );
+          return;
+        }
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
 

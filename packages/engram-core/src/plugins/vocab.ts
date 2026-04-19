@@ -50,6 +50,15 @@ function registerValue(
 }
 
 /**
+ * Clears the plugin vocab registry. Intended for test teardown only.
+ * Does not remove values already mutated into the shared registry objects —
+ * it only clears the collision-tracking map so re-registration won't throw.
+ */
+export function resetPluginVocab(): void {
+  registeredBy.clear();
+}
+
+/**
  * Merges a single plugin's vocab_extensions into the shared registries.
  * Throws VocabCollisionError on any collision.
  */
