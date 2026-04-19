@@ -169,3 +169,62 @@ shape depends on `AuthCredential` stabilization (#200).
 - Vocab extensions are additive and runtime-only — they do not generate TypeScript types.
   Downstream callers that need compile-time safety must import built-in types from
   `packages/engram-core/src/vocab/` and handle plugin-extended values as opaque strings.
+
+## ADR-007 -- Episode supersession for mutable sources
+
+**Date**: 2026-04-19
+**Status**: Accepted
+**Spec**: [`docs/internal/specs/mutable-sources.md`](specs/mutable-sources.md)
+**Issue**: #201
+
+**Context**: Engram's unique index on `(source_type, source_ref)` enforces idempotency
+for immutable sources (git commits, PRs, Gerrit changes). For mutable sources — Google
+Docs, Linear issues, Jira tickets — the same `source_ref` legitimately produces different
+content at different times. Under the current schema, re-ingesting a mutated source
+silently skips the new revision, leaving the knowledge graph anchored to the first
+ingestion and unable to reflect the document's current state.
+
+Three options were evaluated:
+
+- **Option A** — revision-suffixed `source_ref` (e.g. `doc:abc123@rev_N`): no schema
+  change, but pushes complexity into every mutable-source adapter, makes "current version"
+  queries non-index-friendly, and risks `source_ref` format drift across adapter versions.
+- **Option B** — episode supersession: add nullable `superseded_by TEXT REFERENCES episodes(id)`,
+  create new episode on re-ingest, atomically link the prior episode to the new one. Current
+  version query: `WHERE superseded_by IS NULL`.
+- **Option C** — hybrid new rows + `is_current` boolean flag: combines Option A's adapter
+  complexity with Option B's schema change, with the added risk of inconsistency between
+  the flag and the derived truth (`superseded_by IS NULL`). Strictly worse than B.
+
+**Decision**: Adopt **Option B — episode supersession**. Add a nullable `superseded_by`
+column to the `episodes` table and expose a new `supersedeEpisode()` API. The supersession
+algorithm is atomic (single transaction: INSERT new row, UPDATE prior row's `superseded_by`)
+and follows the same pattern already used for edges and projections.
+
+**Alternatives considered**:
+- *Option A (revision-suffixed source_ref).* Rejected: no schema change is the only
+  advantage; every other dimension is worse — adapter complexity, retrieval ergonomics,
+  format stability.
+- *Option C (hybrid new rows + is_current flag).* Rejected: combines the costs of both A
+  and B with no compensating benefit; stores a derived truth redundantly.
+
+**Consequences**:
+
+*Positive*
+- The episode table gains the same temporal linkage language as edges and projections —
+  one pattern for all supersession across the schema.
+- The immutable-content invariant is preserved: `superseded_by` is linkage metadata, not
+  a mutation of episode content. Historical revisions are retained in full.
+- "Current version" lookup is a single index-friendly predicate (`WHERE superseded_by IS NULL`).
+- Additive, nullable column — no migration of existing rows, no format-version bump.
+  Applied via `ADDITIVE_DDL` in `openGraph()`.
+
+*Negative / cost*
+- Adapter authoring convention changes: mutable-source adapters must call
+  `supersedeEpisode()` on re-ingest instead of `addEpisode()`. Built-in adapters for
+  immutable sources are unaffected; existing adapters require no changes.
+- Two new `verifyGraph()` invariants are added (dangling `superseded_by` refs → error;
+  fan-in uniqueness on `superseded_by` → error). Both are cheap single-scan queries.
+- The unique index on `(source_type, source_ref)` must be replaced with a partial index
+  scoped to `WHERE superseded_by IS NULL`, allowing historical revisions to coexist.
+  This is a one-time DDL migration applied alongside the column addition.
