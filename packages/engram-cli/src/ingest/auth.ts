@@ -13,6 +13,7 @@
  */
 
 import * as fs from "node:fs";
+import * as path from "node:path";
 import type { AuthCredential } from "engram-core";
 
 export interface AuthFlags {
@@ -79,12 +80,18 @@ export function buildAuthCredential(
     const saPath =
       flags.serviceAccount ?? process.env[`${prefix}_SERVICE_ACCOUNT_JSON`];
     if (saPath) {
+      const resolvedPath = path.resolve(saPath);
+      if (!resolvedPath.endsWith(".json")) {
+        throw new Error(
+          `service account file must be a .json file: ${resolvedPath}`,
+        );
+      }
       let keyJson: string;
       try {
-        keyJson = fs.readFileSync(saPath, "utf8");
+        keyJson = fs.readFileSync(resolvedPath, "utf8");
       } catch (err) {
         throw new Error(
-          `Failed to read service account file '${saPath}': ${err instanceof Error ? err.message : String(err)}`,
+          `Failed to read service account file '${resolvedPath}': ${err instanceof Error ? err.message : String(err)}`,
         );
       }
       return { kind: "service_account", keyJson };

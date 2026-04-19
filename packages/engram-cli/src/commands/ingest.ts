@@ -23,7 +23,6 @@ import {
   EnrichmentAdapterError,
   GerritAdapter,
   GitHubAdapter,
-  GitHubAuthError,
   ingestGitRepo,
   ingestMarkdown,
   ingestSource,
@@ -420,11 +419,8 @@ See also:
     adapterName: string,
     supportedAuth: string[],
   ): void {
-    if (
-      err instanceof GitHubAuthError ||
-      err instanceof EnrichmentAdapterError
-    ) {
-      const adapterErr = err as EnrichmentAdapterError;
+    if (err instanceof EnrichmentAdapterError) {
+      const adapterErr = err;
       const prefix = adapterName.toUpperCase();
       switch (adapterErr.code) {
         case "auth_failure":
