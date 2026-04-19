@@ -75,3 +75,97 @@ But Karpathy's wiki and graphify both lack two things Engram already has: a temp
 
 *Carried over*
 - All existing principles, schema, operations, and the AI provider layer (#31) remain unchanged. Projection work is gated on #31 shipping.
+
+## ADR-006 -- Hybrid local-plugin loader with XDG discovery and manifest declaration
+
+**Date**: 2026-04-19
+**Status**: Accepted
+**Spec**: [`docs/internal/specs/plugin-loading.md`](specs/plugin-loading.md)
+**Sequencing**: Spec (#204) before implementation (#206).
+
+**Context**: Engram's built-in enrichment adapters (GitHub, Gerrit) are compiled into
+`engram-core`. Community integrations (Jira, GitLab, Phabricator, custom internal systems)
+cannot be shipped this way — the dependency surface would be unbounded and the release cycle
+would become a bottleneck for adopters.
+
+Three requirements shaped the design:
+1. **Any-language plugins** — adopters should not be forced to write TypeScript. Internal
+   tooling at many organizations is Python, Go, or shell.
+2. **Local-first / no registry** — consistent with Engram's core value. No package manager
+   integration, no network fetch at runtime, no centralized trust authority.
+3. **Engram owns the graph** — plugins must not bypass the evidence-first invariant by writing
+   directly to SQLite. All writes must flow through core's validated write path.
+
+**Decision**: Adopt a hybrid local-plugin loader with XDG-standard discovery and explicit
+manifest declaration.
+
+The loader searches two locations in order of increasing precedence:
+- `$XDG_DATA_HOME/engram/plugins/<name>/` (global user; Linux/macOS; `%LOCALAPPDATA%\engram\plugins\<name>\` on Windows)
+- `<project>/.engram/plugins/<name>/` (project-local; higher precedence; committed alongside the codebase)
+
+Each plugin directory contains a `manifest.json` declaring name, version, `contract_version`,
+transport, entry point, capabilities, and optional vocab extensions.
+
+Two transport mechanisms are supported:
+- **js-module**: in-process `await import(entry)`, default export conforms to `EnrichmentAdapter`
+  interface. Full graph API access. TypeScript/JavaScript only.
+- **executable**: any-language subprocess. JSON-lines protocol over stdin/stdout. Engram owns
+  all SQLite writes; plugin only emits record descriptions.
+
+Trust model: install-time user authorization only, same as git hooks and direnv. No signing.
+No sandboxing.
+
+**Alternatives considered**:
+
+- *npm-based plugin registry (e.g. `engram plugin install @scope/adapter`).* Rejected:
+  introduces `npm`/`npx` as a runtime dependency, pulls in remote code automatically, and
+  creates a centralized trust surface inconsistent with local-first principles. Also forces
+  TypeScript on plugin authors.
+
+- *Subprocess-only (no js-module transport).* Rejected: TypeScript adapters that already
+  implement `EnrichmentAdapter` (e.g. a GitHub Enterprise variant) would need to be wrapped
+  in a subprocess harness unnecessarily. In-process loading is strictly more capable for the
+  TypeScript ecosystem; JSON-lines transport is reserved for cross-language interop.
+
+- *Manifest-less file drop (auto-discover any `.js` or executable in a plugins dir).*
+  Rejected: ambiguous entry point resolution, no contract version negotiation, no capability
+  declaration, no structured error for incompatible plugins. The manifest is the minimum
+  necessary metadata to make the loader safe and debuggable.
+
+- *Signed plugin bundles.* Rejected: the threat model for a local-first tool running as the
+  user's own process does not justify the implementation cost. An attacker with write access
+  to `~/.local/share/engram/plugins/` already has user-level code execution via git hooks,
+  `.profile`, or `PATH` manipulation. Signing provides no meaningful defense in this model.
+
+**Trust model justification**: The same rationale that the Git project and direnv use applies
+here. Users who run `git clone` execute arbitrary hooks; users who `cd` into a project with
+`.envrc` execute arbitrary shell. Engram plugins are no different in threat model — the user
+has deliberately installed them. The documentation (§6.3 of the spec) provides security
+guidance for auditing plugin source before installation.
+
+**Sequencing rationale**: The spec (#204) is authored before implementation (#206) so that
+the JSON-lines message catalog, manifest schema, and trust policy are reviewed and stable
+before code is written. The vocab extension mechanism depends on the vocabulary registry
+work (#199 / `docs/internal/specs/vocabulary.md`); the executable transport `auth` field
+shape depends on `AuthCredential` stabilization (#200).
+
+**Consequences**:
+
+*Positive*
+- Any-language plugin authorship (the Python example in the spec is dependency-free stdlib).
+- Engram's evidence-first invariant is preserved for all transports — the loader, not the
+  plugin, calls `addEntity`, `addEdge`, `addEpisode`.
+- XDG paths are conventional and toolable — package managers and dotfile managers can place
+  plugins without engram-specific tooling.
+- Project-local plugins are version-controlled alongside the codebase they serve.
+- `contract_version` negotiation prevents silent incompatibility as the protocol evolves.
+
+*Negative / cost*
+- Executable transport has process-spawn overhead per `enrich()` call. Acceptable for batch
+  ingestion (called infrequently); unacceptable for per-query enrichment. The spec explicitly
+  limits the pattern to batch ingest.
+- No sandboxing means a malicious or buggy js-module plugin can read/write arbitrary process
+  state. Documented risk; mitigation is user education and code review, not a technical fence.
+- Vocab extensions are additive and runtime-only — they do not generate TypeScript types.
+  Downstream callers that need compile-time safety must import built-in types from
+  `packages/engram-core/src/vocab/` and handle plugin-extended values as opaque strings.
