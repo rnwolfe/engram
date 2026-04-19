@@ -360,27 +360,31 @@ function ingestPR(
   ];
 
   // Create PR entity and register shorthand aliases for cross-ref resolution
-  let prEntity = resolveEntity(graph, pr.html_url, "pr");
+  let prEntity = resolveEntity(graph, pr.html_url, "pull_request");
   if (!prEntity) {
     prEntity = addEntity(
       graph,
-      { canonical_name: pr.html_url, entity_type: "pr", summary: pr.title },
+      {
+        canonical_name: pr.html_url,
+        entity_type: "pull_request",
+        summary: pr.title,
+      },
       evidence,
     );
     counts.entitiesCreated++;
+    addEntityAlias(graph, {
+      entity_id: prEntity.id,
+      alias: `#${pr.number}`,
+      episode_id: episodeId,
+    });
+    addEntityAlias(graph, {
+      entity_id: prEntity.id,
+      alias: `${repo}#${pr.number}`,
+      episode_id: episodeId,
+    });
   } else {
     counts.entitiesResolved++;
   }
-  addEntityAlias(graph, {
-    entity_id: prEntity.id,
-    alias: `#${pr.number}`,
-    episode_id: episodeId,
-  });
-  addEntityAlias(graph, {
-    entity_id: prEntity.id,
-    alias: `${repo}#${pr.number}`,
-    episode_id: episodeId,
-  });
 
   if (!pr.user?.login) return;
 
@@ -503,21 +507,19 @@ function ingestIssue(
       evidence,
     );
     counts.entitiesCreated++;
+    addEntityAlias(graph, {
+      entity_id: issueEntity.id,
+      alias: `#${issue.number}`,
+      episode_id: episodeId,
+    });
+    addEntityAlias(graph, {
+      entity_id: issueEntity.id,
+      alias: `${repo}#${issue.number}`,
+      episode_id: episodeId,
+    });
   } else {
     counts.entitiesResolved++;
   }
-
-  // Register shorthand aliases for cross-ref resolution
-  addEntityAlias(graph, {
-    entity_id: issueEntity.id,
-    alias: `#${issue.number}`,
-    episode_id: episodeId,
-  });
-  addEntityAlias(graph, {
-    entity_id: issueEntity.id,
-    alias: `${repo}#${issue.number}`,
-    episode_id: episodeId,
-  });
 }
 
 // ---------------------------------------------------------------------------

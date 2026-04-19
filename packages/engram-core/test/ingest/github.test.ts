@@ -476,7 +476,7 @@ describe("GitHubAdapter — shorthand aliases", () => {
 
     const entity = resolveEntity(graph, "owner/test-repo#123");
     expect(entity).not.toBeNull();
-    expect(entity?.entity_type).toBe("pr");
+    expect(entity?.entity_type).toBe("pull_request");
   });
 
   test("resolveEntity('#N') returns issue entity after ingest", async () => {

@@ -18,7 +18,7 @@ Without registered aliases, the resolver returns `null` and no cross-ref edge is
 
 | Source | canonical_name | Required aliases |
 |---|---|---|
-| GitHub PR | `https://github.com/<owner>/<repo>/pull/<N>` | `#<N>`, `<owner>/<repo>#<N>` |
+| GitHub PR (`pull_request`) | `https://github.com/<owner>/<repo>/pull/<N>` | `#<N>`, `<owner>/<repo>#<N>` |
 | GitHub issue | `https://github.com/<owner>/<repo>/issues/<N>` | `#<N>`, `<owner>/<repo>#<N>` |
 | Git commit | full 40-char SHA | 7-char SHA prefix |
 | Gerrit change | Gerrit change URL | `CL/<N>`, bare change number |
