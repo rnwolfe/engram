@@ -8,476 +8,77 @@
  * Token is NEVER written to the graph.
  *
  * Note: Gerrit prefixes all JSON responses with ")]}'\n" for XSSI protection.
- * This adapter strips the prefix before parsing.
+ * This adapter strips the prefix before parsing (handled in gerrit-helpers.ts).
+ *
+ * Internal helpers live in gerrit-helpers.ts.
  */
 
-import { ulid } from "ulid";
 import type { EngramGraph } from "../../format/index.js";
-import { ENGINE_VERSION } from "../../format/version.js";
-import { addEntityAlias, resolveEntity } from "../../graph/aliases.js";
-import { addEdge } from "../../graph/edges.js";
-import { addEntity, type EvidenceInput } from "../../graph/entities.js";
-import { addEpisode } from "../../graph/episodes.js";
-import {
-  ENTITY_TYPES,
-  EPISODE_SOURCE_TYPES,
-  INGESTION_SOURCE_TYPES,
-  RELATION_TYPES,
-} from "../../vocab/index.js";
+import { INGESTION_SOURCE_TYPES } from "../../vocab/index.js";
 import type {
   AuthCredential,
   EnrichmentAdapter,
   EnrichOpts,
   ScopeSchema,
 } from "../adapter.js";
-import { EnrichmentAdapterError } from "../adapter.js";
+import { applyCompatShim, assertAuthKind } from "../adapter.js";
+import { readNumericCursor } from "../cursor.js";
 import type { IngestResult } from "../git.js";
+import {
+  apiGet,
+  completeIngestionRun,
+  createIngestionRun,
+  type FetchFn,
+  failIngestionRun,
+  GerritAuthError,
+  ingestChange,
+  PAGE_SIZE,
+} from "./gerrit-helpers.js";
+
+export { GerritAuthError } from "./gerrit-helpers.js";
 
 // ---------------------------------------------------------------------------
-// Internal types (Gerrit REST API shapes — only fields we use)
+// Scope schema
 // ---------------------------------------------------------------------------
 
-interface GerritAccount {
-  _account_id: number;
-  name?: string;
-  email?: string;
-  username?: string;
-}
-
-interface GerritChange {
-  id: string; // "project~branch~Change-Id"
-  _number: number;
-  project: string;
-  branch: string;
-  subject: string;
-  status: "NEW" | "MERGED" | "ABANDONED";
-  owner: GerritAccount;
-  reviewers?: {
-    REVIEWER?: GerritAccount[];
-    CC?: GerritAccount[];
-  };
-  created: string;
-  updated: string;
-  _more_changes?: boolean; // present on last item when pagination continues
-}
-
-interface IngestionRun {
-  id: string;
-  source_type: string;
-  source_scope: string;
-  started_at: string;
-  completed_at: string | null;
-  cursor: string | null;
-  extractor_version: string;
-  episodes_created: number;
-  entities_created: number;
-  edges_created: number;
-  status: string;
-  error: string | null;
-}
-
-// ---------------------------------------------------------------------------
-// ingestion_runs helpers
-// ---------------------------------------------------------------------------
-
-const SOURCE_TYPE = INGESTION_SOURCE_TYPES.GERRIT;
-
-function createIngestionRun(
-  graph: EngramGraph,
-  sourceScope: string,
-): IngestionRun {
-  const id = ulid();
-  const now = new Date().toISOString();
-
-  graph.db
-    .prepare<
-      void,
-      [string, string, string, string, string, number, number, number, string]
-    >(
-      `INSERT INTO ingestion_runs
-         (id, source_type, source_scope, started_at, extractor_version,
-          episodes_created, entities_created, edges_created, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(id, SOURCE_TYPE, sourceScope, now, ENGINE_VERSION, 0, 0, 0, "running");
-
-  return graph.db
-    .query<IngestionRun, [string]>("SELECT * FROM ingestion_runs WHERE id = ?")
-    .get(id) as IngestionRun;
-}
-
-function completeIngestionRun(
-  graph: EngramGraph,
-  runId: string,
-  cursor: string | null,
-  counts: { episodes: number; entities: number; edges: number },
-): void {
-  const now = new Date().toISOString();
-  graph.db
-    .prepare<void, [string, string | null, number, number, number, string]>(
-      `UPDATE ingestion_runs
-       SET completed_at = ?, cursor = ?, episodes_created = ?,
-           entities_created = ?, edges_created = ?, status = 'completed'
-       WHERE id = ?`,
-    )
-    .run(now, cursor, counts.episodes, counts.entities, counts.edges, runId);
-}
-
-function failIngestionRun(
-  graph: EngramGraph,
-  runId: string,
-  error: string,
-): void {
-  const now = new Date().toISOString();
-  graph.db
-    .prepare<void, [string, string, string]>(
-      `UPDATE ingestion_runs
-       SET completed_at = ?, status = 'failed', error = ? WHERE id = ?`,
-    )
-    .run(now, error, runId);
-}
-
-function getLastOffset(graph: EngramGraph, sourceScope: string): number {
-  const row = graph.db
-    .query<{ cursor: string | null }, [string, string]>(
-      `SELECT cursor FROM ingestion_runs
-       WHERE source_type = ? AND source_scope = ? AND status = 'completed'
-       ORDER BY completed_at DESC LIMIT 1`,
-    )
-    .get(SOURCE_TYPE, sourceScope);
-
-  if (!row?.cursor) return 0;
-  const n = parseInt(row.cursor, 10);
-  return Number.isNaN(n) ? 0 : n;
-}
-
-// ---------------------------------------------------------------------------
-// Error types
-// ---------------------------------------------------------------------------
-
-export class GerritAuthError extends EnrichmentAdapterError {
-  constructor(message: string) {
-    super("auth_failure", message);
-    this.name = "GerritAuthError";
-  }
-}
-
-// ---------------------------------------------------------------------------
-// HTTP helpers
-// ---------------------------------------------------------------------------
-
-type FetchFn = typeof fetch;
-
-const PAGE_SIZE = 100;
-// Gerrit XSSI protection prefix present on all REST responses
-const XSSI_PREFIX = ")]}'";
-
-function stripXssiPrefix(text: string): string {
-  if (text.startsWith(XSSI_PREFIX)) {
-    return text.slice(XSSI_PREFIX.length).trimStart();
-  }
-  return text;
-}
-
-function buildAuthHeader(token: string | undefined): Record<string, string> {
-  if (!token) return {};
-  // Accept "user:pass"; if no colon, treat as password with anonymous username
-  const credentials = btoa(token.includes(":") ? token : `anonymous:${token}`);
-  return { Authorization: `Basic ${credentials}` };
-}
-
-async function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function apiGet<T>(
-  fetchFn: FetchFn,
-  endpoint: string,
-  path: string,
-  token: string | undefined,
-  attempt = 0,
-): Promise<T> {
-  const url = `${endpoint}${path}`;
-  const headers: Record<string, string> = {
-    Accept: "application/json",
-    ...buildAuthHeader(token),
-  };
-
-  const resp = await fetchFn(url, { headers });
-
-  if (!resp.ok) {
-    const body = await resp.text();
-
-    if (resp.status === 401) {
-      throw new GerritAuthError(
-        token
-          ? "Gerrit API returned 401 — credentials invalid or expired."
-          : "Gerrit API returned 401 — auth required. Pass 'user:password' via --token.",
+/**
+ * ScopeSchema for the Gerrit adapter.
+ * Scope must be a non-empty project name (no leading slash).
+ */
+export const gerritScopeSchema: ScopeSchema = {
+  description: "Gerrit project name (e.g. 'my-project' or 'org/sub-project')",
+  validate(scope: string): void {
+    if (!scope || scope.startsWith("/") || scope.endsWith("/")) {
+      throw new Error(
+        `GerritAdapter: scope must be a non-empty project name without leading/trailing slashes, got: ${JSON.stringify(scope)}`,
       );
     }
-    if (resp.status === 403) {
-      throw new GerritAuthError(
-        "Gerrit API returned 403 — access denied. Check project visibility.",
-      );
-    }
-    if (resp.status === 404) {
-      throw new EnrichmentAdapterError(
-        "data_error",
-        `GerritAdapter: not found — check project name. (${url})`,
-      );
-    }
-    if (resp.status === 429 || resp.status === 503) {
-      if (attempt < 4) {
-        await sleep(1000 * 2 ** attempt);
-        return apiGet<T>(fetchFn, endpoint, path, token, attempt + 1);
-      }
-      throw new EnrichmentAdapterError(
-        "rate_limited",
-        `GerritAdapter: rate limited after ${attempt + 1} attempts (HTTP ${resp.status}).`,
-      );
-    }
-
-    throw new EnrichmentAdapterError(
-      "server_error",
-      `GerritAdapter: GET ${url} returned HTTP ${resp.status}: ${body}`,
-    );
-  }
-
-  const text = await resp.text();
-  return JSON.parse(stripXssiPrefix(text)) as T;
-}
-
-// ---------------------------------------------------------------------------
-// Entity helpers
-// ---------------------------------------------------------------------------
-
-const EXTRACTOR = "gerrit-ingest";
-
-function accountIdentifier(account: GerritAccount): string {
-  return (
-    account.email ??
-    account.username ??
-    account.name ??
-    `gerrit-account-${account._account_id}`
-  );
-}
-
-function getOrCreatePerson(
-  graph: EngramGraph,
-  account: GerritAccount,
-  episodeId: string,
-  counts: { entitiesCreated: number; entitiesResolved: number },
-): string {
-  const identifier = accountIdentifier(account);
-  const existing = resolveEntity(graph, identifier, ENTITY_TYPES.PERSON);
-
-  if (existing) {
-    counts.entitiesResolved++;
-    return existing.id;
-  }
-
-  const entity = addEntity(
-    graph,
-    { canonical_name: identifier, entity_type: ENTITY_TYPES.PERSON },
-    [{ episode_id: episodeId, extractor: EXTRACTOR, confidence: 1.0 }],
-  );
-
-  // Register secondary identifiers as aliases so cross-source lookups succeed
-  const secondaryIds = [account.email, account.username, account.name].filter(
-    (v): v is string => v != null && v !== identifier,
-  );
-  for (const alias of secondaryIds) {
-    addEntityAlias(graph, {
-      entity_id: entity.id,
-      alias,
-      episode_id: episodeId,
-    });
-  }
-
-  counts.entitiesCreated++;
-  return entity.id;
-}
-
-// ---------------------------------------------------------------------------
-// Change ingestion
-// ---------------------------------------------------------------------------
-
-type IngestCounts = Omit<IngestResult, "runId">;
-
-function ingestChange(
-  graph: EngramGraph,
-  change: GerritChange,
-  endpoint: string,
-): IngestCounts {
-  const counts: IngestCounts = {
-    episodesCreated: 0,
-    episodesSkipped: 0,
-    entitiesCreated: 0,
-    entitiesResolved: 0,
-    edgesCreated: 0,
-    edgesSuperseded: 0,
-  };
-
-  const sourceRef = `${endpoint}/c/${change.project}/+/${change._number}`;
-
-  const existing = graph.db
-    .query<{ id: string }, [string, string]>(
-      "SELECT id FROM episodes WHERE source_type = ? AND source_ref = ?",
-    )
-    .get(EPISODE_SOURCE_TYPES.GERRIT_CHANGE, sourceRef);
-
-  if (existing) {
-    counts.episodesSkipped++;
-    return counts;
-  }
-
-  const content = [
-    `CL ${change._number}: ${change.subject}`,
-    `URL: ${sourceRef}`,
-    `Project: ${change.project}`,
-    `Branch: ${change.branch}`,
-    `Status: ${change.status}`,
-    `Owner: ${accountIdentifier(change.owner)}`,
-    `Created: ${change.created}`,
-  ]
-    .join("\n")
-    .trim();
-
-  const episode = addEpisode(graph, {
-    source_type: EPISODE_SOURCE_TYPES.GERRIT_CHANGE,
-    source_ref: sourceRef,
-    content,
-    actor: accountIdentifier(change.owner),
-    timestamp: change.created,
-    extractor_version: ENGINE_VERSION,
-    metadata: {
-      number: change._number,
-      subject: change.subject,
-      status: change.status,
-      project: change.project,
-      branch: change.branch,
-    },
-  });
-
-  counts.episodesCreated++;
-
-  const episodeId = episode.id;
-  const evidence: EvidenceInput[] = [
-    { episode_id: episodeId, extractor: EXTRACTOR, confidence: 1.0 },
-  ];
-
-  // Create change entity with shorthand aliases for cross-ref resolution
-  let changeEntity = resolveEntity(graph, sourceRef, ENTITY_TYPES.PULL_REQUEST);
-  if (!changeEntity) {
-    changeEntity = addEntity(
-      graph,
-      {
-        canonical_name: sourceRef,
-        entity_type: ENTITY_TYPES.PULL_REQUEST,
-        summary: change.subject,
-      },
-      evidence,
-    );
-    counts.entitiesCreated++;
-    addEntityAlias(graph, {
-      entity_id: changeEntity.id,
-      alias: `CL/${change._number}`,
-      episode_id: episodeId,
-    });
-    addEntityAlias(graph, {
-      entity_id: changeEntity.id,
-      alias: `${change.project}/${change._number}`,
-      episode_id: episodeId,
-    });
-  } else {
-    counts.entitiesResolved++;
-  }
-
-  const ownerId = getOrCreatePerson(graph, change.owner, episodeId, counts);
-
-  // authored_by edge: change entity → owner
-  const existingAuthoredEdge = graph.db
-    .query<{ id: string }, [string, string, string, string]>(
-      `SELECT id FROM edges
-       WHERE source_id = ? AND target_id = ? AND relation_type = ?
-         AND edge_kind = ? AND invalidated_at IS NULL LIMIT 1`,
-    )
-    .get(changeEntity.id, ownerId, RELATION_TYPES.AUTHORED_BY, "observed");
-
-  if (!existingAuthoredEdge) {
-    addEdge(
-      graph,
-      {
-        source_id: changeEntity.id,
-        target_id: ownerId,
-        relation_type: RELATION_TYPES.AUTHORED_BY,
-        edge_kind: "observed",
-        fact: `CL/${change._number} authored by ${accountIdentifier(change.owner)}`,
-        valid_from: change.created,
-        confidence: 1.0,
-      },
-      evidence,
-    );
-    counts.edgesCreated++;
-  }
-
-  // reviewed_by edges: each reviewer → owner
-  const reviewers = change.reviewers?.REVIEWER ?? [];
-  for (const reviewer of reviewers) {
-    if (accountIdentifier(reviewer) === accountIdentifier(change.owner))
-      continue;
-
-    const reviewerId = getOrCreatePerson(graph, reviewer, episodeId, counts);
-
-    const existingEdge = graph.db
-      .query<{ id: string }, [string, string, string, string]>(
-        `SELECT id FROM edges
-         WHERE source_id = ? AND target_id = ? AND relation_type = ?
-           AND edge_kind = ? AND invalidated_at IS NULL LIMIT 1`,
-      )
-      .get(reviewerId, ownerId, RELATION_TYPES.REVIEWED_BY, "observed");
-
-    if (!existingEdge) {
-      addEdge(
-        graph,
-        {
-          source_id: reviewerId,
-          target_id: ownerId,
-          relation_type: RELATION_TYPES.REVIEWED_BY,
-          edge_kind: "observed",
-          fact: `${accountIdentifier(reviewer)} reviewed CL/${change._number}`,
-          valid_from: change.created,
-          confidence: 1.0,
-        },
-        evidence,
-      );
-      counts.edgesCreated++;
-    }
-  }
-
-  return counts;
-}
+  },
+};
 
 // ---------------------------------------------------------------------------
 // GerritAdapter
 // ---------------------------------------------------------------------------
 
-const GERRIT_SCOPE_SCHEMA: ScopeSchema = {
-  description:
-    "Gerrit project name (e.g. 'chromium/src'). Slash-separated path components are allowed.",
-  validate(scope: string): string | null {
-    if (!scope) return "scope is required";
-    if (!/^[\w/.-]+$/.test(scope))
-      return `expected a Gerrit project name (e.g. 'myorg/myproject'), got: '${scope}'`;
-    return null;
-  },
-};
+const SOURCE_TYPE = INGESTION_SOURCE_TYPES.GERRIT;
 
 export class GerritAdapter implements EnrichmentAdapter {
   name = "gerrit";
   kind = "enrichment";
+
+  /** Typed auth kinds supported by this adapter. */
   supportedAuth: AuthCredential["kind"][] = ["basic", "bearer", "none"];
-  scopeSchema: ScopeSchema = GERRIT_SCOPE_SCHEMA;
+
+  /** Scope schema — Gerrit project name. */
+  scopeSchema: ScopeSchema = gerritScopeSchema;
+
+  /**
+   * @deprecated Use `supportedAuth` instead.
+   * @experimental
+   */
+  supportsAuth: string[] = ["token", "none"];
+
+  /** @experimental */
   supportsCursor = true;
 
   private fetchFn: FetchFn;
@@ -487,13 +88,19 @@ export class GerritAdapter implements EnrichmentAdapter {
   }
 
   async enrich(graph: EngramGraph, opts: EnrichOpts): Promise<IngestResult> {
-    // v2 fields take precedence; fall back to deprecated v1 fields
+    // Apply v1→v2 compat shim (token→auth, repo→scope) with one-shot warning.
+    opts = applyCompatShim(opts);
+
+    // Validate auth kind against supportedAuth.
+    assertAuthKind(this, opts);
+
     const project = opts.scope ?? opts.repo;
     if (!project) {
       throw new Error(
         "GerritAdapter: opts.scope is required (Gerrit project name)",
       );
     }
+    gerritScopeSchema.validate(project);
 
     const endpoint = (
       opts.endpoint ?? "https://gerrit-review.googlesource.com"
@@ -529,7 +136,9 @@ export class GerritAdapter implements EnrichmentAdapter {
     };
 
     try {
-      let offset = opts.dryRun ? 0 : getLastOffset(graph, sourceScope);
+      let offset = opts.dryRun
+        ? 0
+        : readNumericCursor(graph, SOURCE_TYPE, sourceScope);
       let hasMore = true;
 
       while (hasMore) {
@@ -540,12 +149,9 @@ export class GerritAdapter implements EnrichmentAdapter {
           `/changes/?q=${query}&start=${offset}` +
           `&limit=${PAGE_SIZE}&o=DETAILED_ACCOUNTS`;
 
-        const batch = await apiGet<GerritChange[]>(
-          this.fetchFn,
-          endpoint,
-          path,
-          token,
-        );
+        const batch = await apiGet<
+          Array<{ _more_changes?: boolean; [k: string]: unknown }>
+        >(this.fetchFn, endpoint, path, token);
 
         if (!Array.isArray(batch) || batch.length === 0) break;
 
@@ -557,7 +163,8 @@ export class GerritAdapter implements EnrichmentAdapter {
             continue;
           }
 
-          const counts = ingestChange(graph, change, endpoint);
+          // biome-ignore lint/suspicious/noExplicitAny: GerritChange cast
+          const counts = ingestChange(graph, change as any, endpoint);
           totals.episodesCreated += counts.episodesCreated;
           totals.episodesSkipped += counts.episodesSkipped;
           totals.entitiesCreated += counts.entitiesCreated;
@@ -594,3 +201,7 @@ export class GerritAdapter implements EnrichmentAdapter {
     }
   }
 }
+
+// Suppress unused import warning — GerritAuthError is re-exported above and
+// used internally by apiGet in gerrit-helpers.ts.
+void GerritAuthError;

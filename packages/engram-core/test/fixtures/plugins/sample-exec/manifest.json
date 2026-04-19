@@ -1,0 +1,15 @@
+{
+  "name": "sample-exec",
+  "version": "0.1.0",
+  "contract_version": 1,
+  "transport": "executable",
+  "entry": "plugin.py",
+  "capabilities": {
+    "supported_auth": ["none"],
+    "supports_cursor": false,
+    "scope_schema": {
+      "description": "No scope required for sample-exec plugin",
+      "pattern": ".*"
+    }
+  }
+}
