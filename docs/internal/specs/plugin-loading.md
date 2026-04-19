@@ -300,10 +300,10 @@ Messages are written to the plugin's stdin, one per line.
 | Field | Type | Description |
 |---|---|---|
 | `scope` | `object` | Plugin-defined scope object (validated against `scope_schema` if declared). |
-| `auth` | `object \| null` | Auth credential. Shape depends on auth type: `{"type":"token","token":"..."}` or `{"type":"oauth","token":"..."}` or `null`. |
+| `auth` | `object \| null` | Auth credential. Shape depends on auth type: `{"type":"token","token":"..."}` or `{"type":"oauth","token":"..."}` or `null`. This shape is an interim wire representation; issue #200 will stabilize the `AuthCredential` union type. Until #200 lands, the loader maps a `token: string` from `EnrichOpts` to `{"type":"bearer","token":"..."}` before serialising to the subprocess. Plugins should treat the `type` field as an enum hint and tolerate both `"token"` and `"bearer"` spellings. |
 | `since` | `string \| null` | ISO8601 UTC — only fetch items updated after this date. `null` for full backfill. |
 | `cursor` | `string \| null` | Opaque resume cursor from the previous run. `null` on first run. |
-| `dry_run` | `boolean` | When `true`, plugin SHOULD skip side effects and emit records as if they would be written. |
+| `dry_run` | `boolean` | When `true`, plugin MUST skip all side effects (no external writes) and MUST emit `{"type":"done","cursor":null,...}` as its final message. Counters in `done` should reflect what would have been written. |
 
 #### 3.2.2 Plugin → Engram messages
 
@@ -316,12 +316,20 @@ echoes capabilities back to Engram.
 ```json
 {
   "type": "hello_ack",
+  "contract_version": 1,
   "capabilities": {
     "supported_auth": ["token"],
     "supports_cursor": true
   }
 }
 ```
+
+The `contract_version` field MUST echo the value received in the `hello` message. For
+executable transport, Engram performs the authoritative contract compatibility check against
+`manifest.contract_version` at load time (see §5.1); the `hello_ack` echo provides a
+runtime cross-check that the running process matches the manifest. The loader emits a
+`warn`-level log if the echoed value differs from the manifest declaration but does not
+abort the run.
 
 **`episode`** — emit a new episode (raw evidence). Engram deduplicates on `(source_type, source_ref)`.
 
@@ -458,13 +466,21 @@ At merge time, the loader checks each declared extension value against:
 1. All built-in vocab values.
 2. Values already registered by previously loaded plugins in the same session.
 
-If a collision is detected, the loader emits a `warn`-level log:
+If a collision is detected against **built-in** vocab values, the loader treats it as a
+fatal load error and refuses to load the plugin (logged at `error` level):
 ```
-warn: plugin my-gerrit-adapter declares entity_type "person" which already exists in the built-in registry — skipping
+error: plugin my-gerrit-adapter declares entity_type "person" which collides with a built-in vocab value — plugin not loaded
 ```
 
-The colliding value is silently skipped; the plugin is still loaded. This is not a fatal
-error because the plugin may legitimately be emitting records using a built-in type.
+If a collision is detected against a value already registered by **another plugin** in the
+same session, that is also fatal:
+```
+error: plugin my-gerrit-adapter declares entity_type "other-plugin/foo" which is already registered by plugin other-plugin — plugin not loaded
+```
+
+Treating collisions as fatal prevents two plugins from silently stomping each other's
+types. A plugin that legitimately needs to emit records of a built-in type (e.g. `"person"`)
+must NOT declare it in `vocab_extensions` — only declare genuinely new types there.
 
 ### 4.3 Runtime vocab map for js-module plugins
 
@@ -497,8 +513,10 @@ protocol (message schema changes, removal of fields, semantic changes to existin
 | `manifest.contract_version < LOADER_CONTRACT_VERSION` | Warn: "plugin targets older contract; may work but is unsupported." Load with warning. |
 | `manifest.contract_version > LOADER_CONTRACT_VERSION` | **Refuse to load.** Error: "plugin requires contract v{N} but this engram build supports v{LOADER_CONTRACT_VERSION}. Update engram or downgrade the plugin." |
 
-For executable transport, the loader also cross-checks the `hello_ack` capabilities against
-the manifest declaration. Discrepancies emit a `warn`-level log but do not abort the load.
+For executable transport, the loader also cross-checks the `hello_ack` `capabilities` and
+`contract_version` echo against the manifest declaration (see §3.2.2). Discrepancies emit
+a `warn`-level log but do not abort the load, since the manifest check already ran at load
+time.
 
 ### 5.2 plugin `version` field
 
@@ -560,7 +578,7 @@ plugin marketplace with remote downloads.
 | `contract_version` too high (see §5) | Skip with `error` log. |
 | `transport: js-module` — `import()` throws | Skip with `error` log. Stack trace at `debug` level. |
 | `transport: js-module` — exported `name` != manifest `name` | Skip with `error` log. |
-| Vocab extension collision | Skip the colliding value, log `warn`. Plugin still loads. |
+| Vocab extension collision (built-in or cross-plugin) | **Fatal.** Skip with `error` log. Plugin not loaded. |
 | Vocab extension limit exceeded | Skip with `error` log. Plugin not loaded. |
 
 ### 7.2 Runtime errors (executable transport)
@@ -617,6 +635,7 @@ This example demonstrates a complete executable-transport plugin in Python.
     }
   },
   "vocab_extensions": {
+    "entity_types": ["my-gerrit-adapter/patchset"],
     "source_types": {
       "ingestion": ["my-gerrit-adapter/gerrit"],
       "episode": ["my-gerrit-adapter/gerrit_change"]
@@ -779,11 +798,17 @@ def main() -> None:
             "evidence": {"source_ref": change_url}
         })
 
-        # Emit change entity (pull_request maps to Gerrit CL)
+        # Emit change entity using the plugin's namespaced entity type.
+        # "my-gerrit-adapter/patchset" is a custom type declared in vocab_extensions —
+        # using a namespaced value (plugin-name/type) avoids colliding with built-in types
+        # and makes the provenance of the type clear to readers of the graph.
+        # Note: this plugin does NOT emit a row for the ingestion source_type it declared
+        # ("my-gerrit-adapter/gerrit"). Engram writes ingestion_runs rows itself — the
+        # plugin only emits episodes and entities.
         send({
             "type": "entity",
             "entity": {
-                "entity_type": "pull_request",
+                "entity_type": "my-gerrit-adapter/patchset",
                 "canonical_name": change_url,
                 "properties": {"subject": subject, "change_number": change_num}
             },
