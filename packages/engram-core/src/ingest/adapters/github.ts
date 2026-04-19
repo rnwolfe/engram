@@ -110,7 +110,20 @@ export class GitHubAdapter implements EnrichmentAdapter {
     githubScopeSchema.validate(repo);
 
     const endpoint = opts.endpoint ?? "https://api.github.com";
-    const token = opts.auth?.kind === "bearer" ? opts.auth.token : opts.token;
+
+    // Resolve token from v2 auth credential or deprecated v1 token field
+    let token: string | undefined;
+    const auth = opts.auth;
+    if (auth) {
+      if (auth.kind === "bearer") {
+        token = auth.token;
+      } else if (auth.kind === "oauth2") {
+        token = auth.token;
+      }
+      // 'none' → token remains undefined
+    } else if (opts.token) {
+      token = opts.token;
+    }
 
     const run = createIngestionRun(graph, repo);
     const runId = run.id;

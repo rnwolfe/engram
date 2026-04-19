@@ -67,7 +67,7 @@ export class GerritAdapter implements EnrichmentAdapter {
   kind = "enrichment";
 
   /** Typed auth kinds supported by this adapter. */
-  supportedAuth: AuthCredential["kind"][] = ["basic", "none"];
+  supportedAuth: AuthCredential["kind"][] = ["basic", "bearer", "none"];
 
   /** Scope schema — Gerrit project name. */
   scopeSchema: ScopeSchema = gerritScopeSchema;
@@ -106,13 +106,20 @@ export class GerritAdapter implements EnrichmentAdapter {
       opts.endpoint ?? "https://gerrit-review.googlesource.com"
     ).replace(/\/$/, "");
 
-    // Extract token from auth or fall back to deprecated opts.token
-    const token =
-      opts.auth?.kind === "basic"
-        ? `${(opts.auth as { kind: "basic"; username: string; secret: string }).username}:${(opts.auth as { kind: "basic"; username: string; secret: string }).secret}`
-        : opts.auth?.kind === "bearer"
-          ? (opts.auth as { kind: "bearer"; token: string }).token
-          : opts.token;
+    // Resolve token from v2 auth credential or deprecated v1 token field.
+    // Gerrit uses HTTP Basic auth: "user:password" encoded.
+    let token: string | undefined;
+    const auth = opts.auth;
+    if (auth) {
+      if (auth.kind === "basic") {
+        token = `${auth.username}:${auth.secret}`;
+      } else if (auth.kind === "bearer") {
+        token = auth.token;
+      }
+      // 'none' → token remains undefined
+    } else if (opts.token) {
+      token = opts.token;
+    }
 
     const sourceScope = `${endpoint}/${project}`;
 

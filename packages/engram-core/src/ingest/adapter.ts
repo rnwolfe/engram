@@ -57,6 +57,7 @@ import type { IngestResult } from "./git.js";
  *
  * JSON round-trip note: the `oauth2.refresh` callback is a function and will be
  * lost during JSON serialization. All other variants are fully serializable.
+ * @stable
  */
 export type AuthCredential =
   | { kind: "none" }
@@ -68,9 +69,10 @@ export type AuthCredential =
       token: string;
       scopes: string[];
       /**
-       * Optional refresh callback. Called once on 401/403, swaps the token,
-       * and retries the request once. Throws `EnrichmentAdapterError` with
-       * `code: 'auth_failure'` if the retry also fails.
+       * Optional refresh callback. When the adapter receives a 401/403 and
+       * `refresh` is present, it MUST call `refresh()` once, swap the returned
+       * token in, and retry. If the retry fails too, throw `auth_failure`.
+       * Adapters without a refresh callback surface `auth_failure` immediately.
        *
        * In-process only — subprocess plugins handle refresh internally.
        */
@@ -85,6 +87,7 @@ export type AuthCredential =
  * Declares the expected format and semantics of `EnrichOpts.scope` for a
  * given adapter. Plain object for JSON-expressibility — no closures except
  * the `validate` method which throws on invalid input.
+ * @stable
  */
 export interface ScopeSchema {
   /** Human-readable description of the expected scope format. */
@@ -121,11 +124,17 @@ export interface EnrichProgress {
 
 export interface EnrichOpts {
   /**
-   * Auth token for the remote API. NEVER stored in the graph.
-   * Optional — omit for public repositories (unauthenticated, 60 req/hr).
-   * Required for private repositories.
-   * @deprecated Use `auth: { kind: 'bearer', token }` instead.
+   * Typed auth credential constructed by the CLI from flags/env.
+   * Replaces the legacy `token` field. NEVER stored in the graph.
    * @stable
+   */
+  auth?: AuthCredential;
+
+  /**
+   * Auth token for the remote API. NEVER stored in the graph.
+   * @deprecated Use `auth: { kind: 'bearer', token }` instead.
+   * Accepted for one minor version for backwards-compat; normalised to `auth`
+   * by adapters when `auth` is absent.
    */
   token?: string;
 
@@ -142,25 +151,27 @@ export interface EnrichOpts {
   endpoint?: string;
 
   /**
-   * Repository or project identifier (format is adapter-specific).
-   * @deprecated Use `scope` instead.
-   * @stable
-   */
-  repo?: string;
-
-  /**
-   * Scope string identifying the resource to enrich (format is adapter-specific,
-   * validated by `adapter.scopeSchema`). Replaces the deprecated `repo` field.
+   * Adapter-specific scope identifier (e.g. 'owner/repo' for GitHub,
+   * project name for Gerrit). Replaces the legacy `repo` field.
+   * Validated against `adapter.scopeSchema` before `enrich()` is called.
    * @stable
    */
   scope?: string;
 
   /**
-   * Auth credentials for the remote API. NEVER stored in the graph.
-   * Replaces the deprecated `token` field.
-   * @stable
+   * Repository or project identifier.
+   * @deprecated Use `scope` instead.
+   * Normalised to `scope` by adapters when `scope` is absent.
    */
-  auth?: AuthCredential;
+  repo?: string;
+
+  /**
+   * Opaque resume cursor from the previous run. Adapters read their own
+   * cursor from `ingestion_runs` — this field is reserved for future use
+   * where the caller wants to force a specific resume point.
+   * @experimental
+   */
+  cursor?: string;
 
   /**
    * When true, the adapter MUST skip all writes and return a result describing
@@ -203,17 +214,11 @@ export interface EnrichmentAdapter {
   supportedAuth: AuthCredential["kind"][];
 
   /**
-   * Schema describing the expected `opts.scope` value for this adapter.
+   * Scope format description and validator.
+   * The CLI calls `scopeSchema.validate(scope)` before `enrich()`.
    * @stable
    */
   scopeSchema: ScopeSchema;
-
-  /**
-   * List of auth schemes the adapter supports.
-   * @deprecated Use `supportedAuth` instead.
-   * @experimental
-   */
-  supportsAuth?: string[];
 
   /**
    * Whether the adapter supports resume from a stored cursor.

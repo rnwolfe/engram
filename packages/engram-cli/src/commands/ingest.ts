@@ -5,7 +5,7 @@
  *   - ingest git [<path>] [--since] [--branch]
  *   - ingest md <glob>
  *   - ingest source [<path>] [--exclude] [--no-gitignore] [--dry-run] [--verbose]
- *   - ingest enrich github [--token] [--repo] [--verbose]
+ *   - ingest enrich <adapter> [--scope] [auth flags] [--verbose]
  */
 
 import * as fs from "node:fs";
@@ -25,8 +25,8 @@ import type {
 import {
   closeGraph,
   EnrichmentAdapterError,
+  GerritAdapter,
   GitHubAdapter,
-  GitHubAuthError,
   ingestGitRepo,
   ingestMarkdown,
   ingestSource,
@@ -40,6 +40,7 @@ import {
   loadManifest,
   ManifestValidationError,
 } from "engram-core/plugins";
+import { buildAuthCredential } from "../ingest/auth.js";
 
 interface IngestGitOpts {
   since?: string;
@@ -59,11 +60,22 @@ interface IngestSourceOpts {
   db: string;
 }
 
-interface IngestEnrichGithubOpts {
-  token?: string;
+/** Flags shared across all `ingest enrich <adapter>` subcommands. */
+interface IngestEnrichOpts {
+  scope?: string;
+  /** @deprecated Use --scope */
   repo?: string;
+  since?: string;
+  dryRun?: boolean;
   verbose?: boolean;
   db: string;
+  // Auth flags
+  token?: string;
+  username?: string;
+  password?: string;
+  serviceAccount?: string;
+  oauthToken?: string;
+  oauthScopes?: string;
 }
 
 export function registerIngest(program: Command): void {
@@ -357,26 +369,121 @@ See also:
       }
     });
 
-  // ingest enrich github
+  // ---------------------------------------------------------------------------
+  // ingest enrich — shared auth flag adder and error handler
+  // ---------------------------------------------------------------------------
+
   const enrich = ingest
     .command("enrich")
     .description("Enrich the graph with data from external sources");
 
-  enrich
-    .command("github")
-    .description("Enrich with GitHub PRs and issues")
-    .addHelpText(
-      "after",
-      `
+  /**
+   * Add shared auth and scope flags to an enrich subcommand.
+   * Each adapter subcommand calls this to get a consistent flag set.
+   */
+  function addEnrichFlags(cmd: Command): Command {
+    return cmd
+      .option(
+        "--scope <value>",
+        "adapter-specific scope (e.g. 'owner/repo' for GitHub, project name for Gerrit)",
+      )
+      .option("--repo <value>", "(deprecated) alias for --scope")
+      .option("--since <date>", "only fetch items updated after this date")
+      .option("--dry-run", "preview what would be created without writing")
+      .option(
+        "--token <token>",
+        "API token (bearer auth). Env: <ADAPTER>_TOKEN",
+      )
+      .option(
+        "--username <username>",
+        "username for basic auth. Env: <ADAPTER>_USERNAME",
+      )
+      .option(
+        "--password <password>",
+        "password/secret for basic auth. Env: <ADAPTER>_PASSWORD",
+      )
+      .option(
+        "--service-account <path>",
+        "path to service account JSON file. Env: <ADAPTER>_SERVICE_ACCOUNT_JSON",
+      )
+      .option(
+        "--oauth-token <token>",
+        "OAuth2 bearer token. Env: <ADAPTER>_OAUTH_TOKEN",
+      )
+      .option(
+        "--oauth-scopes <csv>",
+        "comma-separated OAuth2 scopes. Env: <ADAPTER>_OAUTH_SCOPES",
+      )
+      .option(
+        "-v, --verbose",
+        "print extra details (auth mode, rate limit info)",
+        false,
+      )
+      .option("--db <path>", "path to .engram file", ".engram");
+  }
+
+  /**
+   * Handle EnrichmentAdapterError with targeted messages per error code.
+   */
+  function handleEnrichError(
+    err: unknown,
+    adapterName: string,
+    supportedAuth: string[],
+  ): void {
+    if (err instanceof EnrichmentAdapterError) {
+      const adapterErr = err;
+      const prefix = adapterName.toUpperCase();
+      switch (adapterErr.code) {
+        case "auth_failure":
+          log.error(
+            `Auth failed for ${adapterName}. Check your credentials.\n` +
+              `Supported auth: ${supportedAuth.join(", ")}\n` +
+              `Env var: ${prefix}_TOKEN (or equivalent)`,
+          );
+          break;
+        case "rate_limited":
+          log.error(adapterErr.message);
+          log.warn(
+            "Tip: wait a moment and retry, or provide a token to raise rate limits.",
+          );
+          break;
+        case "data_error":
+          log.error(adapterErr.message);
+          break;
+        case "server_error":
+          log.error(adapterErr.message);
+          break;
+        default:
+          log.error(adapterErr.message);
+      }
+    } else {
+      log.error(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // ingest enrich github
+  // ---------------------------------------------------------------------------
+
+  addEnrichFlags(
+    enrich
+      .command("github")
+      .description("Enrich with GitHub PRs and issues")
+      .addHelpText(
+        "after",
+        `
+Auth flags (select based on your setup):
+  --token <token>            Bearer token (or set GITHUB_TOKEN)
+
+Scope:
+  --scope owner/repo         Repository in 'owner/repo' format
+
 Examples:
   # Enrich with GitHub PRs and issues (reads GITHUB_TOKEN from env)
-  engram ingest enrich github
-
-  # Specify repo explicitly
-  engram ingest enrich github --repo owner/repo
+  engram ingest enrich github --scope owner/repo
 
   # Pass token directly (for CI)
-  engram ingest enrich github --token ghp_…
+  engram ingest enrich github --scope owner/repo --token ghp_…
 
 When to use:
   Run after engram ingest git to add PR discussion and issue context.
@@ -384,85 +491,205 @@ When to use:
 
 See also:
   engram ingest git    Ingest git history first`,
-    )
-    .option(
-      "--token <token>",
-      "GitHub API token (or set GITHUB_TOKEN env var). Optional for public repos.",
-    )
-    .option("--repo <owner/repo>", "repository in owner/repo format")
-    .option(
-      "-v, --verbose",
-      "print extra details (auth mode, rate limit info)",
-      false,
-    )
-    .option("--db <path>", "path to .engram file", ".engram")
-    .action(async (opts: IngestEnrichGithubOpts) => {
-      if (process.stdout.isTTY) intro("engram ingest enrich github");
+      ),
+  ).action(async (opts: IngestEnrichOpts) => {
+    if (process.stdout.isTTY) intro("engram ingest enrich github");
 
-      const dbPath = resolveDbPath(path.resolve(opts.db));
-      const token = opts.token ?? process.env.GITHUB_TOKEN;
+    // Handle deprecated --repo alias
+    if (opts.repo && !opts.scope) {
+      console.warn("Warning: --repo is deprecated, use --scope instead.");
+      opts.scope = opts.repo;
+    }
 
-      if (!token) {
-        log.warn(
-          "No token provided — proceeding unauthenticated.\n" +
-            "Public repos work without a token (rate limit: 60 req/hr).\n" +
-            "For private repos or higher rate limits, set GITHUB_TOKEN or use --token.",
-        );
-      } else if (opts.verbose) {
-        log.info("Authenticated (rate limit: 5,000 req/hr)");
-      }
+    const adapter = new GitHubAdapter();
 
-      let graph: EngramGraph | undefined;
-      try {
-        graph = openGraph(dbPath);
-      } catch (err) {
-        log.error(
-          `Cannot open graph: ${err instanceof Error ? err.message : String(err)}`,
-        );
-        process.exit(1);
-      }
+    // Build auth credential from flags/env
+    let auth: ReturnType<typeof buildAuthCredential>;
+    try {
+      auth = buildAuthCredential(opts, adapter.name, adapter.supportedAuth);
+    } catch (err) {
+      log.error(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
 
-      const adapter = new GitHubAdapter();
-      const repoLabel = opts.repo ? ` (${opts.repo})` : "";
-      const s = spinner();
-      s.start(`Fetching from GitHub${repoLabel}`);
+    // Validate scope before opening graph
+    if (!opts.scope) {
+      log.error(
+        `--scope is required for github adapter.\n${adapter.scopeSchema.description}`,
+      );
+      process.exit(1);
+    }
+    try {
+      adapter.scopeSchema.validate(opts.scope);
+    } catch (err) {
+      log.error(
+        `Invalid scope for github: ${err instanceof Error ? err.message : String(err)}\n${adapter.scopeSchema.description}`,
+      );
+      process.exit(1);
+    }
 
-      try {
-        const result = await adapter.enrich(graph, { token, repo: opts.repo });
-        s.stop("GitHub enrichment complete");
-        log.info(
-          [
-            `Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
-            `Entities: ${result.entitiesCreated} created`,
-            `Edges:    ${result.edgesCreated} created`,
-          ].join("\n"),
-        );
-      } catch (err) {
-        s.stop("GitHub enrichment failed");
-        if (err instanceof GitHubAuthError) {
-          log.error(err.message);
-          if (!token) {
-            log.warn(
-              "Tip: provide a token with --token <token> or by setting the GITHUB_TOKEN env var.",
-            );
-          }
-        } else if (err instanceof EnrichmentAdapterError) {
-          log.error(err.message);
-          if (err.code === "rate_limited") {
-            log.warn(
-              "Tip: provide a token with --token <token> or GITHUB_TOKEN to raise the rate limit.",
-            );
-          }
-        } else {
-          log.error(err instanceof Error ? err.message : String(err));
-        }
-        closeGraph(graph);
-        process.exit(1);
-      }
+    if (opts.verbose) {
+      log.info(`Auth: ${auth.kind}`);
+    }
 
+    const dbPath = resolveDbPath(path.resolve(opts.db));
+    let graph: EngramGraph | undefined;
+    try {
+      graph = openGraph(dbPath);
+    } catch (err) {
+      log.error(
+        `Cannot open graph: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      process.exit(1);
+    }
+
+    const s = spinner();
+    s.start(`Fetching from GitHub (${opts.scope})`);
+
+    try {
+      const result = await adapter.enrich(graph, {
+        auth,
+        scope: opts.scope,
+        since: opts.since,
+        dryRun: opts.dryRun,
+      });
+      s.stop("GitHub enrichment complete");
+      log.info(
+        [
+          `Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
+          `Entities: ${result.entitiesCreated} created`,
+          `Edges:    ${result.edgesCreated} created`,
+        ].join("\n"),
+      );
+    } catch (err) {
+      s.stop("GitHub enrichment failed");
+      handleEnrichError(err, adapter.name, adapter.supportedAuth);
       closeGraph(graph);
-      if (process.stdout.isTTY) outro("Done");
-    });
+      process.exit(1);
+    }
+
+    closeGraph(graph);
+    if (process.stdout.isTTY) outro("Done");
+  });
+
+  // ---------------------------------------------------------------------------
+  // ingest enrich gerrit
+  // ---------------------------------------------------------------------------
+
+  addEnrichFlags(
+    enrich
+      .command("gerrit")
+      .description("Enrich with Gerrit code review changes")
+      .addHelpText(
+        "after",
+        `
+Auth flags (select based on your setup):
+  --token <token>                  Bearer token (or set GERRIT_TOKEN)
+  --username <u> --password <p>    HTTP Basic auth (or set GERRIT_USERNAME / GERRIT_PASSWORD)
+
+Scope:
+  --scope <project>      Gerrit project name (e.g. 'chromium/src')
+
+Examples:
+  # Enrich using HTTP Basic auth
+  engram ingest enrich gerrit --scope chromium/src --username alice --password s3cr3t
+
+  # Enrich a public Gerrit instance (no auth)
+  engram ingest enrich gerrit --scope myproject
+
+  # Specify a custom Gerrit endpoint
+  engram ingest enrich gerrit --scope myproject --endpoint https://gerrit.example.com
+
+When to use:
+  Run after engram ingest git to add Gerrit code-review discussions.
+
+See also:
+  engram ingest git    Ingest git history first`,
+      )
+      .option(
+        "--endpoint <url>",
+        "Gerrit base URL (default: https://gerrit-review.googlesource.com)",
+      ),
+  ).action(async (opts: IngestEnrichOpts & { endpoint?: string }) => {
+    if (process.stdout.isTTY) intro("engram ingest enrich gerrit");
+
+    // Handle deprecated --repo alias
+    if (opts.repo && !opts.scope) {
+      console.warn("Warning: --repo is deprecated, use --scope instead.");
+      opts.scope = opts.repo;
+    }
+
+    const adapter = new GerritAdapter();
+
+    // Build auth credential from flags/env
+    let auth: ReturnType<typeof buildAuthCredential>;
+    try {
+      auth = buildAuthCredential(opts, adapter.name, adapter.supportedAuth);
+    } catch (err) {
+      log.error(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
+
+    // Validate scope before opening graph
+    if (!opts.scope) {
+      log.error(
+        `--scope is required for gerrit adapter.\n${adapter.scopeSchema.description}`,
+      );
+      process.exit(1);
+    }
+    try {
+      adapter.scopeSchema.validate(opts.scope);
+    } catch (err) {
+      log.error(
+        `Invalid scope for gerrit: ${err instanceof Error ? err.message : String(err)}\n${adapter.scopeSchema.description}`,
+      );
+      process.exit(1);
+    }
+
+    if (opts.verbose) {
+      log.info(`Auth: ${auth.kind}`);
+    }
+
+    const dbPath = resolveDbPath(path.resolve(opts.db));
+    let graph: EngramGraph | undefined;
+    try {
+      graph = openGraph(dbPath);
+    } catch (err) {
+      log.error(
+        `Cannot open graph: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      process.exit(1);
+    }
+
+    const s = spinner();
+    s.start(`Fetching from Gerrit (${opts.scope})`);
+
+    try {
+      const result = await adapter.enrich(graph, {
+        auth,
+        scope: opts.scope,
+        since: opts.since,
+        dryRun: opts.dryRun,
+        endpoint: opts.endpoint,
+      });
+      s.stop("Gerrit enrichment complete");
+      log.info(
+        [
+          `Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
+          `Entities: ${result.entitiesCreated} created`,
+          `Edges:    ${result.edgesCreated} created`,
+        ].join("\n"),
+      );
+    } catch (err) {
+      s.stop("Gerrit enrichment failed");
+      handleEnrichError(err, adapter.name, adapter.supportedAuth);
+      closeGraph(graph);
+      process.exit(1);
+    }
+
+    closeGraph(graph);
+    if (process.stdout.isTTY) outro("Done");
+  });
 
   registerPluginEnrichSubcommands(enrich);
 }
