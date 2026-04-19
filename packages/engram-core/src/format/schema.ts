@@ -89,15 +89,17 @@ CREATE TABLE episodes (
   ingested_at       TEXT NOT NULL,
   owner_id          TEXT,
   extractor_version TEXT NOT NULL,
-  metadata          TEXT
+  metadata          TEXT,
+  superseded_by     TEXT REFERENCES episodes(id)
 );
 `;
 
 export const CREATE_EPISODES_INDEXES = `
-CREATE UNIQUE INDEX idx_episodes_identity ON episodes(source_type, source_ref) WHERE source_ref IS NOT NULL;
+CREATE UNIQUE INDEX idx_episodes_identity ON episodes(source_type, source_ref) WHERE source_ref IS NOT NULL AND superseded_by IS NULL;
 CREATE INDEX idx_episodes_source ON episodes(source_type);
 CREATE INDEX idx_episodes_time ON episodes(timestamp);
 CREATE INDEX idx_episodes_hash ON episodes(content_hash);
+CREATE INDEX idx_episodes_current ON episodes(source_type, source_ref) WHERE superseded_by IS NULL;
 `;
 
 export const CREATE_ENTITY_EVIDENCE = `
@@ -318,6 +320,27 @@ CREATE INDEX IF NOT EXISTS idx_unresolved_refs_target
   ON unresolved_refs(target_source_type, target_ref)
   WHERE resolved_at IS NULL;
 `;
+
+/**
+ * Migration DDL for the episodes.superseded_by column.
+ *
+ * Adds the column if absent, then replaces the broad unique index with a
+ * partial one that only covers non-superseded rows. All statements are
+ * idempotent (IF NOT EXISTS / column-exists guard handled at the call site).
+ */
+export const MIGRATE_EPISODES_SUPERSEDED_BY: string[] = [
+  // Add the column — SQLite ALTER TABLE ignores no-op if already present via
+  // the caller's column-exists check (see openGraph migration block).
+  `ALTER TABLE episodes ADD COLUMN superseded_by TEXT REFERENCES episodes(id)`,
+  // Replace the old broad unique index with the partial (non-superseded) one.
+  `DROP INDEX IF EXISTS idx_episodes_identity`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_episodes_identity
+     ON episodes(source_type, source_ref)
+     WHERE source_ref IS NOT NULL AND superseded_by IS NULL`,
+  `CREATE INDEX IF NOT EXISTS idx_episodes_current
+     ON episodes(source_type, source_ref)
+     WHERE superseded_by IS NULL`,
+];
 
 /** DDL that is safe to apply on every open (idempotent IF NOT EXISTS). */
 export const ADDITIVE_DDL: string[] = [

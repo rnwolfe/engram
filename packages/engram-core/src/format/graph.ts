@@ -12,7 +12,11 @@ import { Database } from "bun:sqlite";
 import * as fs from "node:fs";
 import * as nodePath from "node:path";
 import { ulid } from "ulid";
-import { ADDITIVE_DDL, SCHEMA_DDL } from "./schema.js";
+import {
+  ADDITIVE_DDL,
+  MIGRATE_EPISODES_SUPERSEDED_BY,
+  SCHEMA_DDL,
+} from "./schema.js";
 import {
   ENGINE_VERSION,
   FORMAT_VERSION,
@@ -208,6 +212,18 @@ export function openGraph(path: string): EngramGraph {
   // new optional tables (e.g. unresolved_refs) without a schema version bump.
   for (const ddl of ADDITIVE_DDL) {
     db.exec(ddl);
+  }
+
+  // Migration: add episodes.superseded_by if the column is absent.
+  // Use a column-exists guard so this is safe to run on both new and old DBs.
+  const episodeCols = db
+    .query<{ name: string }, []>("PRAGMA table_info(episodes)")
+    .all();
+  const hasSupersededBy = episodeCols.some((c) => c.name === "superseded_by");
+  if (!hasSupersededBy) {
+    for (const stmt of MIGRATE_EPISODES_SUPERSEDED_BY) {
+      db.exec(stmt);
+    }
   }
 
   return {

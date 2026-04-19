@@ -363,6 +363,46 @@ function checkProjectionDependencyCycles(graph: EngramGraph): Violation[] {
   return violations;
 }
 
+function checkEpisodeFanIn(graph: EngramGraph): Violation[] {
+  // Each episode may have at most one successor (fan-in uniqueness).
+  // i.e., no two episodes should share the same superseded_by value.
+  const rows = graph.db
+    .query<{ superseded_by: string; cnt: number }, []>(
+      `SELECT superseded_by, COUNT(*) AS cnt
+       FROM episodes
+       WHERE superseded_by IS NOT NULL
+       GROUP BY superseded_by
+       HAVING cnt > 1`,
+    )
+    .all();
+
+  return rows.map((row) => ({
+    check: "checkEpisodeFanIn",
+    entity_or_edge_id: row.superseded_by,
+    message: `Episode '${row.superseded_by}' is referenced as superseded_by by ${row.cnt} episodes (fan-in violation — each episode may have at most one successor)`,
+    severity: "error" as ViolationSeverity,
+  }));
+}
+
+function checkEpisodeDanglingSupersededBy(graph: EngramGraph): Violation[] {
+  // superseded_by must point to a valid existing episode id.
+  const rows = graph.db
+    .query<{ id: string; superseded_by: string }, []>(
+      `SELECT id, superseded_by
+       FROM episodes
+       WHERE superseded_by IS NOT NULL
+         AND superseded_by NOT IN (SELECT id FROM episodes)`,
+    )
+    .all();
+
+  return rows.map((row) => ({
+    check: "checkEpisodeDanglingSupersededBy",
+    entity_or_edge_id: row.id,
+    message: `Episode '${row.id}' has superseded_by '${row.superseded_by}' which does not exist`,
+    severity: "error" as ViolationSeverity,
+  }));
+}
+
 function checkActiveEdgeOverlaps(graph: EngramGraph): Violation[] {
   // Find pairs of active edges (no invalidated_at) sharing the same
   // (source_id, target_id, relation_type, edge_kind) with overlapping validity windows.
@@ -492,6 +532,8 @@ export function verifyGraph(
   }
   violations.push(...checkEntityEvidence(graph));
   violations.push(...checkEdgeEvidence(graph));
+  violations.push(...checkEpisodeFanIn(graph));
+  violations.push(...checkEpisodeDanglingSupersededBy(graph));
   violations.push(...checkSupersededByRefs(graph));
   violations.push(...checkAliasEpisodeRefs(graph));
   violations.push(...checkEvidenceEpisodeRefs(graph));
