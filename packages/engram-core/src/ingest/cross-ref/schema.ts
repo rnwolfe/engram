@@ -6,11 +6,11 @@
  * The table is created by openGraph automatically on every open via ADDITIVE_DDL.
  */
 
+import type { EngramGraph } from "../../format/index.js";
 import {
   CREATE_UNRESOLVED_REFS,
   CREATE_UNRESOLVED_REFS_INDEX,
 } from "../../format/schema.js";
-import type { EngramGraph } from "../../format/index.js";
 
 export { CREATE_UNRESOLVED_REFS, CREATE_UNRESOLVED_REFS_INDEX };
 
