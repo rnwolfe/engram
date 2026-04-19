@@ -17,7 +17,11 @@ import { intro, log, outro, spinner } from "@clack/prompts";
 // For those commands we log a "starting" line and print results when done.
 // spinner() is only used for async operations (GitHub fetch, LLM calls).
 import type { Command } from "commander";
-import type { EngramGraph, SourceProgressEvent } from "engram-core";
+import type {
+  EngramGraph,
+  EnrichmentAdapter,
+  SourceProgressEvent,
+} from "engram-core";
 import {
   closeGraph,
   EnrichmentAdapterError,
@@ -29,6 +33,13 @@ import {
   openGraph,
   resolveDbPath,
 } from "engram-core";
+import {
+  discoverPlugins,
+  loadExecutablePlugin,
+  loadJsModulePlugin,
+  loadManifest,
+  ManifestValidationError,
+} from "engram-core/plugins";
 
 interface IngestGitOpts {
   since?: string;
@@ -452,4 +463,105 @@ See also:
       closeGraph(graph);
       if (process.stdout.isTTY) outro("Done");
     });
+
+  registerPluginEnrichSubcommands(enrich);
+}
+
+interface IngestEnrichPluginOpts {
+  db: string;
+  token?: string;
+  repo?: string;
+  since?: string;
+}
+
+/**
+ * Discovers installed plugins and registers each as an `engram ingest enrich <plugin-name>`
+ * subcommand so plugins are first-class citizens alongside built-in adapters.
+ */
+function registerPluginEnrichSubcommands(
+  enrich: import("commander").Command,
+): void {
+  const projectRoot = process.cwd();
+  const discovered = discoverPlugins(projectRoot);
+
+  for (const pd of discovered) {
+    let manifest: ReturnType<typeof loadManifest>;
+    try {
+      manifest = loadManifest(pd.dir);
+    } catch (err) {
+      // Skip plugins with invalid manifests at registration time; they'll surface in `plugin list`
+      if (!(err instanceof ManifestValidationError)) throw err;
+      continue;
+    }
+
+    const pluginManifest = manifest;
+    const pluginDir = pd.dir;
+
+    enrich
+      .command(pluginManifest.name)
+      .description(
+        `Enrich with plugin '${pluginManifest.name}' v${pluginManifest.version}`,
+      )
+      .option("--db <path>", "path to .engram file", ".engram")
+      .option("--token <token>", "auth token for the plugin (if required)")
+      .option("--repo <scope>", "scope / repository identifier for the plugin")
+      .option(
+        "--since <date>",
+        "only fetch items updated after this date (ISO8601)",
+      )
+      .action(async (opts: IngestEnrichPluginOpts) => {
+        const dbPath = resolveDbPath(path.resolve(opts.db));
+
+        let graph: EngramGraph | undefined;
+        try {
+          graph = openGraph(dbPath);
+        } catch (err) {
+          log.error(
+            `Cannot open graph: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          process.exit(1);
+        }
+
+        let adapter: EnrichmentAdapter;
+        try {
+          if (pluginManifest.transport === "js-module") {
+            adapter = await loadJsModulePlugin(pluginDir, pluginManifest);
+          } else {
+            adapter = loadExecutablePlugin(pluginDir, pluginManifest);
+          }
+        } catch (err) {
+          log.error(
+            `Failed to load plugin '${pluginManifest.name}': ${err instanceof Error ? err.message : String(err)}`,
+          );
+          closeGraph(graph);
+          process.exit(1);
+        }
+
+        const s = spinner();
+        s.start(`Running plugin '${pluginManifest.name}'`);
+
+        try {
+          const result = await adapter.enrich(graph, {
+            token: opts.token,
+            repo: opts.repo,
+            since: opts.since,
+          });
+          s.stop(`Plugin '${pluginManifest.name}' complete`);
+          log.info(
+            [
+              `Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
+              `Entities: ${result.entitiesCreated} created`,
+              `Edges:    ${result.edgesCreated} created`,
+            ].join("\n"),
+          );
+        } catch (err) {
+          s.stop(`Plugin '${pluginManifest.name}' failed`);
+          log.error(err instanceof Error ? err.message : String(err));
+          closeGraph(graph);
+          process.exit(1);
+        }
+
+        closeGraph(graph);
+      });
+  }
 }

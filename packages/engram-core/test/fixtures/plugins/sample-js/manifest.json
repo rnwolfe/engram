@@ -1,0 +1,18 @@
+{
+  "name": "sample-js",
+  "version": "0.1.0",
+  "contract_version": 1,
+  "transport": "js-module",
+  "entry": "index.ts",
+  "capabilities": {
+    "supported_auth": ["none"],
+    "supports_cursor": false,
+    "scope_schema": {
+      "description": "No scope required for sample-js plugin",
+      "pattern": ".*"
+    }
+  },
+  "vocab_extensions": {
+    "entity_types": ["sample-js/test-entity"]
+  }
+}

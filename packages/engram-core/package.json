@@ -9,10 +9,14 @@
     ".": {
       "bun": "./src/index.ts",
       "default": "./dist/index.js"
+    },
+    "./plugins": {
+      "bun": "./src/plugins/index.ts",
+      "default": "./dist/plugins/index.js"
     }
   },
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target node",
+    "build": "bun build src/index.ts src/plugins/index.ts --outdir dist --target node",
     "test": "bun test"
   },
   "dependencies": {
