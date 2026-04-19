@@ -269,26 +269,19 @@ The v0.1 prompt demonstrates that a well-structured discover prompt can:
 3. Emit concrete, actionable proposals with specific substrate citations
 4. Suppress low-signal rows and respect the 5-proposal cap
 
-However, two failure modes observed in development argue for a lightweight
-heuristic pre-filter before the LLM call:
+However, two failure modes argue for a lightweight heuristic pre-filter before the LLM call:
 
-1. **Episode deduplication within the same event.** Multiple episodes from the
-   same PR or the same issue thread carry redundant signal. A pre-filter that
-   groups episodes by `source_ref` prefix (e.g. `PR#11/*`) and passes only one
-   representative per group would reduce context window noise and prevent the
-   borderline token-service proposal from being justified by what is effectively
-   one event seen twice.
+1. **Episode deduplication within the same event.** Group episodes by `source_ref` prefix
+   (e.g. `PR#11/*`) and pass only one representative per group to reduce context noise and
+   prevent thin proposals justified by a single event seen twice.
 
-2. **Minimum evidence threshold for entity candidates.** Entities with fewer
-   than 3 distinct (deduplicated) episodes should be excluded from the delta
-   before it is passed to the model. This mirrors the `entity_summary`
-   `when_to_use` criterion and prevents the model from proposing summaries for
-   thin entities.
+2. **Minimum evidence threshold for entity candidates.** Exclude entities with fewer than
+   3 distinct (deduplicated) episodes before passing the delta to the model — mirroring the
+   `entity_summary` `when_to_use` criterion.
 
-These pre-filters are cheap SQL queries that run before the LLM call. They do
-not replace the LLM's judgment — they reduce the search space so the LLM can
-focus on signal. The contradiction_report and topic_cluster kinds, which have
-no threshold-based `when_to_use` criteria, are passed unfiltered.
+These are cheap SQL queries that run before the LLM call. They reduce the search space
+without replacing the LLM's judgment. The contradiction_report and topic_cluster kinds,
+which have no threshold-based criteria, are passed unfiltered.
 
 **The priority field needs calibration criteria.** A follow-on iteration of the
 prompt should define explicit priority rules: e.g. `high` if the gap involves
