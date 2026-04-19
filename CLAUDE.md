@@ -269,4 +269,6 @@ When creating a PR that implements a GitHub issue:
 | `packages/engram-core/src/ai/kinds.ts` | Kind catalog loader — `loadKindCatalog()`, `KindEntry`, `KindCatalog` |
 | `packages/engram-core/src/ingest/git.ts` | Git VCS ingestion (the "money command" engine) |
 | `packages/engram-core/src/ingest/adapter.ts` | EnrichmentAdapter interface |
+| `docs/internal/specs/adapter-aliases.md` | Adapter shorthand alias convention (required for cross-source ref resolution) |
+| `docs/internal/specs/cross-source-references.md` | Cross-source reference resolver architecture |
 | `packages/engram-core/src/ingest/source/` | Source code ingestion — walks working tree, parses TS/JS with tree-sitter, creates file/module/symbol entities |

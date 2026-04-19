@@ -133,6 +133,12 @@ export interface EnrichmentAdapter {
   /**
    * Enrich the graph with data from the remote source.
    * Must be idempotent — safe to call multiple times.
+   *
+   * **Alias convention (required)**: Every entity created MUST register
+   * source-specific shorthand aliases via `addEntityAlias` so that
+   * `resolveEntity` can match bare references (e.g. `#123`, `CL/456`, `b/789`).
+   * See `docs/internal/specs/adapter-aliases.md` for the full convention.
+   *
    * @stable
    */
   enrich(graph: EngramGraph, opts: EnrichOpts): Promise<IngestResult>;

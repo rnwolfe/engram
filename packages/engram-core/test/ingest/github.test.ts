@@ -5,6 +5,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { resolveEntity } from "../../src/graph/aliases.js";
 import { closeGraph, createGraph, type EngramGraph } from "../../src/index.js";
 import { GitHubAdapter } from "../../src/ingest/adapters/github.js";
 
@@ -426,5 +427,75 @@ describe("GitHubAdapter — Validation", () => {
     expect(
       urls.some((u) => u.startsWith("https://github.example.com/api/v3")),
     ).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Alias convention tests
+// ---------------------------------------------------------------------------
+
+describe("GitHubAdapter — shorthand aliases", () => {
+  const fakePR = {
+    number: 123,
+    html_url: "https://github.com/owner/test-repo/pull/123",
+    title: "Add widget",
+    body: "Adds a widget.",
+    state: "closed",
+    user: { login: "alice" },
+    created_at: "2024-01-01T00:00:00Z",
+    updated_at: "2024-01-02T00:00:00Z",
+    requested_reviewers: [],
+    assignees: [],
+  };
+
+  const fakeIssue = {
+    number: 456,
+    html_url: "https://github.com/owner/test-repo/issues/456",
+    title: "Bug report",
+    body: "Something is broken.",
+    state: "open",
+    user: { login: "bob" },
+    created_at: "2024-02-01T00:00:00Z",
+    updated_at: "2024-02-02T00:00:00Z",
+  };
+
+  test("resolveEntity('#N') returns PR entity after ingest", async () => {
+    const adapter = new GitHubAdapter(makeFetch({ "/pulls": [fakePR] }));
+    await adapter.enrich(graph, { token: TEST_TOKEN, repo: TEST_REPO });
+
+    const entity = resolveEntity(graph, "#123");
+    expect(entity).not.toBeNull();
+    expect(entity?.canonical_name).toBe(
+      "https://github.com/owner/test-repo/pull/123",
+    );
+  });
+
+  test("resolveEntity('owner/repo#N') returns PR entity after ingest", async () => {
+    const adapter = new GitHubAdapter(makeFetch({ "/pulls": [fakePR] }));
+    await adapter.enrich(graph, { token: TEST_TOKEN, repo: TEST_REPO });
+
+    const entity = resolveEntity(graph, "owner/test-repo#123");
+    expect(entity).not.toBeNull();
+    expect(entity?.entity_type).toBe("pull_request");
+  });
+
+  test("resolveEntity('#N') returns issue entity after ingest", async () => {
+    const adapter = new GitHubAdapter(makeFetch({ "/issues": [fakeIssue] }));
+    await adapter.enrich(graph, { token: TEST_TOKEN, repo: TEST_REPO });
+
+    const entity = resolveEntity(graph, "#456");
+    expect(entity).not.toBeNull();
+    expect(entity?.canonical_name).toBe(
+      "https://github.com/owner/test-repo/issues/456",
+    );
+  });
+
+  test("resolveEntity('owner/repo#N') returns issue entity after ingest", async () => {
+    const adapter = new GitHubAdapter(makeFetch({ "/issues": [fakeIssue] }));
+    await adapter.enrich(graph, { token: TEST_TOKEN, repo: TEST_REPO });
+
+    const entity = resolveEntity(graph, "owner/test-repo#456");
+    expect(entity).not.toBeNull();
+    expect(entity?.entity_type).toBe("issue");
   });
 });

@@ -10,7 +10,7 @@
 import { ulid } from "ulid";
 import type { EngramGraph } from "../../format/index.js";
 import { ENGINE_VERSION } from "../../format/version.js";
-import { resolveEntity } from "../../graph/aliases.js";
+import { addEntityAlias, resolveEntity } from "../../graph/aliases.js";
 import { addEdge } from "../../graph/edges.js";
 import { addEntity, type EvidenceInput } from "../../graph/entities.js";
 import { addEpisode } from "../../graph/episodes.js";
@@ -301,6 +301,7 @@ function getOrCreatePerson(
 function ingestPR(
   graph: EngramGraph,
   pr: GitHubPR,
+  repo: string,
   counts: {
     episodesCreated: number;
     episodesSkipped: number;
@@ -358,6 +359,33 @@ function ingestPR(
     { episode_id: episodeId, extractor: EXTRACTOR, confidence: 1.0 },
   ];
 
+  // Create PR entity and register shorthand aliases for cross-ref resolution
+  let prEntity = resolveEntity(graph, pr.html_url, "pull_request");
+  if (!prEntity) {
+    prEntity = addEntity(
+      graph,
+      {
+        canonical_name: pr.html_url,
+        entity_type: "pull_request",
+        summary: pr.title,
+      },
+      evidence,
+    );
+    counts.entitiesCreated++;
+    addEntityAlias(graph, {
+      entity_id: prEntity.id,
+      alias: `#${pr.number}`,
+      episode_id: episodeId,
+    });
+    addEntityAlias(graph, {
+      entity_id: prEntity.id,
+      alias: `${repo}#${pr.number}`,
+      episode_id: episodeId,
+    });
+  } else {
+    counts.entitiesResolved++;
+  }
+
   if (!pr.user?.login) return;
 
   const authorId = getOrCreatePerson(graph, pr.user.login, episodeId, counts);
@@ -408,6 +436,7 @@ function ingestPR(
 function ingestIssue(
   graph: EngramGraph,
   issue: GitHubIssue,
+  repo: string,
   counts: {
     episodesCreated: number;
     episodesSkipped: number;
@@ -478,6 +507,16 @@ function ingestIssue(
       evidence,
     );
     counts.entitiesCreated++;
+    addEntityAlias(graph, {
+      entity_id: issueEntity.id,
+      alias: `#${issue.number}`,
+      episode_id: episodeId,
+    });
+    addEntityAlias(graph, {
+      entity_id: issueEntity.id,
+      alias: `${repo}#${issue.number}`,
+      episode_id: episodeId,
+    });
   } else {
     counts.entitiesResolved++;
   }
@@ -547,7 +586,7 @@ export class GitHubAdapter implements EnrichmentAdapter {
           continue;
         }
 
-        ingestPR(graph, pr, counts);
+        ingestPR(graph, pr, repo, counts);
 
         if (pr.number > latestNumber) {
           latestNumber = pr.number;
@@ -572,7 +611,7 @@ export class GitHubAdapter implements EnrichmentAdapter {
           continue;
         }
 
-        ingestIssue(graph, issue, counts);
+        ingestIssue(graph, issue, repo, counts);
 
         if (issue.number > latestNumber) {
           latestNumber = issue.number;

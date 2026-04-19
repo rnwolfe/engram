@@ -16,7 +16,7 @@ import {
 } from "../ai/utils.js";
 import type { EngramGraph } from "../format/index.js";
 import { ENGINE_VERSION } from "../format/version.js";
-import { resolveEntity } from "../graph/aliases.js";
+import { addEntityAlias, resolveEntity } from "../graph/aliases.js";
 import { addEdge } from "../graph/edges.js";
 import { addEntity, type EvidenceInput } from "../graph/entities.js";
 import { addEpisode } from "../graph/episodes.js";
@@ -478,6 +478,28 @@ export async function ingestGitRepo(
       const evidence: EvidenceInput[] = [
         { episode_id: episodeId, extractor: EXTRACTOR, confidence: 1.0 },
       ];
+
+      // Create commit entity and register 7-char short-SHA alias for cross-ref resolution
+      let commitEntity = resolveEntity(graph, commit.sha, "commit");
+      if (!commitEntity) {
+        commitEntity = addEntity(
+          graph,
+          {
+            canonical_name: commit.sha,
+            entity_type: "commit",
+            summary: commit.subject,
+          },
+          evidence,
+        );
+        counts.entitiesCreated++;
+        addEntityAlias(graph, {
+          entity_id: commitEntity.id,
+          alias: commit.sha.slice(0, 7),
+          episode_id: episodeId,
+        });
+      } else {
+        counts.entitiesResolved++;
+      }
 
       // Get or create author entity
       let authorId = authorEntityCache.get(commit.authorEmail);
