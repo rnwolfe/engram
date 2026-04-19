@@ -1,16 +1,18 @@
 /**
- * adapter.ts — Stable contract for pluggable enrichment adapters.
+ * adapter.ts — Stable contract for pluggable enrichment adapters (v2).
  *
  * ## Contract axes
  *
- * **Auth**: Adapters declare which auth schemes they support via `supportsAuth`.
- * Credentials (tokens, OAuth) are always passed through `EnrichOpts` at call time
- * and MUST never be written into the graph.
+ * **Auth**: Adapters declare which auth kinds they support via `supportedAuth`
+ * (typed `AuthCredential['kind'][]`). Credentials are always passed through
+ * `EnrichOpts.auth` at call time and MUST never be written into the graph.
+ *
+ * **Scope**: Adapters declare a `scopeSchema` that describes the expected
+ * `opts.scope` string and validates it. Scope replaces the old `opts.repo`.
  *
  * **Pagination / cursor semantics**: Adapters that support resume from a prior
  * run declare `supportsCursor: true`. The cursor value is an opaque string stored
- * in `ingestion_runs.cursor` by the adapter itself. On the next call the adapter
- * reads its own cursor and resumes from there.
+ * in `ingestion_runs.cursor`. Use the helpers in `cursor.ts` to read/write.
  *
  * **Rate-limiting**: Adapters are responsible for respecting remote rate limits.
  * When a limit is hit, throw `EnrichmentAdapterError` with `code: 'rate_limited'`
@@ -27,10 +29,72 @@
  * **Error taxonomy**: All adapter-level failures SHOULD be surfaced as
  * `EnrichmentAdapterError` with an appropriate `code` so callers can handle them
  * uniformly (e.g. surface `auth_failure` as a targeted help message).
+ *
+ * ## v1 → v2 migration
+ *
+ * v1 callers using `opts.token` and `opts.repo` continue to work via an automatic
+ * compat shim (see `applyCompatShim`). A one-shot deprecation warning is emitted
+ * to stderr the first time a v1-style call is detected. Migrate to `opts.auth` and
+ * `opts.scope` at your earliest convenience.
  */
 
 import type { EngramGraph } from "../format/index.js";
 import type { IngestResult } from "./git.js";
+
+// ---------------------------------------------------------------------------
+// AuthCredential union
+// ---------------------------------------------------------------------------
+
+/**
+ * Credentials passed to an adapter at call time. NEVER stored in the graph.
+ *
+ * Variants:
+ * - `none`            — no auth required (e.g. public APIs, local sources)
+ * - `bearer`          — HTTP Bearer / personal access token
+ * - `basic`           — HTTP Basic auth (username + password/secret)
+ * - `service_account` — JSON key file for service accounts (e.g. Google APIs)
+ * - `oauth2`          — OAuth2 access token, optionally refreshable
+ *
+ * JSON round-trip note: the `oauth2.refresh` callback is a function and will be
+ * lost during JSON serialization. All other variants are fully serializable.
+ */
+export type AuthCredential =
+  | { kind: "none" }
+  | { kind: "bearer"; token: string }
+  | { kind: "basic"; username: string; secret: string }
+  | { kind: "service_account"; keyJson: string }
+  | {
+      kind: "oauth2";
+      token: string;
+      scopes: string[];
+      /**
+       * Optional refresh callback. Called once on 401/403, swaps the token,
+       * and retries the request once. Throws `EnrichmentAdapterError` with
+       * `code: 'auth_failure'` if the retry also fails.
+       *
+       * In-process only — subprocess plugins handle refresh internally.
+       */
+      refresh?: () => Promise<string>;
+    };
+
+// ---------------------------------------------------------------------------
+// Scope schema
+// ---------------------------------------------------------------------------
+
+/**
+ * Declares the expected format and semantics of `EnrichOpts.scope` for a
+ * given adapter. Plain object for JSON-expressibility — no closures except
+ * the `validate` method which throws on invalid input.
+ */
+export interface ScopeSchema {
+  /** Human-readable description of the expected scope format. */
+  description: string;
+  /**
+   * Validates the scope string. Throws a plain `Error` with a descriptive
+   * message if the value is invalid. Returns `void` on success.
+   */
+  validate(scope: string): void;
+}
 
 // ---------------------------------------------------------------------------
 // Progress reporting
@@ -60,6 +124,7 @@ export interface EnrichOpts {
    * Auth token for the remote API. NEVER stored in the graph.
    * Optional — omit for public repositories (unauthenticated, 60 req/hr).
    * Required for private repositories.
+   * @deprecated Use `auth: { kind: 'bearer', token }` instead.
    * @stable
    */
   token?: string;
@@ -77,10 +142,25 @@ export interface EnrichOpts {
   endpoint?: string;
 
   /**
-   * Repository or project identifier (format is adapter-specific, e.g. 'owner/repo' for GitHub).
+   * Repository or project identifier (format is adapter-specific).
+   * @deprecated Use `scope` instead.
    * @stable
    */
   repo?: string;
+
+  /**
+   * Scope string identifying the resource to enrich (format is adapter-specific,
+   * validated by `adapter.scopeSchema`). Replaces the deprecated `repo` field.
+   * @stable
+   */
+  scope?: string;
+
+  /**
+   * Auth credentials for the remote API. NEVER stored in the graph.
+   * Replaces the deprecated `token` field.
+   * @stable
+   */
+  auth?: AuthCredential;
 
   /**
    * When true, the adapter MUST skip all writes and return a result describing
@@ -116,8 +196,21 @@ export interface EnrichmentAdapter {
   kind: string;
 
   /**
+   * Auth kinds the adapter supports, typed against `AuthCredential['kind']`.
+   * Replaces the old `supportsAuth?: string[]`.
+   * @stable
+   */
+  supportedAuth: AuthCredential["kind"][];
+
+  /**
+   * Schema describing the expected `opts.scope` value for this adapter.
+   * @stable
+   */
+  scopeSchema: ScopeSchema;
+
+  /**
    * List of auth schemes the adapter supports.
-   * Values: 'token' | 'oauth' | 'none'.
+   * @deprecated Use `supportedAuth` instead.
    * @experimental
    */
   supportsAuth?: string[];
@@ -142,6 +235,79 @@ export interface EnrichmentAdapter {
    * @stable
    */
   enrich(graph: EngramGraph, opts: EnrichOpts): Promise<IngestResult>;
+}
+
+// ---------------------------------------------------------------------------
+// Compat shim
+// ---------------------------------------------------------------------------
+
+/** Emits the v1→v2 deprecation warning exactly once per process. */
+let _deprecationWarned = false;
+
+/**
+ * Maps v1 `opts.token` / `opts.repo` to their v2 equivalents (`auth`, `scope`).
+ * Emits a one-shot stderr warning the first time v1 fields are detected.
+ *
+ * Call this at the start of `enrich()` before reading `opts.auth` or `opts.scope`.
+ */
+/** Internal marker — truthy when `auth` was synthesised by the compat shim. */
+const _SHIM_AUTH = Symbol("shimAuth");
+
+export function applyCompatShim(opts: EnrichOpts): EnrichOpts {
+  const hasV1 = opts.token !== undefined || opts.repo !== undefined;
+  if (!hasV1) return opts;
+
+  if (!_deprecationWarned) {
+    process.stderr.write(
+      "engram deprecation: EnrichOpts.token and EnrichOpts.repo are deprecated. " +
+        "Use opts.auth = { kind: 'bearer', token } and opts.scope instead.\n",
+    );
+    _deprecationWarned = true;
+  }
+
+  const patched: EnrichOpts & { [_SHIM_AUTH]?: true } = { ...opts };
+  if (opts.token !== undefined && patched.auth === undefined) {
+    patched.auth = { kind: "bearer", token: opts.token };
+    // Mark that this auth was synthesised by the shim so assertAuthKind skips it.
+    patched[_SHIM_AUTH] = true;
+  }
+  if (opts.repo !== undefined && patched.scope === undefined) {
+    patched.scope = opts.repo;
+  }
+  return patched;
+}
+
+/** Returns true when opts.auth was synthesised by the compat shim (not explicitly provided). */
+export function isShimmedAuth(opts: EnrichOpts): boolean {
+  return (opts as Record<symbol, unknown>)[_SHIM_AUTH] === true;
+}
+
+// ---------------------------------------------------------------------------
+// Auth kind validation helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Validates that the provided `opts.auth.kind` is in `adapter.supportedAuth`.
+ * Throws `EnrichmentAdapterError` with `code: 'auth_failure'` if not.
+ *
+ * Call this at the start of `enrich()` after applying the compat shim.
+ */
+export function assertAuthKind(
+  adapter: Pick<EnrichmentAdapter, "name" | "supportedAuth">,
+  opts: EnrichOpts,
+): void {
+  // Skip the check when auth was synthesised by the compat shim — the shim maps
+  // the old `token` field to bearer regardless of what the adapter supports.
+  // Only explicitly-provided v2 `auth` fields are validated.
+  if (isShimmedAuth(opts)) return;
+
+  const authKind = opts.auth?.kind ?? "none";
+  if (!adapter.supportedAuth.includes(authKind)) {
+    throw new EnrichmentAdapterError(
+      "auth_failure",
+      `${adapter.name}: auth kind '${authKind}' is not supported. Supported kinds: ${adapter.supportedAuth.join(", ")}.`,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
