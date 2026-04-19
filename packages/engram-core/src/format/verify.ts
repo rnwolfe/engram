@@ -397,7 +397,9 @@ function checkActiveEdgeOverlaps(graph: EngramGraph): Violation[] {
 
 const KNOWN_ENTITY_TYPES = new Set(Object.values(ENTITY_TYPES));
 const KNOWN_EPISODE_SOURCE_TYPES = new Set(Object.values(EPISODE_SOURCE_TYPES));
-const KNOWN_INGESTION_SOURCE_TYPES = new Set(Object.values(INGESTION_SOURCE_TYPES));
+const KNOWN_INGESTION_SOURCE_TYPES = new Set(
+  Object.values(INGESTION_SOURCE_TYPES),
+);
 const KNOWN_RELATION_TYPES = new Set(Object.values(RELATION_TYPES));
 
 function checkVocab(graph: EngramGraph): Violation[] {
@@ -478,7 +480,10 @@ function checkVocab(graph: EngramGraph): Violation[] {
  * Runs all integrity checks against the graph and returns a VerifyResult.
  * valid is true when there are no error-severity violations.
  */
-export function verifyGraph(graph: EngramGraph, opts: VerifyOpts = {}): VerifyResult {
+export function verifyGraph(
+  graph: EngramGraph,
+  opts: VerifyOpts = {},
+): VerifyResult {
   const violations: Violation[] = [];
 
   violations.push(...checkMetadata(graph));

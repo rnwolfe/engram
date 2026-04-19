@@ -15,7 +15,7 @@ import {
   createGraph,
   verifyGraph,
 } from "../../src/index.js";
-import { EPISODE_SOURCE_TYPES } from "../../src/vocab/index.js";
+import { ENTITY_TYPES, EPISODE_SOURCE_TYPES } from "../../src/vocab/index.js";
 
 let graph: EngramGraph;
 
@@ -504,9 +504,10 @@ describe("verifyGraph — strict mode vocab checks", () => {
   test("flags unknown entity_type as warning in strict mode", () => {
     const ep = makeEpisode(graph);
     const entity = makeEntity(graph, ep);
-    graph.db.run("UPDATE entities SET entity_type = 'legacy_thing' WHERE id = ?", [
-      entity.id,
-    ]);
+    graph.db.run(
+      "UPDATE entities SET entity_type = 'legacy_thing' WHERE id = ?",
+      [entity.id],
+    );
 
     const result = verifyGraph(graph, { strict: true });
     const v = result.violations.find(
@@ -520,9 +521,10 @@ describe("verifyGraph — strict mode vocab checks", () => {
 
   test("flags unknown episode source_type as warning in strict mode", () => {
     const ep = makeEpisode(graph);
-    graph.db.run("UPDATE episodes SET source_type = 'unknown_source' WHERE id = ?", [
-      ep.id,
-    ]);
+    graph.db.run(
+      "UPDATE episodes SET source_type = 'unknown_source' WHERE id = ?",
+      [ep.id],
+    );
 
     const result = verifyGraph(graph, { strict: true });
     const v = result.violations.find(
@@ -551,12 +553,30 @@ describe("verifyGraph — strict mode vocab checks", () => {
     expect(v?.message).toContain("custom_rel");
   });
 
+  test("flags unknown ingestion_runs source_type as warning in strict mode", () => {
+    const runId = ulid();
+    graph.db.run(
+      `INSERT INTO ingestion_runs (id, source_type, source_scope, started_at, completed_at, extractor_version, episodes_created, entities_created, edges_created, status)
+       VALUES (?, 'unknown_ingest_type', 'test-scope', ?, ?, '1.0.0', 0, 0, 0, 'completed')`,
+      [runId, now(), now()],
+    );
+
+    const result = verifyGraph(graph, { strict: true });
+    const v = result.violations.find(
+      (v) => v.check === "checkVocab" && v.entity_or_edge_id === runId,
+    );
+    expect(v).toBeDefined();
+    expect(v?.severity).toBe("warning");
+    expect(v?.message).toContain("unknown_ingest_type");
+  });
+
   test("non-strict mode does not flag unknown vocab values", () => {
     const ep = makeEpisode(graph);
     const entity = makeEntity(graph, ep);
-    graph.db.run("UPDATE entities SET entity_type = 'legacy_thing' WHERE id = ?", [
-      entity.id,
-    ]);
+    graph.db.run(
+      "UPDATE entities SET entity_type = 'legacy_thing' WHERE id = ?",
+      [entity.id],
+    );
 
     const result = verifyGraph(graph);
     const vocabViolations = result.violations.filter(
@@ -574,7 +594,7 @@ describe("verifyGraph — strict mode vocab checks", () => {
     });
     addEntity(
       graph,
-      { canonical_name: "alice@example.com", entity_type: "person" },
+      { canonical_name: "alice@example.com", entity_type: ENTITY_TYPES.PERSON },
       [{ episode_id: ep.id, extractor: "test", confidence: 1.0 }],
     );
 

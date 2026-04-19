@@ -157,14 +157,14 @@ function findActiveEpisodeForPath(
   const prefix = `${relPath}@`;
   return (
     graph.db
-      .query<{ id: string; source_ref: string }, [number, string]>(
+      .query<{ id: string; source_ref: string }, [string, number, string]>(
         `SELECT id, source_ref FROM episodes
-         WHERE source_type = '${EPISODE_SOURCE_TYPES.SOURCE_FILE}'
+         WHERE source_type = ?
            AND status = 'active'
            AND SUBSTR(source_ref, 1, ?) = ?
          LIMIT 1`,
       )
-      .get(prefix.length, prefix) ?? null
+      .get(EPISODE_SOURCE_TYPES.SOURCE_FILE, prefix.length, prefix) ?? null
   );
 }
 
@@ -234,7 +234,7 @@ export async function ingestSource(
           .query<{ id: string }, [string, string]>(
             `SELECT id FROM episodes WHERE source_type = ? AND source_ref = ? LIMIT 1`,
           )
-          .get(SOURCE_TYPE, sourceRef);
+          .get(EPISODE_SOURCE_TYPES.SOURCE_FILE, sourceRef);
         if (existing) {
           result.filesSkipped++;
           visitedRelPaths.add(relPath);
@@ -539,13 +539,13 @@ export async function ingestSource(
 
   if (!dryRun) {
     const sweepCandidates = graph.db
-      .query<{ id: string; source_ref: string }, [string]>(
+      .query<{ id: string; source_ref: string }, [string, string]>(
         `SELECT id, source_ref FROM episodes
-         WHERE source_type = '${EPISODE_SOURCE_TYPES.SOURCE_FILE}'
+         WHERE source_type = ?
            AND status = 'active'
            AND json_extract(metadata, '$.walk_root') = ?`,
       )
-      .all(absRoot);
+      .all(EPISODE_SOURCE_TYPES.SOURCE_FILE, absRoot);
 
     for (const ep of sweepCandidates) {
       if (!ep.source_ref) continue;
@@ -562,13 +562,13 @@ export async function ingestSource(
   } else {
     // dryRun: count what would be archived without writing
     const sweepCandidates = graph.db
-      .query<{ source_ref: string }, [string]>(
+      .query<{ source_ref: string }, [string, string]>(
         `SELECT source_ref FROM episodes
-         WHERE source_type = '${EPISODE_SOURCE_TYPES.SOURCE_FILE}'
+         WHERE source_type = ?
            AND status = 'active'
            AND json_extract(metadata, '$.walk_root') = ?`,
       )
-      .all(absRoot);
+      .all(EPISODE_SOURCE_TYPES.SOURCE_FILE, absRoot);
 
     for (const ep of sweepCandidates) {
       if (!ep.source_ref) continue;

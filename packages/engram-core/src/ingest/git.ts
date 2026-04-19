@@ -172,12 +172,12 @@ function failIngestionRun(
 
 function getLastCursor(graph: EngramGraph, sourceScope: string): string | null {
   const row = graph.db
-    .query<{ cursor: string | null }, [string]>(
+    .query<{ cursor: string | null }, [string, string]>(
       `SELECT cursor FROM ingestion_runs
-       WHERE source_type = '${INGESTION_SOURCE_TYPES.GIT}' AND source_scope = ? AND status = 'completed'
+       WHERE source_type = ? AND source_scope = ? AND status = 'completed'
        ORDER BY completed_at DESC LIMIT 1`,
     )
-    .get(sourceScope);
+    .get(INGESTION_SOURCE_TYPES.GIT, sourceScope);
 
   return row?.cursor ?? null;
 }
