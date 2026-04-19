@@ -12,7 +12,7 @@ import { Database } from "bun:sqlite";
 import * as fs from "node:fs";
 import * as nodePath from "node:path";
 import { ulid } from "ulid";
-import { SCHEMA_DDL } from "./schema.js";
+import { ADDITIVE_DDL, SCHEMA_DDL } from "./schema.js";
 import {
   ENGINE_VERSION,
   FORMAT_VERSION,
@@ -202,6 +202,12 @@ export function openGraph(path: string): EngramGraph {
     throw new EngramFormatError(
       `openGraph: missing 'owner_id' in metadata — not a valid .engram file: ${path}`,
     );
+  }
+
+  // Apply additive DDL (idempotent IF NOT EXISTS) so existing databases gain
+  // new optional tables (e.g. unresolved_refs) without a schema version bump.
+  for (const ddl of ADDITIVE_DDL) {
+    db.exec(ddl);
   }
 
   return {

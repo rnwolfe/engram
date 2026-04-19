@@ -17,6 +17,7 @@ import type { EngramGraph } from "engram-core";
 import {
   closeGraph,
   createGenerator,
+  drainUnresolved,
   openGraph,
   reconcile,
   resolveDbPath,
@@ -31,6 +32,7 @@ interface ReconcileOpts {
   maxDeltaItems?: string;
   dryRun: boolean;
   resetCursor: boolean;
+  crossRefs: boolean;
   db: string;
 }
 
@@ -67,6 +69,11 @@ export function registerReconcile(program: Command): void {
     .option(
       "--reset-cursor",
       "clear reconciliation history so the next run re-processes all substrate data",
+      false,
+    )
+    .option(
+      "--cross-refs",
+      "re-run cross-source reference resolution over all episodes",
       false,
     )
     .option("--db <path>", "path to .engram file", ".engram")
@@ -117,6 +124,30 @@ See also:
         log.info(
           `Cursor reset — deleted ${deleted} reconciliation run(s). Re-run without --reset-cursor to discover from scratch.`,
         );
+        outro("Done");
+        process.exit(0);
+      }
+
+      // ── Cross-refs resolution ────────────────────────────────────────────────
+      if (opts.crossRefs) {
+        const dbPath = resolveDbPath(path.resolve(opts.db));
+        let graph: EngramGraph | undefined;
+        try {
+          graph = openGraph(dbPath);
+        } catch (err) {
+          log.error(
+            `Cannot open graph: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          process.exit(1);
+        }
+        const s = spinner();
+        s.start("Resolving cross-source references");
+        const result = drainUnresolved(graph);
+        s.stop("Done");
+        log.info(
+          `Edges created: ${result.edgesCreated}\nStill unresolved: ${result.unresolved}`,
+        );
+        closeGraph(graph);
         outro("Done");
         process.exit(0);
       }

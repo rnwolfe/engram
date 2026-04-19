@@ -298,6 +298,33 @@ CREATE TRIGGER projections_au AFTER UPDATE ON projections BEGIN
 END;
 `;
 
+// ─── Additive DDL ────────────────────────────────────────────────────────────
+// These use IF NOT EXISTS so they are safe to run against both new and existing
+// databases. Applied by both createGraph (via SCHEMA_DDL) and openGraph.
+
+export const CREATE_UNRESOLVED_REFS = `
+CREATE TABLE IF NOT EXISTS unresolved_refs (
+  id                 TEXT PRIMARY KEY,
+  source_episode_id  TEXT NOT NULL REFERENCES episodes(id),
+  target_source_type TEXT NOT NULL,
+  target_ref         TEXT NOT NULL,
+  detected_at        TEXT NOT NULL,
+  resolved_at        TEXT
+);
+`;
+
+export const CREATE_UNRESOLVED_REFS_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_unresolved_refs_target
+  ON unresolved_refs(target_source_type, target_ref)
+  WHERE resolved_at IS NULL;
+`;
+
+/** DDL that is safe to apply on every open (idempotent IF NOT EXISTS). */
+export const ADDITIVE_DDL: string[] = [
+  CREATE_UNRESOLVED_REFS,
+  CREATE_UNRESOLVED_REFS_INDEX,
+];
+
 /**
  * All DDL statements in the order they must be applied.
  * Tables with foreign key dependencies come after their referenced tables.
@@ -329,4 +356,6 @@ export const SCHEMA_DDL: string[] = [
   CREATE_RECONCILIATION_RUNS,
   CREATE_PROJECTIONS_FTS,
   CREATE_PROJECTIONS_FTS_TRIGGERS,
+  // Additive (IF NOT EXISTS — safe to re-run)
+  ...ADDITIVE_DDL,
 ];

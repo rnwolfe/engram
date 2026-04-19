@@ -16,6 +16,7 @@ import { addEntity, type EvidenceInput } from "../../graph/entities.js";
 import { addEpisode } from "../../graph/episodes.js";
 import type { EnrichmentAdapter, EnrichOpts } from "../adapter.js";
 import { EnrichmentAdapterError } from "../adapter.js";
+import { BUILT_IN_PATTERNS, resolveReferences } from "../cross-ref/index.js";
 import type { IngestResult } from "../git.js";
 
 // ---------------------------------------------------------------------------
@@ -307,6 +308,7 @@ function ingestPR(
     entitiesResolved: number;
     edgesCreated: number;
     edgesSuperseded: number;
+    episodeIds: string[];
   },
 ): void {
   const content = [
@@ -351,6 +353,7 @@ function ingestPR(
   counts.episodesCreated++;
 
   const episodeId = episode.id;
+  counts.episodeIds.push(episodeId);
   const evidence: EvidenceInput[] = [
     { episode_id: episodeId, extractor: EXTRACTOR, confidence: 1.0 },
   ];
@@ -402,10 +405,6 @@ function ingestPR(
 // Issue ingestion
 // ---------------------------------------------------------------------------
 
-// Match #123 PR/issue references and short 7-40 char hex SHAs
-const SHA_RE = /\b([0-9a-f]{7,40})\b/gi;
-const PR_REF_RE = /#(\d+)/g;
-
 function ingestIssue(
   graph: EngramGraph,
   issue: GitHubIssue,
@@ -416,8 +415,21 @@ function ingestIssue(
     entitiesResolved: number;
     edgesCreated: number;
     edgesSuperseded: number;
+    episodeIds: string[];
   },
 ): void {
+  // Pre-check for existing episode (idempotent dedup — mirrors ingestPR)
+  const existingEpisode = graph.db
+    .query<{ id: string }, [string, string]>(
+      "SELECT id FROM episodes WHERE source_type = ? AND source_ref = ?",
+    )
+    .get("github_issue", issue.html_url);
+
+  if (existingEpisode) {
+    counts.episodesSkipped++;
+    return;
+  }
+
   const content = [
     `Issue #${issue.number}: ${issue.title}`,
     `URL: ${issue.html_url}`,
@@ -448,6 +460,7 @@ function ingestIssue(
   counts.episodesCreated++;
 
   const episodeId = episode.id;
+  counts.episodeIds.push(episodeId);
   const evidence: EvidenceInput[] = [
     { episode_id: episodeId, extractor: EXTRACTOR, confidence: 1.0 },
   ];
@@ -467,96 +480,6 @@ function ingestIssue(
     counts.entitiesCreated++;
   } else {
     counts.entitiesResolved++;
-  }
-
-  const body = issue.body ?? "";
-
-  // Create references edges for mentioned commit SHAs
-  const shaMatches = [...body.matchAll(SHA_RE)];
-  for (const match of shaMatches) {
-    const sha = match[1];
-    if (!sha) continue;
-
-    const mentioned = graph.db
-      .query<{ id: string }, [string, string]>(
-        "SELECT id FROM entities WHERE canonical_name = ? AND entity_type = ? LIMIT 1",
-      )
-      .get(sha, "commit");
-
-    if (!mentioned) continue;
-
-    // Self-reference guard
-    if (mentioned.id === issueEntity.id) continue;
-
-    const existing = graph.db
-      .query<{ id: string }, [string, string, string, string]>(
-        `SELECT id FROM edges
-         WHERE source_id = ? AND target_id = ? AND relation_type = ?
-           AND edge_kind = ? AND invalidated_at IS NULL LIMIT 1`,
-      )
-      .get(issueEntity.id, mentioned.id, "references", "observed");
-
-    if (!existing) {
-      addEdge(
-        graph,
-        {
-          source_id: issueEntity.id,
-          target_id: mentioned.id,
-          relation_type: "references",
-          edge_kind: "observed",
-          fact: `Issue #${issue.number} references commit ${sha}`,
-          valid_from: issue.created_at,
-          confidence: 0.9,
-        },
-        evidence,
-      );
-      counts.edgesCreated++;
-    }
-  }
-
-  // Create references edges for mentioned #N (PR/issue refs)
-  const prMatches = [...body.matchAll(PR_REF_RE)];
-  for (const match of prMatches) {
-    const refNum = match[1];
-    if (!refNum) continue;
-
-    // Look for an entity whose canonical_name ends with /pull/<N> or /issues/<N>
-    const mentioned = graph.db
-      .query<{ id: string }, [string, string]>(
-        `SELECT id FROM entities WHERE (canonical_name LIKE ? OR canonical_name LIKE ?)
-         AND entity_type IN ('issue', 'pull_request') LIMIT 1`,
-      )
-      .get(`%/pull/${refNum}`, `%/issues/${refNum}`);
-
-    if (!mentioned) continue;
-
-    // Self-reference guard
-    if (mentioned.id === issueEntity.id) continue;
-
-    const existing = graph.db
-      .query<{ id: string }, [string, string, string, string]>(
-        `SELECT id FROM edges
-         WHERE source_id = ? AND target_id = ? AND relation_type = ?
-           AND edge_kind = ? AND invalidated_at IS NULL LIMIT 1`,
-      )
-      .get(issueEntity.id, mentioned.id, "references", "observed");
-
-    if (!existing) {
-      addEdge(
-        graph,
-        {
-          source_id: issueEntity.id,
-          target_id: mentioned.id,
-          relation_type: "references",
-          edge_kind: "observed",
-          fact: `Issue #${issue.number} references #${refNum}`,
-          valid_from: issue.created_at,
-          confidence: 0.9,
-        },
-        evidence,
-      );
-      counts.edgesCreated++;
-    }
   }
 }
 
@@ -602,6 +525,7 @@ export class GitHubAdapter implements EnrichmentAdapter {
       entitiesResolved: 0,
       edgesCreated: 0,
       edgesSuperseded: 0,
+      episodeIds: [] as string[],
     };
 
     try {
@@ -661,6 +585,8 @@ export class GitHubAdapter implements EnrichmentAdapter {
         entities: counts.entitiesCreated,
         edges: counts.edgesCreated,
       });
+
+      resolveReferences(graph, counts.episodeIds, BUILT_IN_PATTERNS);
 
       return { ...counts, runId };
     } catch (err: unknown) {
