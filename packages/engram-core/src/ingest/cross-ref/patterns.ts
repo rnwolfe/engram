@@ -56,7 +56,7 @@ export function compilePluginPattern(
     sourceType: manifest.source_type,
     pattern: compiled,
     normalizeRef: (match: string) =>
-      manifest.normalize_template.replace("$1", match),
+      manifest.normalize_template.replaceAll("$1", match),
     confidence: manifest.confidence,
   };
 }

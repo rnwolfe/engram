@@ -11,6 +11,6 @@ export {
   resolveDbPath,
 } from "./graph.js";
 export { migrate_0_1_0_to_0_2_0 } from "./migrations.js";
-export { SCHEMA_DDL } from "./schema.js";
+export { ADDITIVE_DDL, SCHEMA_DDL } from "./schema.js";
 export type { VerifyResult, Violation, ViolationSeverity } from "./verify.js";
 export { verifyGraph } from "./verify.js";

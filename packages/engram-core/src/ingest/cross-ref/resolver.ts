@@ -241,13 +241,17 @@ export function resolveReferences(
           continue;
         }
 
+        // Skip if we have no source entity — emitting a self-loop (source === target)
+        // is worse than dropping the edge.
+        if (!sourceEntity) continue;
+
         // Self-reference guard
-        if (sourceEntity && targetEntity.id === sourceEntity.id) continue;
+        if (targetEntity.id === sourceEntity.id) continue;
 
         const fact = `Episode ${episodeId} (${episode.source_type}) references ${pat.sourceType} ${normalizedRef}`;
         const created = emitReferenceEdge(
           graph,
-          sourceEntity?.id ?? targetEntity.id, // fall back to target if no source entity
+          sourceEntity.id,
           targetEntity.id,
           episodeId,
           pat.confidence,

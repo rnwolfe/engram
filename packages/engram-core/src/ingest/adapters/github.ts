@@ -418,6 +418,18 @@ function ingestIssue(
     episodeIds: string[];
   },
 ): void {
+  // Pre-check for existing episode (idempotent dedup — mirrors ingestPR)
+  const existingEpisode = graph.db
+    .query<{ id: string }, [string, string]>(
+      "SELECT id FROM episodes WHERE source_type = ? AND source_ref = ?",
+    )
+    .get("github_issue", issue.html_url);
+
+  if (existingEpisode) {
+    counts.episodesSkipped++;
+    return;
+  }
+
   const content = [
     `Issue #${issue.number}: ${issue.title}`,
     `URL: ${issue.html_url}`,

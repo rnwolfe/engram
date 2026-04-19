@@ -283,72 +283,36 @@ describe("SHA confidence levels", () => {
 
   test("short 7-11 char SHA produces confidence 0.75", () => {
     const shortSha = "abcdef1";
-    const fullSha = "abcdef1234567890abcdef1234567890abcdef99";
-    const targetEp = makeEpisode("git_commit", fullSha, `commit ${fullSha}`);
-    const _targetEntity = makeEntity(fullSha, "commit", targetEp.id);
 
-    // Only use short-SHA pattern (filter to it)
-    const shortShaPatternFound = BUILT_IN_PATTERNS.find(
+    // Only use the short-SHA pattern to test it specifically
+    const shortShaPattern = BUILT_IN_PATTERNS.find(
       (p) => p.sourceType === "git_commit" && p.confidence === 0.75,
-    );
-    if (!shortShaPatternFound) {
-      throw new Error("short SHA pattern not found in BUILT_IN_PATTERNS");
-    }
-    const shortShaPattern: ReferencePattern = shortShaPatternFound;
+    ) as ReferencePattern;
+    expect(shortShaPattern).toBeDefined();
 
-    // Create episode whose content has the short sha
+    // Target episode uses the short SHA as its source_ref so the resolver finds it
+    const targetEp = makeEpisode("git_commit", shortSha, `commit ${shortSha}`);
+    makeEntity(`commit-short-${shortSha}`, "commit", targetEp.id);
+
     const sourceEp = makeEpisode(
-      "git_commit",
-      "2222222222222222222222222222222222222222",
-      `See abcdef1 for the fix`,
-    );
-    const sourceEntity = makeEntity(
-      "2222222222222222222222222222222222222222",
-      "commit",
-      sourceEp.id,
-    );
-
-    // Run only the short-SHA pattern (so we test that pattern specifically)
-    resolveReferences(graph, [sourceEp.id], [shortShaPattern]);
-
-    const _edges = findEdges(graph, {
-      source_id: sourceEntity.id,
-      relation_type: "references",
-    });
-    // Short SHA won't match because source_ref is full SHA - need the source_ref to be the short sha
-    // The lookup uses source_ref == normalized match, so let's use a different approach:
-    // create an episode with source_ref = shortSha
-    const targetEp2 = makeEpisode("git_commit", shortSha, `commit ${shortSha}`);
-    const _targetEntity2 = makeEntity(
-      `commit-short-${shortSha}`,
-      "commit",
-      targetEp2.id,
-    );
-
-    // Re-run with entity that has source_ref = shortSha
-    const sourceEp2 = makeEpisode(
       "git_commit",
       "3333333333333333333333333333333333333333",
       `See ${shortSha} for the fix`,
     );
-    const sourceEntity2 = makeEntity(
+    const sourceEntity = makeEntity(
       "3333333333333333333333333333333333333333",
       "commit",
-      sourceEp2.id,
+      sourceEp.id,
     );
 
-    const _result2 = resolveReferences(
-      graph,
-      [sourceEp2.id],
-      [shortShaPattern],
-    );
+    resolveReferences(graph, [sourceEp.id], [shortShaPattern]);
 
-    const edges2 = findEdges(graph, {
-      source_id: sourceEntity2.id,
+    const edges = findEdges(graph, {
+      source_id: sourceEntity.id,
       relation_type: "references",
     });
-    expect(edges2.length).toBeGreaterThan(0);
-    expect(edges2[0].confidence).toBe(0.75);
+    expect(edges.length).toBeGreaterThan(0);
+    expect(edges[0].confidence).toBe(0.75);
   });
 });
 
