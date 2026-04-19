@@ -21,6 +21,7 @@ import { addEdge } from "../graph/edges.js";
 import { addEntity, type EvidenceInput } from "../graph/entities.js";
 import { addEpisode } from "../graph/episodes.js";
 import { supersedeEdge } from "../temporal/supersession.js";
+import { BUILT_IN_PATTERNS, resolveReferences } from "./cross-ref/index.js";
 import { parseGitLog, recencyWeight } from "./git-parse.js";
 
 // ---------------------------------------------------------------------------
@@ -737,6 +738,8 @@ export async function ingestGitRepo(
       entities: counts.entitiesCreated,
       edges: counts.edgesCreated,
     });
+
+    resolveReferences(graph, [...episodeIds.values()], BUILT_IN_PATTERNS);
 
     // Post-ingest: generate embeddings for new episodes and entities (best-effort, never blocks)
     if (opts.provider) {

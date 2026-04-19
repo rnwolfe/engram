@@ -144,6 +144,17 @@ export type {
 export { EnrichmentAdapterError } from "./ingest/adapter.js";
 export { GerritAdapter } from "./ingest/adapters/gerrit.js";
 export { GitHubAdapter, GitHubAuthError } from "./ingest/adapters/github.js";
+export type {
+  PluginReferencePattern,
+  ReferencePattern,
+  ResolveResult,
+} from "./ingest/cross-ref/index.js";
+export {
+  BUILT_IN_PATTERNS,
+  compilePluginPattern,
+  drainUnresolved,
+  resolveReferences,
+} from "./ingest/cross-ref/index.js";
 export type { GitIngestOpts, IngestResult } from "./ingest/git.js";
 export { ingestGitRepo } from "./ingest/git.js";
 export type { MarkdownIngestOpts } from "./ingest/markdown.js";
@@ -190,3 +201,5 @@ export {
   getSnapshot,
   supersedeEdge,
 } from "./temporal/index.js";
+export type { RelationType } from "./vocab/relation-types.js";
+export { RELATION_TYPES } from "./vocab/relation-types.js";
