@@ -11,6 +11,7 @@
 /** Values used in ingestion_runs.source_type — identifies the ingestion pass. */
 export const INGESTION_SOURCE_TYPES = {
   GIT: "git",
+  GERRIT: "gerrit",
   GITHUB: "github",
   SOURCE: "source",
   MARKDOWN: "markdown",
@@ -23,6 +24,7 @@ export type IngestionSourceType =
 /** Values used in episodes.source_type — identifies the episode kind. */
 export const EPISODE_SOURCE_TYPES = {
   GIT_COMMIT: "git_commit",
+  GERRIT_CHANGE: "gerrit_change",
   GITHUB_PR: "github_pr",
   GITHUB_ISSUE: "github_issue",
   MANUAL: "manual",
@@ -39,6 +41,7 @@ export type EpisodeSourceType =
  */
 export const INGESTION_TO_EPISODE_SOURCES = {
   [INGESTION_SOURCE_TYPES.GIT]: [EPISODE_SOURCE_TYPES.GIT_COMMIT],
+  [INGESTION_SOURCE_TYPES.GERRIT]: [EPISODE_SOURCE_TYPES.GERRIT_CHANGE],
   [INGESTION_SOURCE_TYPES.GITHUB]: [
     EPISODE_SOURCE_TYPES.GITHUB_PR,
     EPISODE_SOURCE_TYPES.GITHUB_ISSUE,
