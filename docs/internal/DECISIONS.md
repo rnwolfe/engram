@@ -228,3 +228,131 @@ and follows the same pattern already used for edges and projections.
 - The unique index on `(source_type, source_ref)` must be replaced with a partial index
   scoped to `WHERE superseded_by IS NULL`, allowing historical revisions to coexist.
   This is a one-time DDL migration applied alongside the column addition.
+
+## ADR-008 -- First-party adapters ship as in-repo plugins
+
+**Date**: 2026-04-19
+**Status**: Accepted
+**Supersedes (partial)**: The adapter roadmap in [`VISION.md`](VISION.md) phase 2,
+which implicitly treated Gerrit, Jira, Linear, and GitLab as built-in adapters.
+
+**Context**: `VISION.md` phase 2 lists four enrichment adapters as planned work:
+Gerrit, Jira, Linear, GitLab. That list was written before the plugin system
+(ADR-006) existed. With the plugin loader shipped in v0.2.0, the "how should the
+next three adapters be delivered" question becomes load-bearing: built-in means
+they compile into `engram-core`, bloat the release binary, and couple adapter
+release cadence to the engine. Out-of-repo means users lose the "core team
+maintains this" signal on integrations that are clearly first-party.
+
+Gerrit already shipped built-in in v0.2.0 (pre-plugin-loader), establishing
+inertia toward the built-in default. Without an explicit decision, the next
+three adapters will drift into `engram-core` by momentum, the plugin system
+will never be exercised by a first-party implementation, and any bug in the
+plugin contract will surface first on community adapters with less test coverage.
+
+Three delivery models were considered:
+
+- **All built-in** — compile every first-party adapter into `engram-core`.
+- **All out-of-repo** — first-party adapters live in separate repositories,
+  installed via file drop into `$XDG_DATA_HOME/engram/plugins/`.
+- **In-repo plugins** — adapters live under `packages/plugins/<name>/` in this
+  monorepo, maintained by the core team, but load through the plugin system
+  rather than being compiled into `engram-core`.
+
+**Decision**: Adopt the **in-repo plugin** model for first-party adapters.
+
+1. **New first-party adapters (Jira, Linear, GitLab, Google Docs, future) ship
+   as in-repo plugins.** Directory layout: `packages/plugins/<name>/` with a
+   `manifest.json` declaring `transport: js-module`, conforming to the
+   `EnrichmentAdapter` contract, and bundled with adapter-specific dependencies
+   in a local `package.json`.
+
+2. **Gerrit is the migration reference.** Gerrit stays built-in for one cycle
+   (through v0.2.x), then moves to `packages/plugins/gerrit/` as the canonical
+   in-repo plugin port. The migration PR is the executable proof the plugin
+   contract is adequate for a full-featured adapter.
+
+3. **GitHub stays built-in.** GitHub is used by `engram init --from-git` and
+   the VCS layer; unlike the others, it is a foundational integration rather
+   than a selectable enrichment source. Documented exception; not a precedent.
+
+4. **Distribution model.** In-repo plugins are published as independent
+   packages (`@engram/plugin-jira`, `@engram/plugin-linear`, etc.) with their
+   own semver versions, and shipped in sync with engine releases (one
+   cross-package release train, one Git tag, one set of release notes).
+   Independent versioning lets a plugin emit a patch release for an SDK
+   upgrade without forcing an `engram-core` release; the synchronized release
+   train guarantees the plugin's `contract_version` is always validated
+   against the engine it ships with, so contract drift between engine and
+   plugin cannot occur at a release boundary. `engram init` and `engram
+   plugin` get an `install` subcommand (separate issue) that symlinks or
+   copies them into `$XDG_DATA_HOME/engram/plugins/` for user-wide
+   activation.
+
+5. **Third-party adapters remain fully out-of-repo.** Authored, versioned,
+   and trusted independently. The in-repo designation is an authority signal
+   ("core team maintains this"), not a gate on who may write plugins.
+
+**Alternatives considered**:
+
+- *All built-in.* Rejected: unbounded dependency growth in `engram-core`
+  (four SDKs to start, more every phase), a release binary that carries code
+  nobody running on-prem GitLab will ever execute, and no first-party
+  validation of the plugin contract. The plugin system would atrophy into
+  a community-only sidecar.
+
+- *All out-of-repo.* Rejected: loses the "we maintain this" signal users
+  rely on to evaluate adapter trust. Separate repositories fragment issue
+  tracking, force contract-version drift handling across release cycles,
+  and make cross-adapter refactors (e.g. a new `AuthCredential` shape) into
+  a coordinated multi-repo change. Good for community adapters; wrong default
+  for first-party.
+
+- *Mixed case-by-case with no ADR.* Rejected: this is the status quo, and
+  it produced the problem — Gerrit shipped built-in because "it was easier at
+  the time," and absent a written decision, the next adapter will default to
+  the same path.
+
+**Consequences**:
+
+*Positive*
+- The plugin contract is exercised end-to-end by core-maintained code, so
+  contract bugs surface with first-party PRs rather than on community adapters.
+- `engram-core`'s dependency surface is capped at what the engine itself needs
+  (SQLite, tree-sitter, AI providers). Adapter-specific SDKs live in the
+  plugin package.json files.
+- Release cadence decouples: a Jira API change ships as a plugin patch without
+  an `engram-core` release. Contract-breaking changes still require coordinated
+  releases, but are rare by design (ADR-006 `contract_version` negotiation).
+- `packages/plugins/gerrit/` becomes an on-ramp reference for plugin authors —
+  a fully featured, production-grade example in the same monorepo.
+- Clear authority separation: `packages/plugins/` = "we ship and test this,"
+  XDG drop-in = "you installed this."
+
+*Negative / cost*
+- Gerrit migration is a one-time cost: rewrite `packages/engram-core/src/ingest/adapters/gerrit.ts`
+  as `packages/plugins/gerrit/` plus removing the hardcoded CLI registration.
+  Tracked as a separate issue; must land before v0.3.0 tag.
+- Monorepo build graph grows by one package per adapter. The root `package.json`
+  `workspaces` glob (currently `packages/*`) must be extended to also match
+  `packages/plugins/*` so that `bun run --filter '*' build/test` picks up
+  plugin packages. This workspace change lands alongside the first plugin
+  package (likely the Gerrit migration).
+- Users who expect `engram ingest enrich jira` to "just work" after
+  `npm install engram` will need one extra install step. Mitigated by
+  `engram init` offering an interactive "install common plugins?" prompt
+  (separate spec).
+- The "first-party vs third-party" distinction is policy, not code — a future
+  core team could accept a third-party plugin into `packages/plugins/` with
+  no technical gate. This is the same governance question every monorepo
+  faces; no new risk introduced.
+
+*Carried over*
+- ADR-006's trust model is unchanged: users authorize plugins at install
+  time regardless of origin. For in-repo plugins, that authorization step
+  is the explicit `engram plugin install <name>` invocation — the user
+  trusts the engine binary and then explicitly opts each plugin in. There
+  is no implicit enablement.
+- The GitHub adapter stays where it is; any reconsideration of that decision
+  is a separate ADR.
+
