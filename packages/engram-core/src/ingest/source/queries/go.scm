@@ -7,5 +7,8 @@
 ; --- Const declarations (single and block) ---
 (source_file (const_declaration (const_spec name: (identifier) @symbol.const)))
 
-; --- Imports (interpreted string literals include surrounding quotes) ---
-(import_spec path: (interpreted_string_literal) @import.source)
+; --- Imports (both quoted and backtick forms include surrounding delimiters) ---
+(import_spec path: [
+  (interpreted_string_literal)
+  (raw_string_literal)
+] @import.source)

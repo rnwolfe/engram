@@ -144,6 +144,12 @@ import (
     const { rawImports } = extractGo(captureFor(src2));
     expect(rawImports).toContain("net/http");
   });
+
+  it("raw string literal import (backticks)", () => {
+    const src2 = "package main\nimport `net/http`\n";
+    const { rawImports } = extractGo(captureFor(src2));
+    expect(rawImports).toContain("net/http");
+  });
 });
 
 describe("extractGo — byte offsets", () => {

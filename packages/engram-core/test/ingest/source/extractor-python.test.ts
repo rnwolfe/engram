@@ -132,6 +132,18 @@ from collections import defaultdict, OrderedDict
     const { rawImports } = extractPython(captureFor(src));
     expect(rawImports).toContain("pathlib");
   });
+
+  it("extracts aliased import module name (import os as o)", () => {
+    const src2 = "import os as o\n";
+    const { rawImports } = extractPython(captureFor(src2));
+    expect(rawImports).toContain("os");
+  });
+
+  it("extracts relative import (from . import foo)", () => {
+    const src2 = "from . import foo\n";
+    const { rawImports } = extractPython(captureFor(src2));
+    expect(rawImports.length).toBeGreaterThan(0);
+  });
 });
 
 describe("extractPython — byte offsets", () => {
