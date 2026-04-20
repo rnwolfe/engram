@@ -65,7 +65,7 @@ The `.engram` format, the core engine, and the "money command":
 - **Stale-knowledge benchmark in EngRAMark**: ground-truth `reconcile` correctness over substrate evolution — author projections at commit X, advance to commit Y, measure how well the system identifies what changed.
 - Team/tribal knowledge merging with explicit reconciliation
 - EngRAMark against Kubernetes
-- Enrichment adapters: Gerrit, Jira, Linear, GitLab
+- **First-party plugin adapters** — Jira, Linear, GitLab, and Google Docs ship as in-repo plugins (`packages/plugins/<name>/`) loaded via the plugin system. Gerrit has already migrated. See [ADR-008](internal/DECISIONS.md#adr-008----first-party-adapters-ship-as-in-repo-plugins).
 - Non-git ingestors (Slack, Confluence)
 - Community detection and topic clustering
 - Rich TUI and graph visualization
