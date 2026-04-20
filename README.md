@@ -165,7 +165,9 @@ that current code alone does not reveal.
 | `engram verify` | Validate `.engram/` integrity. |
 | `engram embed` | Manage vector embeddings. |
 | `engram rebuild-index` | Rebuild the FTS index. |
-| `engram plugin list` | List discovered plugins. |
+| `engram plugin list` | List discovered plugins (add `--available` for installable bundled plugins). |
+| `engram plugin install <name>` | Wire a bundled first-party plugin into XDG (or project with `--project`). |
+| `engram plugin uninstall <name>` | Remove an installed plugin (`--force` for user-authored). |
 
 Every command has `--help` with examples.
 
@@ -332,11 +334,46 @@ extensions, and security model.
 ```bash
 engram plugin list
 
-NAME        VERSION  TRANSPORT   SCOPE    STATUS
-----------  -------  ----------  -------  ------
-my-jira     0.1.0    executable  user     OK
-my-linear   0.2.0    js-module   project  OK
+NAME        VERSION  TRANSPORT   SCOPE    SOURCE    STATUS
+----------  -------  ----------  -------  --------  ------
+my-jira     0.1.0    executable  user     user      OK
+my-linear   0.2.0    js-module   project  symlinked OK
 ```
+
+### Install and uninstall
+
+First-party bundled plugins (those shipped in the engram install under
+`packages/plugins/`) can be wired into the XDG plugin directory with a
+single command — no manual symlinking required:
+
+```bash
+# List what is available to install
+engram plugin list --available
+
+# Install a bundled plugin user-wide (symlink into XDG_DATA_HOME/engram/plugins/)
+engram plugin install gerrit
+
+# Install into a specific project only
+engram plugin install gerrit --project /path/to/project
+
+# Uninstall a bundled or symlinked plugin
+engram plugin uninstall gerrit
+
+# Uninstall a user-authored (plain-directory) plugin — requires --force
+engram plugin uninstall my-custom --force
+```
+
+**Source column** — `engram plugin list` reports how each plugin was
+installed:
+
+| Source | Meaning |
+|---|---|
+| `bundled` | Symlink pointing into the engram install root (installed via `engram plugin install`). |
+| `symlinked` | A user-created symlink to an external directory. |
+| `user` | A plain directory created by the user. |
+
+On Windows, where symlinks may require elevated permissions, `engram plugin
+install` falls back to a recursive copy automatically.
 
 ## AI providers
 
