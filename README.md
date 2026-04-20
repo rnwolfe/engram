@@ -141,6 +141,7 @@ that current code alone does not reveal.
 | Command | Purpose |
 |---|---|
 | `engram init` | Create a `.engram/` graph (interactive or `--yes`). |
+| `engram add [content]` | Add a manual note or file as evidence. |
 | `engram ingest git [path]` | Ingest a git repository's commit history. |
 | `engram ingest source [path]` | Ingest source files (tree-sitter). |
 | `engram ingest md <glob>` | Ingest markdown documents. |
@@ -163,6 +164,7 @@ that current code alone does not reveal.
 | `engram doctor` | Diagnostics and optional repair. |
 | `engram verify` | Validate `.engram/` integrity. |
 | `engram embed` | Manage vector embeddings. |
+| `engram rebuild-index` | Rebuild the FTS index. |
 | `engram plugin list` | List discovered plugins. |
 
 Every command has `--help` with examples.
@@ -306,9 +308,9 @@ as a plugin without forking engram.
 Plugins are discovered from (highest precedence first):
 
 - `<project>/.engram/plugins/<name>/` — project-local, wins on name collision.
-- `$XDG_DATA_HOME/engram/plugins/<name>/` (Linux) or
-  `~/Library/Application Support/engram/plugins/<name>/` (macOS) or
-  `%LOCALAPPDATA%\engram\plugins\<name>\` (Windows) — user-wide.
+- `$XDG_DATA_HOME/engram/plugins/<name>/` (fallback
+  `~/.local/share/engram/plugins/<name>/`) — user-wide on Linux and macOS.
+- `%LOCALAPPDATA%\engram\plugins\<name>\` — user-wide on Windows.
 
 Each plugin directory needs a `manifest.json`. Discovered plugins are
 auto-registered as `engram ingest enrich <plugin-name>` subcommands and
@@ -404,11 +406,15 @@ const provider = createProvider({ provider: "ollama" });
 // Hybrid search (FTS + vector)
 const results = await search(graph, "auth module ownership", { provider });
 
-// Store embeddings manually
+// Compute an embedding through the provider
+const sourceText = "Auth module owned by the platform team";
+const [vector] = await provider.embed([sourceText]);
+
+// Store that embedding against an entity
 storeEmbedding(graph, entityId, "entity", "nomic-embed-text", vector, sourceText);
 
-// Find similar items by vector
-const similar = findSimilar(graph, queryEmbedding, {
+// Find similar items by vector (here, reusing the same embedding as the query)
+const similar = findSimilar(graph, vector, {
   limit: 10,
   target_type: "entity",
 });
