@@ -1,0 +1,15 @@
+{
+  "name": "gerrit",
+  "version": "0.1.0",
+  "contract_version": 1,
+  "transport": "js-module",
+  "entry": "src/index.ts",
+  "capabilities": {
+    "supported_auth": ["bearer", "basic", "none"],
+    "supports_cursor": true,
+    "scope_schema": {
+      "description": "Gerrit project name (e.g. 'my-project' or 'org/sub-project')",
+      "pattern": "^[^/][^/]*(/[^/]+)*[^/]$|^[^/]$"
+    }
+  }
+}

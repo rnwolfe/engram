@@ -25,7 +25,6 @@ import type {
 import {
   closeGraph,
   EnrichmentAdapterError,
-  GerritAdapter,
   GitHubAdapter,
   ingestGitRepo,
   ingestMarkdown,
@@ -563,125 +562,6 @@ See also:
       );
     } catch (err) {
       s.stop("GitHub enrichment failed");
-      handleEnrichError(err, adapter.name, adapter.supportedAuth);
-      closeGraph(graph);
-      process.exit(1);
-    }
-
-    closeGraph(graph);
-    if (process.stdout.isTTY) outro("Done");
-  });
-
-  // ---------------------------------------------------------------------------
-  // ingest enrich gerrit
-  // ---------------------------------------------------------------------------
-
-  addEnrichFlags(
-    enrich
-      .command("gerrit")
-      .description("Enrich with Gerrit code review changes")
-      .addHelpText(
-        "after",
-        `
-Auth flags (select based on your setup):
-  --token <token>                  Bearer token (or set GERRIT_TOKEN)
-  --username <u> --password <p>    HTTP Basic auth (or set GERRIT_USERNAME / GERRIT_PASSWORD)
-
-Scope:
-  --scope <project>      Gerrit project name (e.g. 'chromium/src')
-
-Examples:
-  # Enrich using HTTP Basic auth
-  engram ingest enrich gerrit --scope chromium/src --username alice --password s3cr3t
-
-  # Enrich a public Gerrit instance (no auth)
-  engram ingest enrich gerrit --scope myproject
-
-  # Specify a custom Gerrit endpoint
-  engram ingest enrich gerrit --scope myproject --endpoint https://gerrit.example.com
-
-When to use:
-  Run after engram ingest git to add Gerrit code-review discussions.
-
-See also:
-  engram ingest git    Ingest git history first`,
-      )
-      .option(
-        "--endpoint <url>",
-        "Gerrit base URL (default: https://gerrit-review.googlesource.com)",
-      ),
-  ).action(async (opts: IngestEnrichOpts & { endpoint?: string }) => {
-    if (process.stdout.isTTY) intro("engram ingest enrich gerrit");
-
-    // Handle deprecated --repo alias
-    if (opts.repo && !opts.scope) {
-      console.warn("Warning: --repo is deprecated, use --scope instead.");
-      opts.scope = opts.repo;
-    }
-
-    const adapter = new GerritAdapter();
-
-    // Build auth credential from flags/env
-    let auth: ReturnType<typeof buildAuthCredential>;
-    try {
-      auth = buildAuthCredential(opts, adapter.name, adapter.supportedAuth);
-    } catch (err) {
-      log.error(err instanceof Error ? err.message : String(err));
-      process.exit(1);
-    }
-
-    // Validate scope before opening graph
-    if (!opts.scope) {
-      log.error(
-        `--scope is required for gerrit adapter.\n${adapter.scopeSchema.description}`,
-      );
-      process.exit(1);
-    }
-    try {
-      adapter.scopeSchema.validate(opts.scope);
-    } catch (err) {
-      log.error(
-        `Invalid scope for gerrit: ${err instanceof Error ? err.message : String(err)}\n${adapter.scopeSchema.description}`,
-      );
-      process.exit(1);
-    }
-
-    if (opts.verbose) {
-      log.info(`Auth: ${auth.kind}`);
-    }
-
-    const dbPath = resolveDbPath(path.resolve(opts.db));
-    let graph: EngramGraph | undefined;
-    try {
-      graph = openGraph(dbPath);
-    } catch (err) {
-      log.error(
-        `Cannot open graph: ${err instanceof Error ? err.message : String(err)}`,
-      );
-      process.exit(1);
-    }
-
-    const s = spinner();
-    s.start(`Fetching from Gerrit (${opts.scope})`);
-
-    try {
-      const result = await adapter.enrich(graph, {
-        auth,
-        scope: opts.scope,
-        since: opts.since,
-        dryRun: opts.dryRun,
-        endpoint: opts.endpoint,
-      });
-      s.stop("Gerrit enrichment complete");
-      log.info(
-        [
-          `Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
-          `Entities: ${result.entitiesCreated} created`,
-          `Edges:    ${result.edgesCreated} created`,
-        ].join("\n"),
-      );
-    } catch (err) {
-      s.stop("Gerrit enrichment failed");
       handleEnrichError(err, adapter.name, adapter.supportedAuth);
       closeGraph(graph);
       process.exit(1);

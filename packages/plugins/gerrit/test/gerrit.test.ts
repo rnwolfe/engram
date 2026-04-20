@@ -1,18 +1,19 @@
 /**
- * gerrit.test.ts — Tests for GerritAdapter with mocked fetch.
+ * gerrit.test.ts — Tests for the Gerrit plugin adapter with mocked fetch.
  *
  * All tests use mock fetch — no real Gerrit API calls are made.
+ * Ported from packages/engram-core/test/ingest/gerrit.test.ts.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { resolveEntity } from "../../src/graph/aliases.js";
+import type { EngramGraph } from "engram-core";
 import {
   closeGraph,
   createGraph,
-  type EngramGraph,
+  resolveEntity,
   verifyGraph,
-} from "../../src/index.js";
-import { GerritAdapter } from "../../src/ingest/adapters/gerrit.js";
+} from "engram-core";
+import { GerritAdapter } from "../src/index.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -210,7 +210,7 @@ discussions, review comments, linked issues, rationale behind decisions.
 | Source | Status | Scope flag | Notes |
 |---|---|---|---|
 | GitHub | Built-in | `--scope owner/repo` | Public works without a token. |
-| Gerrit | Built-in | `--scope <project>` | Basic or bearer auth; `--endpoint <url>`. |
+| Gerrit | Plugin | `--scope <project>` | Basic or bearer auth; `--endpoint <url>`. Install via `engram plugin install gerrit`. |
 | GitLab | Planned | — | — |
 | Jira | Planned | — | — |
 | Linear | Planned | — | — |
@@ -227,7 +227,8 @@ engram ingest enrich github --scope owner/repo
 # GitHub (private or high-rate-limit)
 engram ingest enrich github --scope owner/repo --token $GITHUB_TOKEN
 
-# Gerrit
+# Gerrit (install the plugin first)
+engram plugin install gerrit
 engram ingest enrich gerrit --scope chromium/src \
   --endpoint https://gerrit-review.googlesource.com \
   --username alice --password $GERRIT_PASSWORD
@@ -301,9 +302,13 @@ engram export wiki --out ./wiki
 
 ## Plugins
 
-Engram ships with GitHub and Gerrit adapters. Anything else — GitLab, Jira,
-Linear, a proprietary review system, a custom knowledge source — can live
-as a plugin without forking engram.
+Engram ships with a GitHub built-in adapter and a Gerrit first-party plugin.
+Anything else — GitLab, Jira, Linear, a proprietary review system, a custom
+knowledge source — can live as a plugin without forking engram.
+
+The Gerrit adapter (`packages/plugins/gerrit/`) is the reference implementation
+for the plugin contract (ADR-008) — proof that the contract is adequate for a
+full-featured first-party adapter.
 
 ### Discovery
 

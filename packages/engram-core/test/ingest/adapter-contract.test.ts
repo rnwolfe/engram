@@ -6,9 +6,9 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { GerritAdapter } from "../../../plugins/gerrit/src/index.js";
 import type { EnrichmentAdapter } from "../../src/ingest/adapter.js";
 import { EnrichmentAdapterError } from "../../src/ingest/adapter.js";
-import { GerritAdapter } from "../../src/ingest/adapters/gerrit.js";
 import {
   GitHubAdapter,
   GitHubAuthError,

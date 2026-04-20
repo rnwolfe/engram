@@ -1,25 +1,26 @@
 /**
- * gerrit-helpers.ts — Internal helpers for the Gerrit enrichment adapter.
+ * helpers.ts — Internal helpers for the Gerrit enrichment adapter.
  *
- * Extracted to keep gerrit.ts under 500 lines. Not part of the public API.
+ * Ported from packages/engram-core/src/ingest/adapters/gerrit-helpers.ts
+ * into the in-repo plugin package.
  */
 
-import { ulid } from "ulid";
-import type { EngramGraph } from "../../format/index.js";
-import { ENGINE_VERSION } from "../../format/version.js";
-import { addEntityAlias, resolveEntity } from "../../graph/aliases.js";
-import { addEdge } from "../../graph/edges.js";
-import { addEntity, type EvidenceInput } from "../../graph/entities.js";
-import { addEpisode } from "../../graph/episodes.js";
+import type { EngramGraph, EvidenceInput, IngestResult } from "engram-core";
 import {
+  addEdge,
+  addEntity,
+  addEntityAlias,
+  addEpisode,
+  ENGINE_VERSION,
   ENTITY_TYPES,
+  EnrichmentAdapterError,
   EPISODE_SOURCE_TYPES,
   INGESTION_SOURCE_TYPES,
   RELATION_TYPES,
-} from "../../vocab/index.js";
-import { EnrichmentAdapterError } from "../adapter.js";
-import { writeCursor } from "../cursor.js";
-import type { IngestResult } from "../git.js";
+  resolveEntity,
+  writeCursor,
+} from "engram-core";
+import { ulid } from "ulid";
 
 // ---------------------------------------------------------------------------
 // Internal types (Gerrit REST API shapes — only fields we use)

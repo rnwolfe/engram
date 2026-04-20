@@ -152,10 +152,6 @@ export {
   EnrichmentAdapterError,
 } from "./ingest/adapter.js";
 export {
-  GerritAdapter,
-  gerritScopeSchema,
-} from "./ingest/adapters/gerrit.js";
-export {
   GitHubAdapter,
   GitHubAuthError,
   githubScopeSchema,
