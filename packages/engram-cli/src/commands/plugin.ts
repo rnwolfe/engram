@@ -43,10 +43,12 @@ function installPlugin(src: string, dest: string): "symlink" | "copy" {
   fs.mkdirSync(path.dirname(dest), { recursive: true });
 
   try {
-    fs.symlinkSync(src, dest, "junction");
+    // Use "junction" only on Windows; POSIX directory symlinks use "dir"
+    const symlinkType = process.platform === "win32" ? "junction" : "dir";
+    fs.symlinkSync(src, dest, symlinkType);
     return "symlink";
   } catch {
-    // Fallback: recursive copy
+    // Fallback: recursive copy (common on Windows without elevated permissions)
     copyDir(src, dest);
     return "copy";
   }
@@ -91,9 +93,10 @@ function registerList(plugin: Command): void {
     .action(async (opts: PluginListOpts) => {
       const projectRoot = path.resolve(opts.project ?? ".");
 
-      // Show available bundled plugins if requested
+      const root = opts.bundledRoot ?? bundledPluginsRoot();
+
+      // Show available bundled plugins section when --available is requested
       if (opts.available) {
-        const root = opts.bundledRoot ?? bundledPluginsRoot();
         const available = listBundledPlugins(root ?? undefined);
         if (available.length === 0) {
           log.info(
@@ -106,13 +109,11 @@ function registerList(plugin: Command): void {
             process.stdout.write(`  ${name}\n`);
           }
           process.stdout.write(
-            "\nInstall with: engram plugin install <name>\n",
+            "\nInstall with: engram plugin install <name>\n\n",
           );
         }
-        return;
+        // Fall through to also show installed plugins below
       }
-
-      const root = opts.bundledRoot ?? bundledPluginsRoot();
       const discovered = discoverPlugins(projectRoot, root ?? undefined);
 
       if (discovered.length === 0) {
@@ -258,9 +259,18 @@ function registerInstall(plugin: Command): void {
         return;
       }
 
-      const src = path.join(root, name);
-      const destRoot = resolveDestRoot(opts.project);
+      const src = path.resolve(path.join(root, name));
+      const destRoot = path.resolve(resolveDestRoot(opts.project));
       const dest = path.join(destRoot, name);
+
+      // Guard against path traversal in `name`
+      if (!dest.startsWith(destRoot + path.sep)) {
+        process.stderr.write(
+          `error: plugin name '${name}' is invalid (path traversal detected)\n`,
+        );
+        process.exitCode = 1;
+        return;
+      }
 
       if (fs.existsSync(dest)) {
         process.stderr.write(
@@ -305,8 +315,17 @@ function registerUninstall(plugin: Command): void {
     )
     .option("--bundled-root <path>", "override bundled plugins root (testing)")
     .action(async (name: string, opts: PluginUninstallOpts) => {
-      const destRoot = resolveDestRoot(opts.project);
+      const destRoot = path.resolve(resolveDestRoot(opts.project));
       const dest = path.join(destRoot, name);
+
+      // Guard against path traversal in `name`
+      if (!dest.startsWith(destRoot + path.sep)) {
+        process.stderr.write(
+          `error: plugin name '${name}' is invalid (path traversal detected)\n`,
+        );
+        process.exitCode = 1;
+        return;
+      }
 
       if (!fs.existsSync(dest)) {
         process.stderr.write(
