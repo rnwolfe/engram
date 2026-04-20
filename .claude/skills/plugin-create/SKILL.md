@@ -1,7 +1,7 @@
 ---
 name: plugin-create
 description: "Guide the creation of a high-quality engram enrichment plugin — js-module or executable transport — with correct manifest, auth, scope, vocab, aliases, cursor, and tests"
-disable-model-invocation: false
+disable-model-invocation: true
 ---
 
 # Plugin Create — Interactive Guidance for Engram Adapter Authors
@@ -237,10 +237,11 @@ the adapter object. `assertAuthKind(this, opts)` at the start of `enrich()` enfo
 | `service_account` | Google APIs, some GCP services | `keyJson` is a full JSON string, not a file path |
 | `oauth2` | Sources with short-lived tokens | `refresh` callback only works in `js-module` — document clearly |
 
-For `executable` transport, the wire form differs slightly — the loader currently
-serialises `opts.token` directly as the `auth` field (see `transport/executable.ts`
-line 266). Executable plugins should tolerate both `{type: "bearer", token: "..."}`
-and legacy `{type: "token", token: "..."}` until the wire shape is stabilised.
+For `executable` transport, the loader currently sends `auth` as a plain string
+(`opts.token`) — not as an `AuthCredential` object. The v2 object shape is not yet
+implemented in `transport/executable.ts`. Executable plugins receive a bare token
+string in the `enrich.auth` field and should treat it as a bearer token until the
+wire shape is upgraded.
 
 ### 3.2 Scope schema
 
@@ -362,7 +363,9 @@ Notes from the live schema validator:
 - `contract_version` must be `1` (or the current `CURRENT_CONTRACT_VERSION` — check
   `packages/engram-core/src/plugins/manifest.ts`).
 - `entry` must resolve inside the plugin dir (path traversal is rejected).
-- If you declare `vocab_extensions`, respect the 50-per-category cap.
+- `vocab_extensions` values must be namespaced (`<plugin-name>/<value>`); collisions
+  with built-ins are rejected. No per-category count limit is currently enforced by
+  the validator (spec proposes 50 but it is not implemented).
 
 ### 4.3 Reference `package.json` — js-module
 
@@ -562,9 +565,11 @@ export function ingestItem(graph: EngramGraph, item: SourceItem): Partial<Ingest
     metadata: { /* small non-PII fields */ },
   });
 
-  // 2. Entity — resolve first, create with evidence if new
+  // 2. Entity — resolve first, create with evidence if new.
+  //    Always pass entity_type to resolveEntity — canonical_name is not unique
+  //    across types and the wrong entity can be returned without the filter.
   const canonicalName = /* stable identifier */;
-  let entity = resolveEntity(graph, canonicalName);
+  let entity = resolveEntity(graph, canonicalName, ENTITY_TYPES.PULL_REQUEST);
   let entityIsNew = false;
   if (!entity) {
     entity = addEntity(graph,
@@ -620,12 +625,17 @@ The prose spec (`docs/internal/specs/plugin-loading.md`) and the current loader
 the source of truth** because that's the code the plugin talks to. See §8 for the
 reconciliation guidance; use the loader-shaped messages below when writing code.
 
-**Engram → plugin**:
+**Engram → plugin** (actual loader behavior — `transport/executable.ts`):
 ```json
 {"op": "hello", "contract_version": 1}
-{"op": "enrich", "scope": "<string>", "auth": "<string or object>",
+{"op": "enrich", "scope": "<opts.repo string>", "auth": "<opts.token string>",
  "since": "<ISO8601 or null>", "cursor": null, "dry_run": false}
 ```
+
+> **Current limitation**: the loader sends `scope` as `opts.repo` (the legacy field)
+> and `auth` as a plain token string (`opts.token`), not as a v2 `AuthCredential`
+> object. The v2 `opts.scope` / `opts.auth` object fields are not yet forwarded to
+> executable plugins.
 
 **Plugin → engram** (each on its own line, flushed):
 ```json
@@ -650,6 +660,12 @@ Notes:
   evidence from the referenced episode.
 - Edge `source_ref` / `target_ref` are entity canonical names, resolved by the
   loader. Both entities must have been emitted earlier in the same run.
+- **`valid_from`/`valid_until` are not supported in the edge wire format.** The
+  `EdgeRecord` interface has no validity fields, and the loader calls `addEdge`
+  without them. Temporal bounds on executable-plugin edges are a current limitation.
+- **`done.cursor` is currently ignored by the loader.** The transport does not
+  persist it to `ingestion_runs`. Cursor resume does not work for executable plugins
+  today — document this in the plugin's README.
 - An `{type: "error", message: "..."}` record ends the run with a fatal error.
 - 60-second timeout, 10 MB per-line cap. Paginate and flush.
 
