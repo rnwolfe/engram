@@ -2,8 +2,15 @@
  * plugins/index.ts — barrel export for the plugin loader module.
  */
 
-export type { PluginDirectory } from "./discover.js";
-export { discoverPlugins } from "./discover.js";
+export type { PluginDirectory, PluginSource } from "./discover.js";
+export {
+  bundledPluginsRoot,
+  discoverPlugins,
+  listBundledPlugins,
+  projectPluginsRoot,
+  userPluginsRoot,
+  xdgDataHome,
+} from "./discover.js";
 export type {
   PluginCapabilities,
   PluginManifest,
