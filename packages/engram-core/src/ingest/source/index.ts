@@ -21,13 +21,22 @@ import {
   INGESTION_SOURCE_TYPES,
   RELATION_TYPES,
 } from "../../vocab/index.js";
-import type { ExtractedFile } from "./extractors/typescript.js";
+import type { ExtractedFile } from "./extractors/types.js";
+import { extractGo } from "./extractors/go.js";
+import { extractPython } from "./extractors/python.js";
 import { extractTypeScript, resolveImport } from "./extractors/typescript.js";
+import type { Language } from "./parser.js";
 import { languageForPath, SourceParser } from "./parser.js";
 import { walk } from "./walker.js";
 
 const SOURCE_TYPE = INGESTION_SOURCE_TYPES.SOURCE;
-const EXTRACTOR = "source/typescript";
+const EXTRACTOR = "source";
+
+function extractFile(captures: ReturnType<SourceParser["runQuery"]>, lang: Language): ExtractedFile {
+  if (lang === "go") return extractGo(captures);
+  if (lang === "python") return extractPython(captures);
+  return extractTypeScript(captures);
+}
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -267,7 +276,7 @@ export async function ingestSource(
             // extracted remains empty — episode is still created below
           } else {
             const captures = parser.runQuery(tree, lang);
-            extracted = extractTypeScript(captures);
+            extracted = extractFile(captures, lang);
             result.filesParsed++;
             onProgress?.({ type: "file_parsed", relPath });
           }

@@ -37,12 +37,16 @@ describe("languageForPath", () => {
     expect(languageForPath("src/foo.tsx")).toBe("tsx");
   });
 
-  it("returns null for .py", () => {
-    expect(languageForPath("src/foo.py")).toBeNull();
+  it("maps .py to python", () => {
+    expect(languageForPath("src/foo.py")).toBe("python");
   });
 
-  it("returns null for .go", () => {
-    expect(languageForPath("src/foo.go")).toBeNull();
+  it("maps .pyw to python", () => {
+    expect(languageForPath("src/foo.pyw")).toBe("python");
+  });
+
+  it("maps .go to go", () => {
+    expect(languageForPath("src/foo.go")).toBe("go");
   });
 
   it("returns null for .rs", () => {
@@ -114,6 +118,18 @@ describe("SourceParser", () => {
     const tsxTree = parser.parse("const el = <span />;", "tsx");
     expect(tsTree.rootNode.type).toBe("program");
     expect(tsxTree.rootNode.type).toBe("program");
+  });
+
+  it("parses Go source — root is source_file node", () => {
+    const tree = parser.parse("package main\nfunc main() {}", "go");
+    expect(tree.rootNode.type).toBe("source_file");
+    expect(tree.rootNode.hasError).toBe(false);
+  });
+
+  it("parses Python source — root is module node", () => {
+    const tree = parser.parse("def hello():\n    pass\n", "python");
+    expect(tree.rootNode.type).toBe("module");
+    expect(tree.rootNode.hasError).toBe(false);
   });
 
   it("dispose() does not throw", async () => {

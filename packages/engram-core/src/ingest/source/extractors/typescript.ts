@@ -1,28 +1,8 @@
 import path from "node:path";
 import type { QueryCapture } from "../parser";
+import type { ExtractedFile, ExtractedSymbol } from "./types.js";
 
-/** A top-level symbol found in a TypeScript/TSX file. */
-export interface ExtractedSymbol {
-  name: string;
-  kind:
-    | "function"
-    | "class"
-    | "interface"
-    | "type"
-    | "enum"
-    | "const"
-    | "default";
-  exported: boolean;
-  startByte: number;
-  endByte: number;
-}
-
-/** The result of extracting symbols and imports from a single file. */
-export interface ExtractedFile {
-  symbols: ExtractedSymbol[];
-  /** Raw import specifier strings, e.g. `'./foo'`, `'react'`. */
-  rawImports: string[];
-}
+export type { ExtractedFile, ExtractedSymbol };
 
 /** Map from capture name prefix to ExtractedSymbol kind. */
 const KIND_MAP: Record<string, ExtractedSymbol["kind"]> = {
