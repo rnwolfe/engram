@@ -1,0 +1,15 @@
+{
+  "name": "@engram/plugin-gerrit",
+  "version": "0.1.0",
+  "description": "Gerrit enrichment adapter for engram (in-repo plugin)",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "echo 'plugin: no build step required'",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "engram-core": "workspace:*",
+    "ulid": "^2.3.0"
+  }
+}

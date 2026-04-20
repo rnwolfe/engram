@@ -1,5 +1,5 @@
 /**
- * gerrit.ts — Gerrit enrichment adapter.
+ * index.ts — Gerrit enrichment adapter (in-repo plugin).
  *
  * Fetches code-review changes from the Gerrit REST API and ingests them into
  * an EngramGraph. Uses ingestion_runs cursors (offset-based) for resumability.
@@ -8,34 +8,36 @@
  * Token is NEVER written to the graph.
  *
  * Note: Gerrit prefixes all JSON responses with ")]}'\n" for XSSI protection.
- * This adapter strips the prefix before parsing (handled in gerrit-helpers.ts).
+ * This adapter strips the prefix before parsing (handled in helpers.ts).
  *
- * Internal helpers live in gerrit-helpers.ts.
+ * Default export: GerritAdapter instance (required by js-module plugin contract).
  */
 
-import type { EngramGraph } from "../../format/index.js";
-import { INGESTION_SOURCE_TYPES } from "../../vocab/index.js";
 import type {
   AuthCredential,
+  EngramGraph,
   EnrichmentAdapter,
   EnrichOpts,
+  IngestResult,
   ScopeSchema,
-} from "../adapter.js";
-import { applyCompatShim, assertAuthKind } from "../adapter.js";
-import { readNumericCursor } from "../cursor.js";
-import type { IngestResult } from "../git.js";
+} from "engram-core";
+import {
+  applyCompatShim,
+  assertAuthKind,
+  INGESTION_SOURCE_TYPES,
+  readNumericCursor,
+} from "engram-core";
 import {
   apiGet,
   completeIngestionRun,
   createIngestionRun,
   type FetchFn,
   failIngestionRun,
-  GerritAuthError,
   ingestChange,
   PAGE_SIZE,
-} from "./gerrit-helpers.js";
+} from "./helpers.js";
 
-export { GerritAuthError } from "./gerrit-helpers.js";
+export { GerritAuthError } from "./helpers.js";
 
 // ---------------------------------------------------------------------------
 // Scope schema
@@ -202,6 +204,5 @@ export class GerritAdapter implements EnrichmentAdapter {
   }
 }
 
-// Suppress unused import warning — GerritAuthError is re-exported above and
-// used internally by apiGet in gerrit-helpers.ts.
-void GerritAuthError;
+// Default export required by the js-module plugin transport contract.
+export default new GerritAdapter();

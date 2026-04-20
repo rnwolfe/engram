@@ -315,7 +315,7 @@ describe("auth-kind mismatch does not call enrich()", () => {
 // ---------------------------------------------------------------------------
 
 describe("ingest enrich command registration", () => {
-  it("registers gerrit as an enrich subcommand", async () => {
+  it("registers github as an enrich subcommand (gerrit is now a plugin)", async () => {
     const { registerIngest } = await import("../../src/commands/ingest.js");
     const program = new Command().exitOverride();
     registerIngest(program);
@@ -330,7 +330,10 @@ describe("ingest enrich command registration", () => {
 
     const subNames = enrich.commands.map((c) => c.name());
     expect(subNames).toContain("github");
-    expect(subNames).toContain("gerrit");
+    // gerrit is no longer a hardcoded built-in subcommand — it is now a plugin
+    // discovered from packages/plugins/gerrit/ and auto-registered at runtime
+    // when installed via `engram plugin install gerrit`.
+    expect(subNames).not.toContain("gerrit");
   });
 
   it("github enrich subcommand has --scope flag", async () => {
