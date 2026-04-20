@@ -1,8 +1,9 @@
 # Engram — Status
 
-> Last synced: 2026-04-07
+> Last synced: 2026-04-20
+> Latest release: **v0.2.0** (2026-04-19)
 
-## Phase 1 — Foundation (v0.1)
+## Phase 1 — Foundation (v0.1) — shipped 2026-04-08
 
 ### Done
 
@@ -19,38 +20,131 @@
 - [x] Integrity verification — `verifyGraph()` with 8 checks, `engram verify` CLI command (#28)
 - [x] EngRAMark v0.1 — 20 ground-truth Q&A for Fastify, VCS-only + grep baselines (#29)
 - [x] Markdown and text ingestion (#30)
+- [x] AI provider integration — `AIProvider` interface, `NullProvider`, `OllamaProvider`, `GeminiProvider`, `storeEmbedding()`, `findSimilar()`, hybrid search (#31)
+- [x] Graph visualization — Cytoscape.js web UI with filter sidebar, search-to-focus, temporal slider, decay/ownership overlays (#58–#62)
+- [x] commitlint CI action permission fix (#16)
 
-### In Progress
+## Phase 2 — Growth (v0.2) — shipped 2026-04-19
 
-- [ ] AI provider integration — pluggable embeddings + entity extraction (#31, specced at `docs/internal/specs/ai-providers.md`)
-  - `AIProvider` interface, `NullProvider`, `OllamaProvider`, `GeminiProvider`
-  - `storeEmbedding()`, `findSimilar()`, hybrid search integration
-  - Unblocked — all Phase 1 dependencies shipped
+### Done
 
-### Next Up
+#### Projection layer (schema v0.2)
 
-- [ ] AI benchmarking extension (#32)
-  - `ai-enhanced` runner, `--all` comparison mode, CI baseline regression detection
-  - **Blocked by**: #31
+- [x] Projection layer spec + ADR-002 (#77)
+- [x] Schema migration v0.1 → v0.2 — projection tables (#78)
+- [x] `project()` operation + `ProjectionGenerator` interface (#79)
+- [x] `listActiveProjections()`, `searchProjections()` with batched staleness (#80)
+- [x] `reconcile()` assess phase — `Budget`, `softRefresh`, `currentInputState` (#81)
+- [x] `verifyGraph()` projection invariants (#82)
+- [x] `engram export wiki` — materialize projections to markdown folder (#83)
+- [x] Kind catalog — v0.2 built-in kinds (#84)
+- [x] `engram project` — explicit projection authoring (#85, #218, #219, #220)
+- [x] Real AI projection authoring — Anthropic, Gemini, OpenAI providers (#95)
+- [x] `engram reconcile` — two-phase maintenance loop (#87, #88, #92, #220)
+- [x] Reconcile discover phase — emergent projection authoring (#87, #219)
+- [x] Discover-phase prompt experiment + v0.1 draft (#63, #218)
 
-### Bugs
+#### Source code ingestion
 
-- [ ] commitlint CI action needs `pull-requests: read` permission (#16)
+- [x] Source ingestion scaffold + file walker (#104)
+- [x] tree-sitter parser + grammar vendoring (#105)
+- [x] TypeScript extractor + tree-sitter queries (#106)
+- [x] Source ingestion — episode/entity/edge writes + idempotency (#107)
+- [x] Sweep phase — archive episodes for deleted source files (#108)
+- [x] `engram ingest source` subcommand (#109)
+- [x] Source ingestion docs + self-ingest verification (#110)
 
-## Phase 2 — Growth (v0.2+)
+#### Plugin system
 
-Not started. Phase 1 completion (AI provider layer) is the gate.
+- [x] Plugin loading architecture spec + ADR-006 (#204, #212)
+- [x] Plugin loader — XDG discovery, manifest parsing, js-module + executable transports (#206, #214)
+- [x] Formal ingest plugin contract — D3 Deliverable 1 (#129)
 
-Planned per VISION.md:
-- Team/tribal knowledge merging
-- EngRAMark against Kubernetes
-- Enrichment adapters: Gerrit, Jira, Linear, GitLab
-- Non-git ingestors (Slack, Confluence)
-- Community detection and topic clustering
-- Rich TUI and graph visualization
+#### Enrichment adapters
+
+- [x] EnrichmentAdapter v2 contract — `AuthCredential`, `ScopeSchema`, cursor helpers (#213)
+- [x] Gerrit adapter — changes, owners, reviewers from Gerrit REST API (#191, #211)
+- [x] `engram ingest` — consume v2 adapter options (#205, #215)
+
+#### Graph and ingestion
+
+- [x] Cross-source reference edge resolver (#208)
+- [x] Adapter shorthand alias convention (#209)
+- [x] Controlled vocabulary registries — `entity_type`, `source_type`, `relation_type` (#199, #210)
+- [x] Episode supersession — schema, graph helpers, `verifyGraph()` invariants (#201, #207, #216, #217)
+- [x] Semantic entity embeddings — vector search over entities (#127)
+- [x] Embedding model as per-database config (ADR-003) (#126)
+
+#### CLI and UX
+
+- [x] `engram init` — interactive embedding/provider setup, enrichment selection, companion wiring (#130, #180, #189)
+- [x] `engram status` — health + config dashboard (#131)
+- [x] `engram embed` — reindex, check, enable, status (#132)
+- [x] `engram doctor` — diagnostic and repair (#188)
+- [x] `engram companion --check --file` — idempotent CI use (#182)
+- [x] `engram context --max-entities --max-edges` hard caps (#181)
+- [x] `--format text\|json` on `stats`, `decay`, `show`, `history` (#164, #165, #166, #167)
+- [x] `-j` and `-v` short flags on all commands (#183)
+- [x] Colorized terminal output (#190)
+- [x] `.engram` directory layout migration — flat file → `.engram/` dir (#187)
+- [x] CLI help text pass — Phases 1-3 (#133, #134, #135)
+
+#### Stale-knowledge benchmark
+
+- [x] Stale-knowledge benchmark spec (#86)
+- [x] EngRAMark stale-knowledge detection benchmark (#90)
+
+#### Decommissioning (ADR-005)
+
+- [x] MCP projection tools (get, search, list, project, reconcile) implemented (#89), then removed alongside the MCP server
+- [x] `engram-mcp` server removed — replaced by `engram context` (#136)
+- [x] `engramark` suite removed; stale-knowledge tests relocated (#128)
+
+#### Retrieval tuning
+
+- [x] Config noise filter; term-matching entities ranked higher (#137)
+
+#### Documentation
+
+- [x] README v0.2 overhaul — plugins, Gerrit, reconcile, companion, token-budget semantics (#221)
+- [x] Various CLI fixes in #168-#179 (embed default, port validation, sparse-results gating, piped-intro suppression, etc.)
+
+## Phase 2 — In flight / Next up
+
+### Open, ready for work (`backlog/ready`)
+
+- [ ] #222 — Migrate Gerrit adapter from built-in to in-repo plugin (ADR-008 reference port; blocks v0.3.0 tag)
+- [ ] #223 — `engram plugin install` subcommand (wire first-party plugins into XDG; blocks Gerrit migration UX)
+- [ ] #224 — docs: update VISION.md phase 2 for in-repo plugin model
+
+### Open, needs refinement (`backlog/needs-refinement`)
+
+- [ ] #196 — Google Docs adapter (priority/high) — first LLM-consumable mutable source after ADR-007
+- [ ] #198 — Google Drive folder enumeration (depends on #196)
+- [ ] #193 — GitLab adapter (reclassified as in-repo plugin per ADR-008)
+- [ ] #194 — Jira adapter (reclassified as in-repo plugin per ADR-008)
+- [ ] #195 — Linear adapter (reclassified as in-repo plugin per ADR-008)
+- [ ] #192 — Buganizer spike (verify public API alignment)
+- [ ] #203 — `engram sync` — config-driven multi-source orchestration
+- [ ] #123 — Harness plugin core + Gemini CLI adapter (D3 Deliverable 2)
+- [ ] #111 — epic: retrieval precision + context provider viability
+- [ ] #116 — **Workflow benchmark** (priority/high, research) — Gate G1 for narrative projections per ADR-004. Flagged in most recent `/product` check: `decision_page`, `contradiction_report`, and `topic_cluster` shipped in v0.2.0 without G1 exit criteria met.
+
+## Phase 3 — Maturity — not started
+
+Per VISION.md:
+- Tribal merge: centralized reconciliation of personal engram files
+- Organizational knowledge topology dashboards
+- Real-time ingestion from CI/CD pipelines
+- IDE extensions (VS Code, JetBrains)
+- Obsidian plugin
+
+Phase 3 is gated on Phase 2 adapter coverage (Gerrit migration + Jira/Linear/GitLab/Google Docs shipping as plugins) and on Gate G1 (#116) validating the projection layer on real multi-file tasks.
 
 ## Architecture Stats
 
-- **Test count**: ~293 (as of EngRAMark merge)
-- **Packages**: 2 (engram-core, engram-cli)
-- **Specs**: 2 (format-v0.1, ai-providers)
+- **Packages**: 3 (`engram-core`, `engram-cli`, `engram-web`)
+- **Specs**: 17 under `docs/internal/specs/`
+- **ADRs**: 8 recorded in `docs/internal/DECISIONS.md`
+- **Schema version**: v0.2 (projection layer + mutable-source supersession)
+- **Adapter contract**: v2 (typed auth, scope schema, cursor helpers)
