@@ -33,7 +33,6 @@ import {
   createIngestionRun,
   type FetchFn,
   failIngestionRun,
-  GerritAuthError,
   ingestChange,
   PAGE_SIZE,
 } from "./helpers.js";
@@ -204,10 +203,6 @@ export class GerritAdapter implements EnrichmentAdapter {
     }
   }
 }
-
-// Suppress unused import warning — GerritAuthError is re-exported above and
-// used internally by apiGet in helpers.ts.
-void GerritAuthError;
 
 // Default export required by the js-module plugin transport contract.
 export default new GerritAdapter();
