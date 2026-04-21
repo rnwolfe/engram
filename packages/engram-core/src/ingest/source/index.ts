@@ -29,6 +29,7 @@ import { extractJava } from "./extractors/java.js";
 import { extractPython } from "./extractors/python.js";
 import { extractRuby } from "./extractors/ruby.js";
 import { extractRust } from "./extractors/rust.js";
+import { extractStarlark } from "./extractors/starlark.js";
 import type { EntityRef, ExtractedFile } from "./extractors/types.js";
 import { extractTypeScript, resolveImport } from "./extractors/typescript.js";
 import type { Language } from "./parser.js";
@@ -41,6 +42,8 @@ const EXTRACTOR = "source";
 function extractFile(
   captures: ReturnType<SourceParser["runQuery"]>,
   lang: Language,
+  filePath: string,
+  root: string,
 ): ExtractedFile {
   if (lang === "go") return extractGo(captures);
   if (lang === "java") return extractJava(captures);
@@ -50,6 +53,7 @@ function extractFile(
   if (lang === "c") return extractC(captures);
   if (lang === "cpp") return extractCpp(captures);
   if (lang === "c_sharp") return extractCSharp(captures);
+  if (lang === "starlark") return extractStarlark(captures, filePath, root);
   return extractTypeScript(captures);
 }
 
@@ -332,7 +336,7 @@ export async function ingestSource(
             // extracted remains empty — episode is still created below
           } else {
             const captures = parser.runQuery(tree, lang);
-            extracted = extractFile(captures, lang);
+            extracted = extractFile(captures, lang, relPath, absRoot);
             result.filesParsed++;
             onProgress?.({ type: "file_parsed", relPath });
           }

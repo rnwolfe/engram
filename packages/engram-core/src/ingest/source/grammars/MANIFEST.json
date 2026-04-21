@@ -48,5 +48,10 @@
     "version": "0.23.5",
     "commit": "",
     "source": "https://github.com/tree-sitter/tree-sitter-c-sharp"
+  },
+  "starlark": {
+    "version": "1.3.0",
+    "commit": "npm:tree-sitter-starlark@1.3.0",
+    "source": "https://github.com/tree-sitter-grammars/tree-sitter-starlark"
   }
 }

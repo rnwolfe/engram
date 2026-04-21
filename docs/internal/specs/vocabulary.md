@@ -43,6 +43,7 @@ union type (for function signatures and parameter narrowing).
 | `ISSUE` | `"issue"` | Bug tracker issue |
 | `K8S_RESOURCE_KIND` | `"k8s_resource_kind"` | Kubernetes resource type (e.g. Deployment, ReplicaSet) |
 | `RBAC_PERMISSION` | `"rbac_permission"` | Kubernetes RBAC permission (group/resource#verb tuple) |
+| `BAZEL_TARGET` | `"bazel_target"` | Bazel/Buck build target (from BUILD file ingestion) |
 
 ## Source types — two registries
 
@@ -90,6 +91,7 @@ via `INGESTION_TO_EPISODE_SOURCES`.
 | `CONTROLLER_WATCHES` | `"controller_watches"` | controller-runtime: controller reconciles this resource kind (For/Watches) |
 | `CONTROLLER_OWNS` | `"controller_owns"` | controller-runtime: controller owns this resource kind (Owns) |
 | `RBAC_GRANTS` | `"rbac_grants"` | Controller struct is granted RBAC permission via kubebuilder marker |
+| `BUILD_DEPENDS_ON` | `"build_depends_on"` | Bazel target depends on another target (from BUILD file ingestion) |
 
 ## Adding a new value
 
