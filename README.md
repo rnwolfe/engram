@@ -192,8 +192,20 @@ tree-sitter, and creates file, module, and symbol entities. Respects
 `.gitignore` by default; always skips `node_modules`, build artifacts, and
 lockfiles.
 
-TypeScript and JavaScript are supported today. Additional grammars land in
-later versions.
+Supported languages: **TypeScript/JavaScript (including TSX/JSX), Go, Python,
+Rust, Java, Ruby, C, C++, C#**, and **Starlark** (`BUILD`/`BUILD.bazel`/`BUCK`
+files).
+
+Beyond generic symbol extraction, engram parses a few ecosystem-specific
+structures into first-class graph signal:
+
+- **Kubebuilder RBAC markers** in Go (`+kubebuilder:rbac:…`) become
+  `rbac_permission` entities linked to their controller.
+- **controller-runtime** `SetupWithManager` relationships become edges from a
+  reconciler to resources it watches (`.For()`/`.Watches()`) and owns
+  (`.Owns()`).
+- **Bazel** `BUILD` rules become `bazel_target` entities with
+  `build_depends_on` edges, yielding a navigable build-dependency graph.
 
 ```bash
 engram ingest source                            # current directory
@@ -496,7 +508,7 @@ Deeper reading:
 | Area | State |
 |---|---|
 | Git ingest (structural graph) | Stable |
-| Source ingest (TS/JS) | Stable |
+| Source ingest (TS/JS/TSX/JSX, Go, Python, Rust, Java, Ruby, C/C++, C#, Starlark) | Stable |
 | GitHub enrichment | Stable |
 | Gerrit enrichment | Experimental |
 | Plugin loader (js-module + executable) | Experimental |
