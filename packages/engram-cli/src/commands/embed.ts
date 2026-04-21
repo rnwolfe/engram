@@ -556,7 +556,8 @@ async function runEnable(
   });
 
   const elapsedSec = ((Date.now() - startMs) / 1000).toFixed(1);
-  if (s) s.stop(`Embedded ${result.done.toLocaleString()} items in ${elapsedSec}s`);
+  if (s)
+    s.stop(`Embedded ${result.done.toLocaleString()} items in ${elapsedSec}s`);
 
   if (result.errors > 0 && !opts.json) {
     log.warn(`${result.errors} items failed — run again to retry.`);

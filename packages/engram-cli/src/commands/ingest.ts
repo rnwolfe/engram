@@ -147,7 +147,7 @@ See also:
         if (isTTY) {
           log.success(summary);
         } else {
-          process.stdout.write(summary + "\n");
+          process.stdout.write(`${summary}\n`);
         }
       } catch (err) {
         process.stderr.write(
@@ -206,7 +206,7 @@ See also:
         if (isTTY) {
           log.success(summary);
         } else {
-          process.stdout.write(summary + "\n");
+          process.stdout.write(`${summary}\n`);
         }
       } catch (err) {
         process.stderr.write(
@@ -582,6 +582,8 @@ interface IngestEnrichPluginOpts {
   db: string;
   token?: string;
   scope?: string;
+  /** @deprecated Use --scope */
+  repo?: string;
   since?: string;
 }
 
@@ -615,15 +617,19 @@ function registerPluginEnrichSubcommands(
       )
       .option("--db <path>", "path to .engram file", ".engram")
       .option("--token <token>", "auth token for the plugin (if required)")
-      .option(
-        "--scope <value>",
-        "adapter-specific scope (e.g. 'owner/repo')",
-      )
+      .option("--scope <value>", "adapter-specific scope (e.g. 'owner/repo')")
+      .option("--repo <value>", "(deprecated) alias for --scope")
       .option(
         "--since <date>",
         "only fetch items updated after this date (ISO8601)",
       )
       .action(async (opts: IngestEnrichPluginOpts) => {
+        if (opts.repo && !opts.scope) {
+          process.stderr.write(
+            "Warning: --repo is deprecated for plugin adapters, use --scope instead.\n",
+          );
+          opts.scope = opts.repo;
+        }
         const dbPath = resolveDbPath(path.resolve(opts.db));
 
         let graph: EngramGraph | undefined;
