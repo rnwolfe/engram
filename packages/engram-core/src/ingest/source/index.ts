@@ -22,6 +22,7 @@ import {
   RELATION_TYPES,
 } from "../../vocab/index.js";
 import { extractGo } from "./extractors/go.js";
+import { extractJava } from "./extractors/java.js";
 import { extractPython } from "./extractors/python.js";
 import { extractRust } from "./extractors/rust.js";
 import type { EntityRef, ExtractedFile } from "./extractors/types.js";
@@ -38,6 +39,7 @@ function extractFile(
   lang: Language,
 ): ExtractedFile {
   if (lang === "go") return extractGo(captures);
+  if (lang === "java") return extractJava(captures);
   if (lang === "python") return extractPython(captures);
   if (lang === "rust") return extractRust(captures);
   return extractTypeScript(captures);
