@@ -12,3 +12,12 @@
   (interpreted_string_literal)
   (raw_string_literal)
 ] @import.source)
+
+; --- SetupWithManager method declarations (controller-runtime) ---
+; Captures the full method_declaration node for SetupWithManager methods so the
+; extractor can walk the body and emit controller_watches / controller_owns edges.
+(method_declaration
+  receiver: (parameter_list) @setup.receiver
+  name: (field_identifier) @setup.name
+  (#eq? @setup.name "SetupWithManager")
+  body: (block) @setup.body)

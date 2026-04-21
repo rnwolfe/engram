@@ -16,6 +16,7 @@ export const ENTITY_TYPES = {
   COMMIT: "commit",
   PULL_REQUEST: "pull_request",
   ISSUE: "issue",
+  K8S_RESOURCE_KIND: "k8s_resource_kind",
 } as const;
 
 export type EntityType = (typeof ENTITY_TYPES)[keyof typeof ENTITY_TYPES];

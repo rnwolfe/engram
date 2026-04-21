@@ -209,7 +209,8 @@ function supersedeEpisode(graph: EngramGraph, episodeId: string): void {
  * @param symbolEntityIds - Map from bare symbol name to its ULID within this file.
  * @param graph - The EngramGraph instance (used for canonical lookups/upserts).
  * @param evidence - Evidence inputs to attach when upserting a new canonical entity.
- * @returns The resolved entity id and whether it was newly created.
+ * @returns The resolved entity id and whether it was newly created, or null if a symbol
+ * reference cannot be resolved in the current file (e.g. cross-file Go receiver).
  */
 export function resolveEntityRef(
   ref: EntityRef,
@@ -217,7 +218,7 @@ export function resolveEntityRef(
   symbolEntityIds: Map<string, string>,
   graph: EngramGraph,
   evidence: EvidenceInput[],
-): { id: string; created: boolean } {
+): { id: string; created: boolean } | null {
   if (ref.kind === "file") {
     return { id: fileEntityId, created: false };
   }
@@ -225,9 +226,10 @@ export function resolveEntityRef(
   if (ref.kind === "symbol") {
     const symId = symbolEntityIds.get(ref.name);
     if (!symId) {
-      throw new Error(
-        `EntityRef symbol "${ref.name}" not found among extracted symbols for this file`,
+      console.warn(
+        `[engram source] symbol ref "${ref.name}" not found in this file — skipping edge (may be defined in another file)`,
       );
+      return null;
     }
     return { id: symId, created: false };
   }
@@ -443,29 +445,31 @@ export async function ingestSource(
 
         // Extra edges declared by the extractor
         for (const edge of extracted.extraEdges ?? []) {
-          const { id: srcId, created: srcCreated } = resolveEntityRef(
+          const srcResolved = resolveEntityRef(
             edge.source,
             fileEntityId,
             symbolEntityIds,
             graph,
             ev,
           );
-          if (srcCreated) result.entitiesCreated++;
+          if (!srcResolved) continue;
+          if (srcResolved.created) result.entitiesCreated++;
 
-          const { id: tgtId, created: tgtCreated } = resolveEntityRef(
+          const tgtResolved = resolveEntityRef(
             edge.target,
             fileEntityId,
             symbolEntityIds,
             graph,
             ev,
           );
-          if (tgtCreated) result.entitiesCreated++;
+          if (!tgtResolved) continue;
+          if (tgtResolved.created) result.entitiesCreated++;
 
           const created = upsertEdge(
             graph,
             {
-              source_id: srcId,
-              target_id: tgtId,
+              source_id: srcResolved.id,
+              target_id: tgtResolved.id,
               relation_type: edge.relationType,
               edge_kind: edge.edgeKind,
               fact: edge.fact,
