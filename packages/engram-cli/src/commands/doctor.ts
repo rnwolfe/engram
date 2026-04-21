@@ -158,7 +158,6 @@ Examples:
   engram doctor -j               # same as --format json`,
     )
     .action(async (opts: DoctorOpts) => {
-      const cwd = process.cwd();
       const rawDb = opts.db;
 
       // Resolve format flag: -j / --json shorthand
@@ -171,6 +170,11 @@ Examples:
       // We need to know whether the layout is flat or directory *before* resolveDbPath
       // so that checkLayout can report accurately.
       const absRaw = nodePath.resolve(rawDb);
+      // Derive cwd from the db path (parent of .engram) rather than process.cwd()
+      // so that gitignore and WAL checks work correctly regardless of the caller's
+      // working directory. For the default `--db .engram` this resolves identically
+      // to process.cwd().
+      const cwd = nodePath.dirname(absRaw);
       let resolvedDbPath = resolveDbPath(absRaw);
 
       // Figure out the db dir name relative to cwd (for gitignore check)
