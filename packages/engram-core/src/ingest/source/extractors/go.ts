@@ -77,7 +77,7 @@ export function extractGo(captures: QueryCapture[]): ExtractedFile {
     }
 
     if (captureName.startsWith("setup.")) {
-      // Group by the method_declaration's start index (grandparent of each capture)
+      // Group by the method_declaration's start index (parent of each capture)
       const methodNode = node.parent;
       if (!methodNode) continue;
       const key = methodNode.startIndex;

@@ -331,4 +331,36 @@ func (r *FooReconciler) SetupWithManager(mgr interface{}) error {
     const vr = verifyGraph(graph);
     expect(vr.violations.filter((v) => v.severity === "error")).toHaveLength(0);
   });
+
+  it("does not throw when SetupWithManager receiver type is defined in a different file", async () => {
+    // In Go, a struct can be defined in types.go while its method is in controller.go.
+    // The extractor emits a symbol ref for the receiver; if it's absent from the method
+    // file's symbolEntityIds, the orchestrator must skip the edge rather than throw.
+    const root = tmpDir;
+    fs.mkdirSync(path.join(root, "controllers"), { recursive: true });
+
+    // Method file — struct NOT declared here
+    fs.writeFileSync(
+      path.join(root, "controllers", "setup.go"),
+      `package controllers
+
+func (r *CrossFileReconciler) SetupWithManager(mgr interface{}) error {
+  return x.For(&appsv1.Deployment{}).Complete(r)
+}
+`,
+    );
+
+    // No struct file — CrossFileReconciler is "in another file"
+
+    const result = await ingestSource(graph, {
+      root,
+      respectGitignore: false,
+    });
+
+    // Ingest must complete without errors even though the symbol ref can't be resolved
+    expect(result.errors).toHaveLength(0);
+
+    const vr = verifyGraph(graph);
+    expect(vr.violations.filter((v) => v.severity === "error")).toHaveLength(0);
+  });
 });

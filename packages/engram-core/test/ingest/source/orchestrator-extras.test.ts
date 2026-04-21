@@ -126,7 +126,7 @@ describe("resolveEntityRef kind=symbol", () => {
     expect(result.created).toBe(false);
   });
 
-  test("throws when symbol name is not in symbolEntityIds", async () => {
+  test("returns null when symbol name is not in symbolEntityIds (cross-file ref)", async () => {
     const { ev } = buildEpisodeAndEvidence(graph);
     const fileEntity = addEntity(
       graph,
@@ -135,15 +135,14 @@ describe("resolveEntityRef kind=symbol", () => {
     );
 
     const symbolIds = new Map<string, string>();
-    expect(() =>
-      resolveEntityRef(
-        { kind: "symbol", name: "missing" },
-        fileEntity.id,
-        symbolIds,
-        graph,
-        ev,
-      ),
-    ).toThrow(/missing/);
+    const result = resolveEntityRef(
+      { kind: "symbol", name: "missing" },
+      fileEntity.id,
+      symbolIds,
+      graph,
+      ev,
+    );
+    expect(result).toBeNull();
   });
 });
 
