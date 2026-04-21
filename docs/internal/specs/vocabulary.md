@@ -41,6 +41,7 @@ union type (for function signatures and parameter narrowing).
 | `COMMIT` | `"commit"` | Git commit |
 | `PULL_REQUEST` | `"pull_request"` | GitHub/Gerrit/GitLab PR or CL |
 | `ISSUE` | `"issue"` | Bug tracker issue |
+| `K8S_RESOURCE_KIND` | `"k8s_resource_kind"` | Kubernetes resource type (e.g. Deployment, ReplicaSet) |
 
 ## Source types — two registries
 
@@ -85,6 +86,8 @@ via `INGESTION_TO_EPISODE_SOURCES`.
 | `CONTAINS` | `"contains"` | Module/dir contains file or sub-module |
 | `DEFINED_IN` | `"defined_in"` | Symbol is defined in file |
 | `IMPORTS` | `"imports"` | File imports another file |
+| `CONTROLLER_WATCHES` | `"controller_watches"` | controller-runtime: controller reconciles this resource kind (For/Watches) |
+| `CONTROLLER_OWNS` | `"controller_owns"` | controller-runtime: controller owns this resource kind (Owns) |
 
 ## Adding a new value
 

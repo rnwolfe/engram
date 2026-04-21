@@ -18,6 +18,9 @@ export const RELATION_TYPES = {
   CONTAINS: "contains",
   DEFINED_IN: "defined_in",
   IMPORTS: "imports",
+  // Kubernetes controller-runtime relationships
+  CONTROLLER_WATCHES: "controller_watches",
+  CONTROLLER_OWNS: "controller_owns",
 } as const;
 
 export type RelationType = (typeof RELATION_TYPES)[keyof typeof RELATION_TYPES];
