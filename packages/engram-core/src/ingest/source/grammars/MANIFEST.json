@@ -18,5 +18,10 @@
     "version": "0.23.6",
     "commit": "bffb65a8cfe4e46290331dfef0dbf0ef3679de11",
     "source": "https://github.com/tree-sitter/tree-sitter-python"
+  },
+  "rust": {
+    "version": "0.23.2",
+    "commit": "129626a04c7b8a10e7e7a22d5a49c46f9ff2f57e",
+    "source": "https://github.com/tree-sitter/tree-sitter-rust"
   }
 }

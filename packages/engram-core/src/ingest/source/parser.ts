@@ -5,13 +5,14 @@ import type { QueryCapture } from "web-tree-sitter";
 import { Parser, Query, Language as TreeSitterLanguage } from "web-tree-sitter";
 
 /** Languages supported by the source parser. */
-export type Language = "typescript" | "tsx" | "go" | "python";
+export type Language = "typescript" | "tsx" | "go" | "python" | "rust";
 
 const GRAMMAR_FILES: Record<Language, string> = {
   typescript: "tree-sitter-typescript.wasm",
   tsx: "tree-sitter-tsx.wasm",
   go: "tree-sitter-go.wasm",
   python: "tree-sitter-python.wasm",
+  rust: "tree-sitter-rust.wasm",
 };
 
 /** Maps each language to its tree-sitter query file. */
@@ -20,6 +21,7 @@ const QUERY_FILES: Record<Language, string> = {
   tsx: "typescript.scm",
   go: "go.scm",
   python: "python.scm",
+  rust: "rust.scm",
 };
 
 const TS_EXTENSIONS: Set<string> = new Set([
@@ -33,6 +35,7 @@ const TS_EXTENSIONS: Set<string> = new Set([
 const TSX_EXTENSIONS: Set<string> = new Set([".tsx", ".jsx"]);
 const GO_EXTENSIONS: Set<string> = new Set([".go"]);
 const PYTHON_EXTENSIONS: Set<string> = new Set([".py", ".pyw"]);
+const RUST_EXTENSIONS: Set<string> = new Set([".rs"]);
 
 /**
  * Maps a relative file path to the Language enum value to use when parsing it,
@@ -44,6 +47,7 @@ export function languageForPath(relPath: string): Language | null {
   if (TS_EXTENSIONS.has(ext)) return "typescript";
   if (GO_EXTENSIONS.has(ext)) return "go";
   if (PYTHON_EXTENSIONS.has(ext)) return "python";
+  if (RUST_EXTENSIONS.has(ext)) return "rust";
   return null;
 }
 

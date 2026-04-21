@@ -11,6 +11,7 @@ parser works without a build step or internet access at runtime.
 | `tree-sitter-tsx.wasm` | TSX | `tree-sitter/tree-sitter-typescript` |
 | `tree-sitter-go.wasm` | Go | `tree-sitter/tree-sitter-go` |
 | `tree-sitter-python.wasm` | Python | `tree-sitter/tree-sitter-python` |
+| `tree-sitter-rust.wasm` | Rust | `tree-sitter/tree-sitter-rust` |
 
 See `MANIFEST.json` for pinned version and commit.
 

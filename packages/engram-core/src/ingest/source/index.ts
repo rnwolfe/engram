@@ -23,6 +23,7 @@ import {
 } from "../../vocab/index.js";
 import { extractGo } from "./extractors/go.js";
 import { extractPython } from "./extractors/python.js";
+import { extractRust } from "./extractors/rust.js";
 import type { EntityRef, ExtractedFile } from "./extractors/types.js";
 import { extractTypeScript, resolveImport } from "./extractors/typescript.js";
 import type { Language } from "./parser.js";
@@ -38,6 +39,7 @@ function extractFile(
 ): ExtractedFile {
   if (lang === "go") return extractGo(captures);
   if (lang === "python") return extractPython(captures);
+  if (lang === "rust") return extractRust(captures);
   return extractTypeScript(captures);
 }
 

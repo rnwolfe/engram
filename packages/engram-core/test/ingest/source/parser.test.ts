@@ -49,8 +49,8 @@ describe("languageForPath", () => {
     expect(languageForPath("src/foo.go")).toBe("go");
   });
 
-  it("returns null for .rs", () => {
-    expect(languageForPath("src/foo.rs")).toBeNull();
+  it("maps .rs to rust", () => {
+    expect(languageForPath("src/foo.rs")).toBe("rust");
   });
 
   it("returns null for files without extension", () => {
@@ -129,6 +129,12 @@ describe("SourceParser", () => {
   it("parses Python source — root is module node", () => {
     const tree = parser.parse("def hello():\n    pass\n", "python");
     expect(tree.rootNode.type).toBe("module");
+    expect(tree.rootNode.hasError).toBe(false);
+  });
+
+  it("parses Rust source — root is source_file node", () => {
+    const tree = parser.parse("pub fn main() {}", "rust");
+    expect(tree.rootNode.type).toBe("source_file");
     expect(tree.rootNode.hasError).toBe(false);
   });
 
