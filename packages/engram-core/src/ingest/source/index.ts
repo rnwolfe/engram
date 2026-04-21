@@ -23,7 +23,7 @@ import {
 } from "../../vocab/index.js";
 import { extractGo } from "./extractors/go.js";
 import { extractPython } from "./extractors/python.js";
-import type { ExtractedFile } from "./extractors/types.js";
+import type { EntityRef, ExtractedFile } from "./extractors/types.js";
 import { extractTypeScript, resolveImport } from "./extractors/typescript.js";
 import type { Language } from "./parser.js";
 import { languageForPath, SourceParser } from "./parser.js";
@@ -189,6 +189,45 @@ function supersedeEpisode(graph: EngramGraph, episodeId: string): void {
     .run(episodeId);
 }
 
+/**
+ * Resolve an EntityRef to a ULID given the context of a single file's pass.
+ *
+ * @param ref - The EntityRef to resolve (see EntityRef JSDoc for semantics).
+ * @param fileEntityId - ULID of the current file entity.
+ * @param symbolEntityIds - Map from bare symbol name to its ULID within this file.
+ * @param graph - The EngramGraph instance (used for canonical lookups/upserts).
+ * @param evidence - Evidence inputs to attach when upserting a new canonical entity.
+ * @returns The resolved entity id and whether it was newly created.
+ */
+export function resolveEntityRef(
+  ref: EntityRef,
+  fileEntityId: string,
+  symbolEntityIds: Map<string, string>,
+  graph: EngramGraph,
+  evidence: EvidenceInput[],
+): { id: string; created: boolean } {
+  if (ref.kind === "file") {
+    return { id: fileEntityId, created: false };
+  }
+
+  if (ref.kind === "symbol") {
+    const symId = symbolEntityIds.get(ref.name);
+    if (!symId) {
+      throw new Error(
+        `EntityRef symbol "${ref.name}" not found among extracted symbols for this file`,
+      );
+    }
+    return { id: symId, created: false };
+  }
+
+  // ref.kind === "canonical"
+  return upsertEntity(
+    graph,
+    { canonical_name: ref.canonicalName, entity_type: ref.entityType },
+    evidence,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Orchestrator
 // ---------------------------------------------------------------------------
@@ -304,6 +343,8 @@ export async function ingestSource(
         result.entitiesCreated++; // file entity
         result.entitiesCreated += extracted.symbols.length;
         result.edgesCreated += extracted.symbols.length * 2; // file→contains + symbol→defined_in
+        result.entitiesCreated += extracted.extraEntities?.length ?? 0;
+        result.edgesCreated += extracted.extraEdges?.length ?? 0;
       } else {
         // SUPERSESSION — invalidate old episode if file content changed
         const oldEpisode = findActiveEpisodeForPath(graph, relPath);
@@ -334,6 +375,9 @@ export async function ingestSource(
         fileEntityId = id;
         if (fileCreated) result.entitiesCreated++;
 
+        // Map from bare symbol name → ULID for EntityRef resolution.
+        const symbolEntityIds = new Map<string, string>();
+
         // Upsert symbol entities + file→contains + symbol→defined_in edges
         for (const sym of extracted.symbols) {
           const symName = `${relPath}::${sym.name}`;
@@ -343,6 +387,7 @@ export async function ingestSource(
             ev,
           );
           if (symCreated) result.entitiesCreated++;
+          symbolEntityIds.set(sym.name, symEntityId);
 
           const c1 = upsertEdge(
             graph,
@@ -369,6 +414,53 @@ export async function ingestSource(
             ev,
           );
           if (c2) result.edgesCreated++;
+        }
+
+        // Extra entities declared by the extractor
+        for (const extra of extracted.extraEntities ?? []) {
+          const { created } = upsertEntity(
+            graph,
+            {
+              canonical_name: extra.canonicalName,
+              entity_type: extra.entityType,
+            },
+            ev,
+          );
+          if (created) result.entitiesCreated++;
+        }
+
+        // Extra edges declared by the extractor
+        for (const edge of extracted.extraEdges ?? []) {
+          const { id: srcId, created: srcCreated } = resolveEntityRef(
+            edge.source,
+            fileEntityId,
+            symbolEntityIds,
+            graph,
+            ev,
+          );
+          if (srcCreated) result.entitiesCreated++;
+
+          const { id: tgtId, created: tgtCreated } = resolveEntityRef(
+            edge.target,
+            fileEntityId,
+            symbolEntityIds,
+            graph,
+            ev,
+          );
+          if (tgtCreated) result.entitiesCreated++;
+
+          const created = upsertEdge(
+            graph,
+            {
+              source_id: srcId,
+              target_id: tgtId,
+              relation_type: edge.relationType,
+              edge_kind: edge.edgeKind,
+              fact: edge.fact,
+            },
+            ev,
+          );
+          if (created) result.edgesCreated++;
         }
       }
 
