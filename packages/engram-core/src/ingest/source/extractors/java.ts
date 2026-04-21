@@ -13,7 +13,7 @@ const KIND_MAP: Record<string, ExtractedSymbol["kind"]> = {
 };
 
 function hasPublicModifier(modifiersText: string): boolean {
-  return modifiersText.split(/\s+/).includes("public");
+  return /\bpublic\b/.test(modifiersText);
 }
 
 export function extractJava(captures: QueryCapture[]): ExtractedFile {

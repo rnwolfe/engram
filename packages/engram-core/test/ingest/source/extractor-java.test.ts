@@ -250,6 +250,21 @@ describe("extractJava — byte offsets", () => {
   });
 });
 
+describe("extractJava — annotated public method", () => {
+  const src = `
+public class MyClass {
+  @Override
+  public String toString() { return ""; }
+}
+`;
+
+  it("exported = true for annotated public method", () => {
+    const { symbols } = extractJava(captureFor(src));
+    const sym = symbols.find((s) => s.name === "toString");
+    expect(sym?.exported).toBe(true);
+  });
+});
+
 describe("extractJava — nested classes not extracted", () => {
   it("inner class is not extracted as top-level symbol", () => {
     const src = `
