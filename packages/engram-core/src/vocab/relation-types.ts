@@ -21,6 +21,8 @@ export const RELATION_TYPES = {
   // Kubernetes controller-runtime relationships
   CONTROLLER_WATCHES: "controller_watches",
   CONTROLLER_OWNS: "controller_owns",
+  // Kubernetes RBAC
+  RBAC_GRANTS: "rbac_grants",
 } as const;
 
 export type RelationType = (typeof RELATION_TYPES)[keyof typeof RELATION_TYPES];

@@ -18,13 +18,17 @@ const KIND_MAP: Record<string, ExtractedSymbol["kind"]> = {
 
 const WATCH_METHODS = new Set(["For", "Owns", "Watches"]);
 
+// Matches: // +kubebuilder:rbac:groups=...,resources=...,verbs=...
+const KUBEBUILDER_RBAC_RE = /^\/\/\s*\+kubebuilder:rbac:(.+)$/;
+
 /**
  * Extract top-level symbols and import paths from tree-sitter-go query captures.
  *
  * In Go, exported symbols have names beginning with an uppercase letter.
  * Import paths are quoted string literals — quotes are stripped.
  *
- * Also extracts controller-runtime SetupWithManager watch/owns edges.
+ * Also extracts controller-runtime SetupWithManager watch/owns edges and
+ * kubebuilder RBAC permission markers adjacent to struct declarations.
  */
 export function extractGo(captures: QueryCapture[]): ExtractedFile {
   const symbols: ExtractedSymbol[] = [];
@@ -33,6 +37,7 @@ export function extractGo(captures: QueryCapture[]): ExtractedFile {
   const extraEntities: ExtractedEntity[] = [];
   const extraEdges: ExtractedEdge[] = [];
   const seenResourceKinds = new Set<string>();
+  const seenRbacPerms = new Set<string>();
 
   // Group setup.* captures by position so we can pair receiver + name + body.
   // Each triplet shares the same method_declaration parent start index.
@@ -40,6 +45,9 @@ export function extractGo(captures: QueryCapture[]): ExtractedFile {
     number,
     { receiver?: SyntaxNode; name?: SyntaxNode; body?: SyntaxNode }
   >();
+
+  // Struct type declaration nodes for RBAC marker walking.
+  const structNameNodes: SyntaxNode[] = [];
 
   for (const capture of captures) {
     const { name: captureName, node } = capture;
@@ -88,6 +96,11 @@ export function extractGo(captures: QueryCapture[]): ExtractedFile {
       if (part === "receiver") group.receiver = node;
       else if (part === "name") group.name = node;
       else if (part === "body") group.body = node;
+      continue;
+    }
+
+    if (captureName === "rbac.struct.name") {
+      structNameNodes.push(node);
     }
   }
 
@@ -127,7 +140,183 @@ export function extractGo(captures: QueryCapture[]): ExtractedFile {
     }
   }
 
+  // RBAC marker extraction: for each struct, walk preceding sibling comments.
+  for (const nameNode of structNameNodes) {
+    const structName = nameNode.text;
+    // type_identifier → type_spec → type_declaration
+    const typeDecl = nameNode.parent?.parent;
+    if (!typeDecl || typeDecl.type !== "type_declaration") continue;
+
+    const markerLines = collectPrecedingRbacMarkers(typeDecl);
+
+    for (const markerLine of markerLines) {
+      processRbacMarker(
+        markerLine,
+        structName,
+        extraEntities,
+        extraEdges,
+        seenRbacPerms,
+      );
+    }
+  }
+
   return { symbols, rawImports, extraEntities, extraEdges };
+}
+
+/**
+ * Walk backward through preceding siblings of a type_declaration node to collect
+ * adjacent // +kubebuilder:rbac: comment text. Stops at the first non-comment sibling.
+ */
+function collectPrecedingRbacMarkers(typeDecl: SyntaxNode): string[] {
+  const parent = typeDecl.parent;
+  if (!parent) return [];
+
+  // Find index of typeDecl among parent's children by position (not object identity,
+  // which is unreliable for WASM-backed tree-sitter nodes).
+  let typeDeclIdx = -1;
+  for (let i = 0; i < parent.childCount; i++) {
+    const c = parent.child(i);
+    if (c && c.startIndex === typeDecl.startIndex && c.type === typeDecl.type) {
+      typeDeclIdx = i;
+      break;
+    }
+  }
+  if (typeDeclIdx < 0) return [];
+
+  const markers: string[] = [];
+  for (let i = typeDeclIdx - 1; i >= 0; i--) {
+    const sibling = parent.child(i);
+    if (!sibling || sibling.type !== "comment") break;
+    const text = sibling.text;
+    if (KUBEBUILDER_RBAC_RE.test(text)) {
+      markers.unshift(text);
+    }
+  }
+  return markers;
+}
+
+/**
+ * Parse a single kubebuilder RBAC marker line and push entities/edges into the
+ * accumulator arrays. Skips with a warning on missing required keys; skips
+ * silently (debug-level) on unsupported constructs (subresources, multi-resource,
+ * urls).
+ *
+ * Canonical name format: `<group-or-core>/<resource>#<verb>`
+ * Empty groups="" maps to the prefix "core/".
+ */
+function processRbacMarker(
+  line: string,
+  structName: string,
+  extraEntities: ExtractedEntity[],
+  extraEdges: ExtractedEdge[],
+  seenRbacPerms: Set<string>,
+): void {
+  const match = KUBEBUILDER_RBAC_RE.exec(line);
+  if (!match) return;
+
+  const params = parseMarkerParams(match[1]);
+
+  const groupsRaw = params.get("groups");
+  const resourcesRaw = params.get("resources");
+  const verbsRaw = params.get("verbs");
+
+  if (
+    groupsRaw === undefined ||
+    resourcesRaw === undefined ||
+    verbsRaw === undefined
+  ) {
+    console.warn(
+      `[engram extractor/go] kubebuilder RBAC marker missing required key (groups/resources/verbs) — skipping: ${line}`,
+    );
+    return;
+  }
+
+  // Skip subresources (resources containing "/")
+  if (resourcesRaw.includes("/")) {
+    console.debug?.(
+      `[engram extractor/go] skipping RBAC marker with subresource: ${line}`,
+    );
+    return;
+  }
+
+  // Skip urls key (not supported)
+  if (params.has("urls")) {
+    console.debug?.(
+      `[engram extractor/go] skipping RBAC marker with urls: ${line}`,
+    );
+    return;
+  }
+
+  // Skip multi-resource (comma or semicolon-separated resources)
+  const resources = resourcesRaw
+    .split(/[,;]/)
+    .map((r) => r.trim())
+    .filter(Boolean);
+  if (resources.length > 1) {
+    console.debug?.(
+      `[engram extractor/go] skipping RBAC marker with multiple resources: ${line}`,
+    );
+    return;
+  }
+  const resource = resources[0];
+  if (!resource) return;
+
+  // Strip surrounding quotes from group value (e.g. groups="" → groups="")
+  const rawGroups = groupsRaw
+    .split(",")
+    .map((g) => g.trim().replace(/^["']|["']$/g, ""));
+  const groups = rawGroups;
+  const verbs = verbsRaw
+    .split(";")
+    .map((v) => v.trim())
+    .filter(Boolean);
+
+  for (const group of groups) {
+    const groupPrefix = group === "" ? "core/" : `${group}/`;
+
+    for (const verb of verbs) {
+      const canonicalName = `${groupPrefix}${resource}#${verb}`;
+
+      if (!seenRbacPerms.has(canonicalName)) {
+        seenRbacPerms.add(canonicalName);
+        extraEntities.push({
+          canonicalName,
+          entityType: ENTITY_TYPES.RBAC_PERMISSION,
+        });
+      }
+
+      extraEdges.push({
+        source: { kind: "symbol", name: structName },
+        target: {
+          kind: "canonical",
+          canonicalName,
+          entityType: ENTITY_TYPES.RBAC_PERMISSION,
+        },
+        relationType: RELATION_TYPES.RBAC_GRANTS,
+        edgeKind: "observed",
+        fact: `${structName} is granted ${verb} on ${groupPrefix}${resource} via kubebuilder RBAC marker`,
+      });
+    }
+  }
+}
+
+/**
+ * Parse a kubebuilder marker parameter string into a key→value map.
+ * Format: key=value,key=value (values may contain semicolons for verb lists).
+ * Splits on "," only when followed by a key= pattern to handle verb semicolons.
+ */
+function parseMarkerParams(paramStr: string): Map<string, string> {
+  const result = new Map<string, string>();
+  // Split on commas that are followed by a word= pattern (key boundary)
+  const parts = paramStr.split(/,(?=[a-zA-Z]+=)/);
+  for (const part of parts) {
+    const eqIdx = part.indexOf("=");
+    if (eqIdx < 0) continue;
+    const key = part.slice(0, eqIdx).trim();
+    const value = part.slice(eqIdx + 1).trim();
+    result.set(key, value);
+  }
+  return result;
 }
 
 /**
