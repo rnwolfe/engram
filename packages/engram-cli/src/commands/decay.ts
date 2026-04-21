@@ -65,7 +65,11 @@ export function registerDecay(program: Command): void {
     .description("Show knowledge decay report")
     .option("--stale-days <n>", "days without evidence to mark as stale", "180")
     .option("--dormant-days <n>", "days of owner inactivity to flag", "90")
-    .option("--format <fmt>", "output format: text (alias: table) or json", "text")
+    .option(
+      "--format <fmt>",
+      "output format: text (alias: table) or json",
+      "text",
+    )
     .option("-j", "shorthand for --format json")
     .option("--db <path>", "path to .engram file", ".engram")
     .addHelpText(
