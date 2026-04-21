@@ -95,9 +95,7 @@ describe("engram doctor — layout check", () => {
     const dbDir = makeGoodDb(tmpDir);
     const program = makeProgram();
 
-    const origCwd = process.cwd();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     try {
       let exited = false;
       process.exit = (() => {
@@ -113,7 +111,6 @@ describe("engram doctor — layout check", () => {
       expect(output).toContain("✓");
     } finally {
       process.exit = origExit;
-      process.chdir(origCwd);
     }
   });
 
@@ -122,9 +119,7 @@ describe("engram doctor — layout check", () => {
     const flatPath = makeFlatDb(tmpDir);
     const program = makeProgram();
 
-    const origCwd = process.cwd();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let exitCode = 0;
 
     try {
@@ -143,7 +138,6 @@ describe("engram doctor — layout check", () => {
       });
     } finally {
       process.exit = origExit;
-      process.chdir(origCwd);
     }
 
     expect(exitCode).toBe(1);
@@ -166,9 +160,7 @@ describe("engram doctor — gitignore check", () => {
     fs.writeFileSync(path.join(tmpDir, ".gitignore"), ".engram/\n", "utf8");
     const program = makeProgram();
 
-    const origCwd = process.cwd();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     try {
       process.exit = (() => {
         // no-op capture
@@ -187,7 +179,6 @@ describe("engram doctor — gitignore check", () => {
       expect(output).toContain("gitignore");
     } finally {
       process.exit = origExit;
-      process.chdir(origCwd);
     }
   });
 
@@ -197,9 +188,7 @@ describe("engram doctor — gitignore check", () => {
     fs.writeFileSync(path.join(tmpDir, ".gitignore"), ".engram\n", "utf8");
     const program = makeProgram();
 
-    const origCwd = process.cwd();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let exitCode = 0;
 
     try {
@@ -222,7 +211,6 @@ describe("engram doctor — gitignore check", () => {
       expect(exitCode).toBe(1);
     } finally {
       process.exit = origExit;
-      process.chdir(origCwd);
     }
   });
 });
@@ -242,9 +230,7 @@ describe("engram doctor — schema check", () => {
     const dbDir = makeGoodDb(tmpDir);
     const program = makeProgram();
 
-    const origCwd = process.cwd();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let _exitCode = 0;
 
     try {
@@ -263,7 +249,6 @@ describe("engram doctor — schema check", () => {
       expect(schemaLine).toContain("✓");
     } finally {
       process.exit = origExit;
-      process.chdir(origCwd);
     }
   });
 });
@@ -283,9 +268,7 @@ describe("engram doctor — fts_index check", () => {
     const dbDir = makeGoodDb(tmpDir);
     const program = makeProgram();
 
-    const origCwd = process.cwd();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let _exitCode = 0;
 
     try {
@@ -302,7 +285,6 @@ describe("engram doctor — fts_index check", () => {
       expect(lines[0]).toContain("✓");
     } finally {
       process.exit = origExit;
-      process.chdir(origCwd);
     }
   });
 });
@@ -322,9 +304,7 @@ describe("engram doctor — embedding_index check", () => {
     const dbDir = makeGoodDb(tmpDir);
     const program = makeProgram();
 
-    const origCwd = process.cwd();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let _exitCode = 0;
 
     try {
@@ -339,7 +319,6 @@ describe("engram doctor — embedding_index check", () => {
       expect(output).toContain("embedding_index");
     } finally {
       process.exit = origExit;
-      process.chdir(origCwd);
     }
   });
 
@@ -353,9 +332,7 @@ describe("engram doctor — embedding_index check", () => {
     closeGraph(graph);
 
     const program = makeProgram();
-    const origCwd = process.cwd();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let _exitCode = 0;
 
     try {
@@ -380,7 +357,6 @@ describe("engram doctor — embedding_index check", () => {
       expect(lines[0]).toContain("✓");
     } finally {
       process.exit = origExit;
-      process.chdir(origCwd);
     }
   });
 });
@@ -400,9 +376,7 @@ describe("engram doctor — wal check", () => {
     const dbDir = makeGoodDb(tmpDir);
     const program = makeProgram();
 
-    const origCwd = process.cwd();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let _exitCode = 0;
 
     try {
@@ -419,7 +393,6 @@ describe("engram doctor — wal check", () => {
       expect(lines[0]).toContain("✓");
     } finally {
       process.exit = origExit;
-      process.chdir(origCwd);
     }
   });
 
@@ -430,9 +403,7 @@ describe("engram doctor — wal check", () => {
     fs.writeFileSync(path.join(tmpDir, ".engram-wal"), "", "utf8");
     const program = makeProgram();
 
-    const origCwd = process.cwd();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let exitCode = 0;
 
     try {
@@ -448,7 +419,6 @@ describe("engram doctor — wal check", () => {
       expect(exitCode).toBe(1);
     } finally {
       process.exit = origExit;
-      process.chdir(origCwd);
     }
   });
 });
@@ -490,9 +460,7 @@ describe("engram doctor — evidence_integrity check", () => {
     closeGraph(graph);
 
     const program = makeProgram();
-    const origCwd = process.cwd();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let _exitCode = 0;
 
     try {
@@ -517,7 +485,6 @@ describe("engram doctor — evidence_integrity check", () => {
       expect(lines[0]).toContain("✓");
     } finally {
       process.exit = origExit;
-      process.chdir(origCwd);
     }
   });
 });
@@ -537,9 +504,7 @@ describe("engram doctor — JSON output", () => {
     const dbDir = makeGoodDb(tmpDir);
     const program = makeProgram();
 
-    const origCwd = process.cwd();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let _exitCode = 0;
 
     try {
@@ -576,7 +541,6 @@ describe("engram doctor — JSON output", () => {
       }
     } finally {
       process.exit = origExit;
-      process.chdir(origCwd);
     }
   });
 
@@ -585,9 +549,7 @@ describe("engram doctor — JSON output", () => {
     const dbDir = makeGoodDb(tmpDir);
     const program = makeProgram();
 
-    const origCwd = process.cwd();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let _exitCode = 0;
 
     try {
@@ -610,7 +572,6 @@ describe("engram doctor — JSON output", () => {
       expect(parsed).toHaveProperty("checks");
     } finally {
       process.exit = origExit;
-      process.chdir(origCwd);
     }
   });
 });
@@ -637,9 +598,7 @@ describe("engram doctor — --fix layout migration", () => {
     expect(fs.statSync(flatPath).isFile()).toBe(true);
 
     const program = makeProgram();
-    const origCwd = process.cwd();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let _exitCode = 0;
 
     try {
@@ -660,7 +619,6 @@ describe("engram doctor — --fix layout migration", () => {
       });
     } finally {
       process.exit = origExit;
-      process.chdir(origCwd);
     }
 
     // After fix: flat file replaced by .engram/ directory containing engram.db
@@ -696,9 +654,7 @@ describe("engram doctor — --fix gitignore update", () => {
     fs.writeFileSync(path.join(tmpDir, ".gitignore"), ".engram\n", "utf8");
 
     const program = makeProgram();
-    const origCwd = process.cwd();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let _exitCode = 0;
 
     try {
@@ -719,7 +675,6 @@ describe("engram doctor — --fix gitignore update", () => {
       });
     } finally {
       process.exit = origExit;
-      process.chdir(origCwd);
     }
 
     const content = fs.readFileSync(path.join(tmpDir, ".gitignore"), "utf8");
@@ -753,9 +708,7 @@ describe("engram doctor — --fix WAL cleanup", () => {
     fs.writeFileSync(path.join(tmpDir, ".engram-shm"), "stale", "utf8");
 
     const program = makeProgram();
-    const origCwd = process.cwd();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let _exitCode = 0;
 
     try {
@@ -776,7 +729,6 @@ describe("engram doctor — --fix WAL cleanup", () => {
       });
     } finally {
       process.exit = origExit;
-      process.chdir(origCwd);
     }
 
     expect(fs.existsSync(path.join(tmpDir, ".engram-wal"))).toBe(false);
@@ -800,9 +752,7 @@ describe("engram doctor — exit codes", () => {
     fs.writeFileSync(path.join(tmpDir, ".gitignore"), ".engram/\n", "utf8");
 
     const program = makeProgram();
-    const origCwd = process.cwd();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let exitCode: number | undefined;
 
     try {
@@ -815,7 +765,6 @@ describe("engram doctor — exit codes", () => {
       });
     } finally {
       process.exit = origExit;
-      process.chdir(origCwd);
     }
 
     // exitCode should remain undefined (no call to process.exit) or 0
@@ -827,9 +776,7 @@ describe("engram doctor — exit codes", () => {
     const flatPath = makeFlatDb(tmpDir);
 
     const program = makeProgram();
-    const origCwd = process.cwd();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let exitCode = 0;
 
     try {
@@ -848,7 +795,6 @@ describe("engram doctor — exit codes", () => {
       });
     } finally {
       process.exit = origExit;
-      process.chdir(origCwd);
     }
 
     expect(exitCode).toBe(1);
