@@ -65,7 +65,8 @@ export function extractRust(captures: QueryCapture[]): ExtractedFile {
       // Look up whether the parent item node had a visibility_modifier, and if
       // so whether it was bare `pub` (not `pub(crate)` / `pub(super)` etc.).
       const parentStart = node.parent?.startIndex;
-      const visText = parentStart !== undefined ? visMap.get(parentStart) : undefined;
+      const visText =
+        parentStart !== undefined ? visMap.get(parentStart) : undefined;
       const exported = visText !== undefined && isBarePub(visText);
 
       seenNames.add(symbolName);
