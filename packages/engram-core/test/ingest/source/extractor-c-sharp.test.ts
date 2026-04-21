@@ -206,3 +206,31 @@ describe("extractCSharp — byte offsets", () => {
     expect(sym?.endByte).toBeLessThanOrEqual(src.length);
   });
 });
+
+describe("extractCSharp — multiple modifiers", () => {
+  const src = `
+public static class MathHelper {
+  public static int Square(int x) { return x * x; }
+}
+
+internal static class InternalUtil {}
+`;
+
+  it("exported = true for public static class", () => {
+    const { symbols } = extractCSharp(captureFor(src));
+    const cls = symbols.find((s) => s.name === "MathHelper");
+    expect(cls?.exported).toBe(true);
+  });
+
+  it("exported = false for internal static class", () => {
+    const { symbols } = extractCSharp(captureFor(src));
+    const cls = symbols.find((s) => s.name === "InternalUtil");
+    expect(cls?.exported).toBe(false);
+  });
+
+  it("exported = true for public static method", () => {
+    const { symbols } = extractCSharp(captureFor(src));
+    const method = symbols.find((s) => s.name === "Square");
+    expect(method?.exported).toBe(true);
+  });
+});

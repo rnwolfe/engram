@@ -34,7 +34,8 @@ export function extractCSharp(captures: QueryCapture[]): ExtractedFile {
   for (const capture of captures) {
     const { name: captureName, node } = capture;
     if (captureName.endsWith(".vis") && node.parent) {
-      visMap.set(node.parent.startIndex, node.text);
+      const existing = visMap.get(node.parent.startIndex) ?? "";
+      visMap.set(node.parent.startIndex, `${existing} ${node.text}`);
     }
   }
 
