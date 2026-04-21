@@ -12,6 +12,7 @@ parser works without a build step or internet access at runtime.
 | `tree-sitter-go.wasm` | Go | `tree-sitter/tree-sitter-go` |
 | `tree-sitter-python.wasm` | Python | `tree-sitter/tree-sitter-python` |
 | `tree-sitter-rust.wasm` | Rust | `tree-sitter/tree-sitter-rust` |
+| `tree-sitter-java.wasm` | Java | `tree-sitter/tree-sitter-java` |
 
 See `MANIFEST.json` for pinned version and commit.
 

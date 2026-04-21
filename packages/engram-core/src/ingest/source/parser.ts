@@ -5,7 +5,7 @@ import type { QueryCapture } from "web-tree-sitter";
 import { Parser, Query, Language as TreeSitterLanguage } from "web-tree-sitter";
 
 /** Languages supported by the source parser. */
-export type Language = "typescript" | "tsx" | "go" | "python" | "rust";
+export type Language = "typescript" | "tsx" | "go" | "python" | "rust" | "java";
 
 const GRAMMAR_FILES: Record<Language, string> = {
   typescript: "tree-sitter-typescript.wasm",
@@ -13,6 +13,7 @@ const GRAMMAR_FILES: Record<Language, string> = {
   go: "tree-sitter-go.wasm",
   python: "tree-sitter-python.wasm",
   rust: "tree-sitter-rust.wasm",
+  java: "tree-sitter-java.wasm",
 };
 
 /** Maps each language to its tree-sitter query file. */
@@ -22,6 +23,7 @@ const QUERY_FILES: Record<Language, string> = {
   go: "go.scm",
   python: "python.scm",
   rust: "rust.scm",
+  java: "java.scm",
 };
 
 const TS_EXTENSIONS: Set<string> = new Set([
@@ -36,6 +38,7 @@ const TSX_EXTENSIONS: Set<string> = new Set([".tsx", ".jsx"]);
 const GO_EXTENSIONS: Set<string> = new Set([".go"]);
 const PYTHON_EXTENSIONS: Set<string> = new Set([".py", ".pyw"]);
 const RUST_EXTENSIONS: Set<string> = new Set([".rs"]);
+const JAVA_EXTENSIONS: Set<string> = new Set([".java"]);
 
 /**
  * Maps a relative file path to the Language enum value to use when parsing it,
@@ -48,6 +51,7 @@ export function languageForPath(relPath: string): Language | null {
   if (GO_EXTENSIONS.has(ext)) return "go";
   if (PYTHON_EXTENSIONS.has(ext)) return "python";
   if (RUST_EXTENSIONS.has(ext)) return "rust";
+  if (JAVA_EXTENSIONS.has(ext)) return "java";
   return null;
 }
 
