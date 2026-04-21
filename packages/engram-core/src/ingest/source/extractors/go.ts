@@ -38,6 +38,7 @@ export function extractGo(captures: QueryCapture[]): ExtractedFile {
   const extraEdges: ExtractedEdge[] = [];
   const seenResourceKinds = new Set<string>();
   const seenRbacPerms = new Set<string>();
+  const seenRbacEdges = new Set<string>();
 
   // Group setup.* captures by position so we can pair receiver + name + body.
   // Each triplet shares the same method_declaration parent start index.
@@ -156,6 +157,7 @@ export function extractGo(captures: QueryCapture[]): ExtractedFile {
         extraEntities,
         extraEdges,
         seenRbacPerms,
+        seenRbacEdges,
       );
     }
   }
@@ -210,6 +212,7 @@ function processRbacMarker(
   extraEntities: ExtractedEntity[],
   extraEdges: ExtractedEdge[],
   seenRbacPerms: Set<string>,
+  seenRbacEdges: Set<string>,
 ): void {
   const match = KUBEBUILDER_RBAC_RE.exec(line);
   if (!match) return;
@@ -261,11 +264,12 @@ function processRbacMarker(
   const resource = resources[0];
   if (!resource) return;
 
-  // Strip surrounding quotes from group value (e.g. groups="" → groups="")
-  const rawGroups = groupsRaw
+  // Strip surrounding quotes from group value (e.g. groups="" → "")
+  // Multiple groups expand to one entity+edge per group (intentional; asymmetric
+  // with multi-resource which is out-of-scope for v0.1).
+  const groups = groupsRaw
     .split(",")
     .map((g) => g.trim().replace(/^["']|["']$/g, ""));
-  const groups = rawGroups;
   const verbs = verbsRaw
     .split(";")
     .map((v) => v.trim())
@@ -285,17 +289,21 @@ function processRbacMarker(
         });
       }
 
-      extraEdges.push({
-        source: { kind: "symbol", name: structName },
-        target: {
-          kind: "canonical",
-          canonicalName,
-          entityType: ENTITY_TYPES.RBAC_PERMISSION,
-        },
-        relationType: RELATION_TYPES.RBAC_GRANTS,
-        edgeKind: "observed",
-        fact: `${structName} is granted ${verb} on ${groupPrefix}${resource} via kubebuilder RBAC marker`,
-      });
+      const edgeKey = `${structName}::${canonicalName}`;
+      if (!seenRbacEdges.has(edgeKey)) {
+        seenRbacEdges.add(edgeKey);
+        extraEdges.push({
+          source: { kind: "symbol", name: structName },
+          target: {
+            kind: "canonical",
+            canonicalName,
+            entityType: ENTITY_TYPES.RBAC_PERMISSION,
+          },
+          relationType: RELATION_TYPES.RBAC_GRANTS,
+          edgeKind: "observed",
+          fact: `${structName} is granted ${verb} on ${groupPrefix}${resource} via kubebuilder RBAC marker`,
+        });
+      }
     }
   }
 }

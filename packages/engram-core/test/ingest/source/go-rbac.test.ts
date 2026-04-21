@@ -42,6 +42,31 @@ function captureFor(src: string) {
 // Unit tests — single verb
 // ---------------------------------------------------------------------------
 
+describe("extractGo — RBAC multi-group expansion", () => {
+  const src = `
+package controllers
+
+// +kubebuilder:rbac:groups=apps,batch,resources=jobs,verbs=get
+type MultiGroupReconciler struct{}
+`;
+
+  it("emits one entity per group", () => {
+    const { extraEntities } = extractGo(captureFor(src));
+    const names = extraEntities?.map((e) => e.canonicalName) ?? [];
+    expect(names).toContain("apps/jobs#get");
+    expect(names).toContain("batch/jobs#get");
+  });
+
+  it("emits one edge per group", () => {
+    const { extraEdges } = extractGo(captureFor(src));
+    const edges = extraEdges?.filter(
+      (e) =>
+        e.source.kind === "symbol" && e.source.name === "MultiGroupReconciler",
+    ) ?? [];
+    expect(edges).toHaveLength(2);
+  });
+});
+
 describe("extractGo — RBAC single verb", () => {
   const src = `
 package controllers
