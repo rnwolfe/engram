@@ -120,7 +120,6 @@ describe("engram doctor — layout check", () => {
     const program = makeProgram();
 
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let exitCode = 0;
 
     try {
@@ -190,7 +189,6 @@ describe("engram doctor — gitignore check", () => {
     const program = makeProgram();
 
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let exitCode = 0;
 
     try {
@@ -233,7 +231,6 @@ describe("engram doctor — schema check", () => {
     const program = makeProgram();
 
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let _exitCode = 0;
 
     try {
@@ -272,7 +269,6 @@ describe("engram doctor — fts_index check", () => {
     const program = makeProgram();
 
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let _exitCode = 0;
 
     try {
@@ -309,7 +305,6 @@ describe("engram doctor — embedding_index check", () => {
     const program = makeProgram();
 
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let _exitCode = 0;
 
     try {
@@ -338,7 +333,6 @@ describe("engram doctor — embedding_index check", () => {
 
     const program = makeProgram();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let _exitCode = 0;
 
     try {
@@ -383,7 +377,6 @@ describe("engram doctor — wal check", () => {
     const program = makeProgram();
 
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let _exitCode = 0;
 
     try {
@@ -411,7 +404,6 @@ describe("engram doctor — wal check", () => {
     const program = makeProgram();
 
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let exitCode = 0;
 
     try {
@@ -469,7 +461,6 @@ describe("engram doctor — evidence_integrity check", () => {
 
     const program = makeProgram();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let _exitCode = 0;
 
     try {
@@ -514,7 +505,6 @@ describe("engram doctor — JSON output", () => {
     const program = makeProgram();
 
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let _exitCode = 0;
 
     try {
@@ -560,7 +550,6 @@ describe("engram doctor — JSON output", () => {
     const program = makeProgram();
 
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let _exitCode = 0;
 
     try {
@@ -610,7 +599,6 @@ describe("engram doctor — --fix layout migration", () => {
 
     const program = makeProgram();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let _exitCode = 0;
 
     try {
@@ -667,7 +655,6 @@ describe("engram doctor — --fix gitignore update", () => {
 
     const program = makeProgram();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let _exitCode = 0;
 
     try {
@@ -722,7 +709,6 @@ describe("engram doctor — --fix WAL cleanup", () => {
 
     const program = makeProgram();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let _exitCode = 0;
 
     try {
@@ -767,7 +753,6 @@ describe("engram doctor — exit codes", () => {
 
     const program = makeProgram();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let exitCode: number | undefined;
 
     try {
@@ -792,7 +777,6 @@ describe("engram doctor — exit codes", () => {
 
     const program = makeProgram();
     const origExit = process.exit.bind(process);
-    process.chdir(tmpDir);
     let exitCode = 0;
 
     try {
