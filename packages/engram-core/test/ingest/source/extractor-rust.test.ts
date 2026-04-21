@@ -253,6 +253,43 @@ describe("extractRust — byte offsets", () => {
   });
 });
 
+describe("extractRust — restricted visibility (pub(crate), pub(super))", () => {
+  const src = `
+pub(crate) fn crate_fn() {}
+pub(super) struct SuperStruct {}
+pub(crate) const CRATE_CONST: u32 = 1;
+pub fn truly_public() {}
+`;
+
+  it("exported = false for pub(crate) fn", () => {
+    const { symbols } = extractRust(captureFor(src));
+    const sym = symbols.find((s) => s.name === "crate_fn");
+    expect(sym).toBeDefined();
+    expect(sym?.exported).toBe(false);
+  });
+
+  it("exported = false for pub(super) struct", () => {
+    const { symbols } = extractRust(captureFor(src));
+    const sym = symbols.find((s) => s.name === "SuperStruct");
+    expect(sym).toBeDefined();
+    expect(sym?.exported).toBe(false);
+  });
+
+  it("exported = false for pub(crate) const", () => {
+    const { symbols } = extractRust(captureFor(src));
+    const sym = symbols.find((s) => s.name === "CRATE_CONST");
+    expect(sym).toBeDefined();
+    expect(sym?.exported).toBe(false);
+  });
+
+  it("exported = true for bare pub fn", () => {
+    const { symbols } = extractRust(captureFor(src));
+    const sym = symbols.find((s) => s.name === "truly_public");
+    expect(sym).toBeDefined();
+    expect(sym?.exported).toBe(true);
+  });
+});
+
 describe("extractRust — methods inside impl not extracted as top-level", () => {
   it("method inside impl block is not extracted as a top-level symbol", () => {
     const src = `
