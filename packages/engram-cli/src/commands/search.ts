@@ -95,13 +95,12 @@ See also:
         if (err instanceof EmbeddingModelMismatchError) {
           console.error(
             [
-              "",
-              "Embedding model mismatch.",
+              `${c.red("Error:")} embedding model mismatch.`,
               `  Database was indexed with:  ${err.storedModel}  (${err.storedDimensions} dims)`,
               `  Currently configured:       ${err.activeModel}${err.activeDimensions ? `  (${err.activeDimensions} dims)` : ""}`,
               "",
               "To re-index with the configured model:",
-              "  engram embed reindex",
+              "  engram embed --reindex",
               "",
               "To keep the existing index, revert your embedding config to",
               `  ${err.storedModel}.`,

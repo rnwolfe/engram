@@ -13,6 +13,8 @@ import { c } from "../colors.js";
 
 interface VerifyOpts {
   db: string;
+  format: string;
+  j?: boolean;
 }
 
 interface IdRow {
@@ -25,6 +27,8 @@ export function registerVerify(program: Command): void {
     .command("verify")
     .description("Validate .engram integrity (evidence invariants)")
     .option("--db <path>", "path to .engram file", ".engram")
+    .option("--format <fmt>", "output format: text or json", "text")
+    .option("-j", "shorthand for --format json")
     .addHelpText(
       "after",
       `
@@ -35,6 +39,9 @@ Examples:
   # Verify a specific database file
   engram verify --db path/to/project.engram
 
+  # Machine-readable JSON output
+  engram verify --format json
+
 When to use:
   After manual graph edits, merges, or any operation that might leave evidence
   invariants broken. Exit code 2 means violations were found.
@@ -43,6 +50,11 @@ See also:
   engram decay   surface stale or orphaned knowledge`,
     )
     .action((opts: VerifyOpts) => {
+      if (opts.j) opts.format = "json";
+      if (opts.format !== "text" && opts.format !== "json") {
+        console.error(`${c.red("Error:")} --format must be 'text' or 'json'`);
+        process.exit(1);
+      }
       const dbPath = resolveDbPath(path.resolve(opts.db));
 
       let graph: EngramGraph | undefined;
@@ -136,6 +148,21 @@ See also:
       }
 
       closeGraph(graph);
+
+      if (opts.format === "json") {
+        console.log(
+          JSON.stringify(
+            {
+              ok: violations.length === 0,
+              violations: violations.map((msg) => ({ message: msg })),
+            },
+            null,
+            2,
+          ),
+        );
+        if (violations.length > 0) process.exit(2);
+        return;
+      }
 
       if (violations.length === 0) {
         console.log(c.green("Graph integrity OK — no violations found."));

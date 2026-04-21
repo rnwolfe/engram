@@ -113,7 +113,7 @@ export function registerOwnership(program: Command): void {
     )
     .option("--limit <n>", "maximum number of entries to show", "20")
     .option("--module <path>", "scope to entities under this path prefix")
-    .option("--format <fmt>", "output format: table or json", "table")
+    .option("--format <fmt>", "output format: text or json", "text")
     .option("-j", "shorthand for --format json")
     .option(
       "--min-confidence <f>",
@@ -165,8 +165,10 @@ See also:
         process.exit(1);
       }
 
-      if (format !== "table" && format !== "json") {
-        console.error(`${c.red("Error:")} --format must be 'table' or 'json'`);
+      if (format !== "text" && format !== "table" && format !== "json") {
+        console.error(
+          `${c.red("Error:")} --format must be 'text' or 'json'`,
+        );
         process.exit(1);
       }
 

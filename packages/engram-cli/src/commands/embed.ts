@@ -41,6 +41,8 @@ interface EmbedOpts {
   yes?: boolean;
   verify: boolean;
   limit?: number;
+  json?: boolean;
+  j?: boolean;
 }
 
 // ─── Provider resolution ──────────────────────────────────────────────────────
@@ -227,7 +229,7 @@ async function runReindex(
     );
   }
 
-  if (!opts.yes) {
+  if (!opts.yes && !opts.json) {
     const message = gapOnly
       ? `Embed missing ${targetLabel} with ${activeModel}?`
       : `Rebuild the ${targetLabel} vector index with ${activeModel}?`;
@@ -239,14 +241,15 @@ async function runReindex(
   }
 
   const startMs = Date.now();
-  const s = spinner();
+  const s = opts.json ? undefined : spinner();
   const verb = gapOnly ? "Filling gaps" : "Reindexing";
-  s.start(`${verb}…`);
+  if (s) s.start(`${verb}…`);
 
   const result = await reindexEmbeddings(
     graph,
     provider,
     (p) => {
+      if (!s) return;
       const rate =
         p.done > 0
           ? `${(p.done / ((Date.now() - startMs) / 1000)).toFixed(0)}/s`
@@ -258,25 +261,61 @@ async function runReindex(
   );
 
   const elapsedSec = ((Date.now() - startMs) / 1000).toFixed(1);
+
+  if (gapOnly && result.total === 0) {
+    if (s) s.stop("Coverage is already complete — nothing to fill.");
+    if (opts.json) {
+      const newModel = getEmbeddingModel(graph);
+      console.log(
+        JSON.stringify(
+          {
+            mode: "fill",
+            done: 0,
+            total: 0,
+            errors: 0,
+            elapsed: 0,
+            model: newModel?.model ?? null,
+            dimensions: newModel?.dimensions ?? null,
+            alreadyComplete: true,
+          },
+          null,
+          2,
+        ),
+      );
+    }
+    return 0;
+  }
+
   const rate = (
     result.done / Math.max(1, (Date.now() - startMs) / 1000)
   ).toFixed(1);
 
-  if (gapOnly && result.total === 0) {
-    s.stop("Coverage is already complete — nothing to fill.");
-    return 0;
-  }
+  if (s)
+    s.stop(
+      `${gapOnly ? "Filled" : "Reindexed"} ${result.done.toLocaleString()} items in ${elapsedSec}s (${rate} items/s)`,
+    );
 
-  s.stop(
-    `${gapOnly ? "Filled" : "Reindexed"} ${result.done.toLocaleString()} items in ${elapsedSec}s (${rate} items/s)`,
-  );
-
-  if (result.errors > 0) {
+  if (result.errors > 0 && !opts.json) {
     log.warn(`${result.errors} items failed — run again to retry.`);
   }
 
   const newModel = getEmbeddingModel(graph);
-  if (newModel) {
+  if (opts.json) {
+    console.log(
+      JSON.stringify(
+        {
+          mode: gapOnly ? "fill" : "reindex",
+          done: result.done,
+          errors: result.errors,
+          elapsed: parseFloat(elapsedSec),
+          model: newModel?.model ?? null,
+          dimensions: newModel?.dimensions ?? null,
+        },
+        null,
+        2,
+      ),
+    );
+  } else if (newModel) {
     log.success(
       `Embedding model recorded: ${newModel.model} (${newModel.dimensions} dims)`,
     );
@@ -291,7 +330,17 @@ async function runCheck(
   const stored = getEmbeddingModel(graph);
 
   if (!stored || stored.model === "none") {
-    log.warn("Embedding model not configured — semantic search is disabled.");
+    if (opts.json) {
+      console.log(
+        JSON.stringify(
+          { mode: "check", ok: false, exitCode: 1, status: "unconfigured" },
+          null,
+          2,
+        ),
+      );
+    } else {
+      log.warn("Embedding model not configured — semantic search is disabled.");
+    }
     return 1;
   }
 
@@ -301,18 +350,35 @@ async function runCheck(
   const modelLine = `Embedding model (stored):      ${stored.model} (${stored.dimensions} dims)`;
 
   if (!provider) {
-    // Provider env is set to something we can't instantiate (e.g. openai)
     const note =
       aiProviderEnv !== "null" && aiProviderEnv !== "none"
         ? `${aiProviderEnv} (not supported for embedding validation)`
         : "(none — ENGRAM_AI_PROVIDER not set)";
-    log.warn(
-      [
-        modelLine,
-        `Configured provider:           ${note}`,
-        "Status:  UNCONFIGURED — set ENGRAM_AI_PROVIDER=ollama or =gemini",
-      ].join("\n"),
-    );
+    if (opts.json) {
+      console.log(
+        JSON.stringify(
+          {
+            mode: "check",
+            ok: false,
+            exitCode: 1,
+            status: "unconfigured",
+            storedModel: stored.model,
+            storedDimensions: stored.dimensions,
+            configuredProvider: note,
+          },
+          null,
+          2,
+        ),
+      );
+    } else {
+      log.warn(
+        [
+          modelLine,
+          `Configured provider:           ${note}`,
+          "Status:  UNCONFIGURED — set ENGRAM_AI_PROVIDER=ollama or =gemini",
+        ].join("\n"),
+      );
+    }
     return 1;
   }
 
@@ -320,22 +386,39 @@ async function runCheck(
   const configLine = `Configured provider model:     ${activeModel}`;
 
   if (stored.model !== activeModel) {
-    log.warn(
-      [
-        modelLine,
-        configLine,
-        "Status:  MISMATCH — run  engram embed --reindex  to rebuild",
-      ].join("\n"),
-    );
+    if (opts.json) {
+      console.log(
+        JSON.stringify(
+          {
+            mode: "check",
+            ok: false,
+            exitCode: 2,
+            status: "mismatch",
+            storedModel: stored.model,
+            storedDimensions: stored.dimensions,
+            configuredModel: activeModel,
+          },
+          null,
+          2,
+        ),
+      );
+    } else {
+      log.warn(
+        [
+          modelLine,
+          configLine,
+          "Status:  MISMATCH — run  engram embed --reindex  to rebuild",
+        ].join("\n"),
+      );
+    }
     return 2;
   }
 
-  let reachLine = "";
+  let reach: { ok: boolean; message: string } | null = null;
   if (opts.verify) {
     const ollamaEndpoint =
       process.env.ENGRAM_OLLAMA_ENDPOINT ?? "http://localhost:11434";
 
-    let reach: { ok: boolean; message: string } | null = null;
     if (aiProviderEnv === "ollama") {
       reach = await checkOllama(ollamaEndpoint, stored.model);
     } else if (aiProviderEnv === "gemini") {
@@ -345,19 +428,32 @@ async function runCheck(
     } else if (aiProviderEnv === "openai") {
       reach = await checkOpenAI(process.env.OPENAI_API_KEY);
     }
-
-    if (reach) {
-      reachLine = `\nProvider reachability:         ${reach.ok ? `✓ ${reach.message}` : `✗ ${reach.message}`}`;
-    }
   }
 
-  log.info(
-    [
-      modelLine,
-      configLine,
-      `Status:  OK — stored model matches configured model${reachLine}`,
-    ].join("\n"),
-  );
+  if (opts.json) {
+    const output: Record<string, unknown> = {
+      mode: "check",
+      ok: true,
+      exitCode: 0,
+      status: "ok",
+      storedModel: stored.model,
+      storedDimensions: stored.dimensions,
+      configuredModel: activeModel,
+    };
+    if (reach) output.reachability = reach;
+    console.log(JSON.stringify(output, null, 2));
+  } else {
+    const reachLine = reach
+      ? `\nProvider reachability:         ${reach.ok ? `✓ ${reach.message}` : `✗ ${reach.message}`}`
+      : "";
+    log.info(
+      [
+        modelLine,
+        configLine,
+        `Status:  OK — stored model matches configured model${reachLine}`,
+      ].join("\n"),
+    );
+  }
   return 0;
 }
 
@@ -438,7 +534,7 @@ async function runEnable(
     ].join("\n"),
   );
 
-  if (!opts.yes) {
+  if (!opts.yes && !opts.json) {
     const ok = await confirm({ message: "Continue?", initialValue: false });
     if (!ok || typeof ok !== "boolean") {
       log.info("Aborted.");
@@ -447,10 +543,11 @@ async function runEnable(
   }
 
   const startMs = Date.now();
-  const s = spinner();
-  s.start("Embedding…");
+  const s = opts.json ? undefined : spinner();
+  if (s) s.start("Embedding…");
 
   const result = await reindexEmbeddings(graph, provider, (p) => {
+    if (!s) return;
     const rate =
       p.done > 0
         ? `${(p.done / ((Date.now() - startMs) / 1000)).toFixed(0)}/s`
@@ -459,14 +556,29 @@ async function runEnable(
   });
 
   const elapsedSec = ((Date.now() - startMs) / 1000).toFixed(1);
-  s.stop(`Embedded ${result.done.toLocaleString()} items in ${elapsedSec}s`);
+  if (s) s.stop(`Embedded ${result.done.toLocaleString()} items in ${elapsedSec}s`);
 
-  if (result.errors > 0) {
+  if (result.errors > 0 && !opts.json) {
     log.warn(`${result.errors} items failed — run again to retry.`);
   }
 
   const newModel = getEmbeddingModel(graph);
-  if (newModel) {
+  if (opts.json) {
+    console.log(
+      JSON.stringify(
+        {
+          mode: "enable",
+          done: result.done,
+          errors: result.errors,
+          elapsed: parseFloat(elapsedSec),
+          model: newModel?.model ?? null,
+          dimensions: newModel?.dimensions ?? null,
+        },
+        null,
+        2,
+      ),
+    );
+  } else if (newModel) {
     log.success(
       `Semantic search enabled: ${newModel.model} (${newModel.dimensions} dims)`,
     );
@@ -477,9 +589,38 @@ async function runEnable(
 function runStatus(
   graph: ReturnType<typeof openGraph>,
   dbPath: string,
+  json?: boolean,
 ): number {
   const stored = getEmbeddingModel(graph);
   const cov = queryCoverage(graph);
+
+  if (json) {
+    const pctNum = (n: number, d: number) =>
+      d === 0 ? 0 : Math.round((n / d) * 100);
+    console.log(
+      JSON.stringify(
+        {
+          mode: "status",
+          db: dbPath,
+          model: stored?.model ?? null,
+          dimensions: stored?.dimensions ?? null,
+          entityCoverage: {
+            embedded: cov.entityEmbedded,
+            total: cov.entityTotal,
+            pct: pctNum(cov.entityEmbedded, cov.entityTotal),
+          },
+          episodeCoverage: {
+            embedded: cov.episodeEmbedded,
+            total: cov.episodeTotal,
+            pct: pctNum(cov.episodeEmbedded, cov.episodeTotal),
+          },
+        },
+        null,
+        2,
+      ),
+    );
+    return 0;
+  }
 
   const modelStr = stored
     ? stored.model === "none"
@@ -533,7 +674,9 @@ export function registerEmbed(program: Command): void {
     .option("--db <path>", "path to .engram file", ".engram")
     .option("--yes", "skip confirmation prompts")
     .option("--no-verify", "skip provider reachability check")
-    .option("--limit <n>", "reindex at most N items (for testing)", Number)
+    .option("--limit <n>", "reindex at most N items (for testing only)", Number)
+    .option("--json", "emit JSON output")
+    .option("-j", "shorthand for --json")
     .addHelpText(
       "after",
       `
@@ -560,10 +703,20 @@ Examples:
   engram embed --enable --model mxbai-embed-large
 
   # Show embedding coverage without reindexing
-  engram embed --status`,
+  engram embed --status
+
+  # Machine-readable output (for scripting and agents)
+  engram embed --status --json
+  engram embed --check --json
+
+Exit codes (--check):
+  0   stored model matches configured provider
+  1   model not configured or provider unrecognised
+  2   stored model does not match configured model (run --reindex to fix)`,
     )
     .action(async (opts: EmbedOpts) => {
-      intro("engram embed");
+      if (opts.j) opts.json = true;
+      if (!opts.json) intro("engram embed");
 
       const modeCount = [
         opts.reindex,
@@ -615,13 +768,13 @@ Examples:
         } else if (opts.enable) {
           exitCode = await runEnable(graph, opts);
         } else if (opts.status) {
-          exitCode = runStatus(graph, dbPath);
+          exitCode = runStatus(graph, dbPath, opts.json);
         }
       } finally {
         closeGraph(graph);
       }
 
-      if (exitCode === 0) {
+      if (exitCode === 0 && !opts.json) {
         outro("Done");
       }
       if (exitCode !== 0) {

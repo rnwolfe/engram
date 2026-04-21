@@ -138,15 +138,16 @@ See also:
           since: opts.since,
           branch: opts.branch,
         });
+        const summary = [
+          "Git ingestion complete",
+          `  Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
+          `  Entities: ${result.entitiesCreated} created`,
+          `  Edges:    ${result.edgesCreated} created, ${result.edgesSuperseded} superseded`,
+        ].join("\n");
         if (isTTY) {
-          log.success(
-            [
-              "Git ingestion complete",
-              `  Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
-              `  Entities: ${result.entitiesCreated} created`,
-              `  Edges:    ${result.edgesCreated} created, ${result.edgesSuperseded} superseded`,
-            ].join("\n"),
-          );
+          log.success(summary);
+        } else {
+          process.stdout.write(summary + "\n");
         }
       } catch (err) {
         process.stderr.write(
@@ -198,13 +199,14 @@ See also:
       if (isTTY) log.info(`Ingesting markdown: ${glob}`);
       try {
         const result = await ingestMarkdown(graph, glob);
+        const summary = [
+          "Markdown ingestion complete",
+          `  Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
+        ].join("\n");
         if (isTTY) {
-          log.success(
-            [
-              "Markdown ingestion complete",
-              `  Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
-            ].join("\n"),
-          );
+          log.success(summary);
+        } else {
+          process.stdout.write(summary + "\n");
         }
       } catch (err) {
         process.stderr.write(
@@ -496,7 +498,9 @@ See also:
 
     // Handle deprecated --repo alias
     if (opts.repo && !opts.scope) {
-      console.warn("Warning: --repo is deprecated, use --scope instead.");
+      process.stderr.write(
+        "Warning: --repo is deprecated, use --scope instead.\n",
+      );
       opts.scope = opts.repo;
     }
 
@@ -577,7 +581,7 @@ See also:
 interface IngestEnrichPluginOpts {
   db: string;
   token?: string;
-  repo?: string;
+  scope?: string;
   since?: string;
 }
 
@@ -611,7 +615,10 @@ function registerPluginEnrichSubcommands(
       )
       .option("--db <path>", "path to .engram file", ".engram")
       .option("--token <token>", "auth token for the plugin (if required)")
-      .option("--repo <scope>", "scope / repository identifier for the plugin")
+      .option(
+        "--scope <value>",
+        "adapter-specific scope (e.g. 'owner/repo')",
+      )
       .option(
         "--since <date>",
         "only fetch items updated after this date (ISO8601)",
@@ -650,7 +657,8 @@ function registerPluginEnrichSubcommands(
         try {
           const result = await adapter.enrich(graph, {
             token: opts.token,
-            repo: opts.repo,
+            scope: opts.scope,
+            repo: opts.scope, // compat alias for plugins using old adapter contract
             since: opts.since,
           });
           s.stop(`Plugin '${pluginManifest.name}' complete`);

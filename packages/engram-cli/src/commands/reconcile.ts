@@ -60,7 +60,10 @@ export function registerReconcile(program: Command): void {
       "both",
     )
     .option("--scope <filter>", "limit scope: kind:<value> or anchor:<value>")
-    .option("--max-cost <n>", "token budget cap (required unless --dry-run)")
+    .option(
+      "--max-cost <n>",
+      "token budget cap (required unless --dry-run)",
+    )
     .option(
       "--max-delta-items <n>",
       "max substrate items per discover call — larger values use more tokens (default: 500)",

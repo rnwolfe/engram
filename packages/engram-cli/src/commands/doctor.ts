@@ -57,7 +57,7 @@ interface DoctorOpts {
   fix: boolean;
   yes: boolean;
   format?: string;
-  json?: boolean;
+  j?: boolean;
 }
 
 // ─── Report rendering ─────────────────────────────────────────────────────────
@@ -128,12 +128,8 @@ export function registerDoctor(program: Command): void {
     .option("--db <path>", "path to .engram file or directory", ".engram")
     .option("--fix", "apply safe auto-fixes with confirmation prompts")
     .option("--yes", "apply all safe fixes non-interactively (implies --fix)")
-    .option(
-      "--format <format>",
-      "output format: human (default) or json",
-      "human",
-    )
-    .option("-j, --json", "shorthand for --format json")
+    .option("--format <format>", "output format: human or json", "human")
+    .option("-j", "shorthand for --format json")
     .addHelpText(
       "after",
       `
@@ -160,8 +156,8 @@ Examples:
     .action(async (opts: DoctorOpts) => {
       const rawDb = opts.db;
 
-      // Resolve format flag: -j / --json shorthand
-      const jsonOutput = opts.json === true || opts.format === "json";
+      if (opts.j) opts.format = "json";
+      const jsonOutput = opts.format === "json";
 
       const applyFixes = opts.fix === true || opts.yes === true;
       const autoYes = opts.yes === true;

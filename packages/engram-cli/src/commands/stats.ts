@@ -101,14 +101,18 @@ See also:
 
         if (opts.format === "json") {
           console.log(
-            JSON.stringify({
-              entities,
-              edges,
-              edgesInvalidated: invalidatedEdges,
-              episodes,
-              aliases,
-              db: dbPath,
-            }),
+            JSON.stringify(
+              {
+                entities,
+                edges,
+                edgesInvalidated: invalidatedEdges,
+                episodes,
+                aliases,
+                db: dbPath,
+              },
+              null,
+              2,
+            ),
           );
         } else {
           console.log(`Graph: ${dbPath}`);

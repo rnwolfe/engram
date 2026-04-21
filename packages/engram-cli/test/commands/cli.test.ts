@@ -527,7 +527,7 @@ describe("engram decay", () => {
         process.exit = origExit;
       }
       expect(exitCode).toBe(1);
-      expect(errors.join("\n")).toContain("--format must be 'table' or 'json'");
+      expect(errors.join("\n")).toContain("--format must be 'text' or 'json'");
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
