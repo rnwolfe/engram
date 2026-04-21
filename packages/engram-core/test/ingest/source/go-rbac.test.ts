@@ -59,10 +59,12 @@ type MultiGroupReconciler struct{}
 
   it("emits one edge per group", () => {
     const { extraEdges } = extractGo(captureFor(src));
-    const edges = extraEdges?.filter(
-      (e) =>
-        e.source.kind === "symbol" && e.source.name === "MultiGroupReconciler",
-    ) ?? [];
+    const edges =
+      extraEdges?.filter(
+        (e) =>
+          e.source.kind === "symbol" &&
+          e.source.name === "MultiGroupReconciler",
+      ) ?? [];
     expect(edges).toHaveLength(2);
   });
 });
