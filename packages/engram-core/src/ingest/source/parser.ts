@@ -15,7 +15,8 @@ export type Language =
   | "ruby"
   | "c"
   | "cpp"
-  | "c_sharp";
+  | "c_sharp"
+  | "starlark";
 
 const GRAMMAR_FILES: Record<Language, string> = {
   typescript: "tree-sitter-typescript.wasm",
@@ -28,6 +29,7 @@ const GRAMMAR_FILES: Record<Language, string> = {
   c: "tree-sitter-c.wasm",
   cpp: "tree-sitter-cpp.wasm",
   c_sharp: "tree-sitter-c_sharp.wasm",
+  starlark: "tree-sitter-starlark.wasm",
 };
 
 /** Maps each language to its tree-sitter query file. */
@@ -42,6 +44,7 @@ const QUERY_FILES: Record<Language, string> = {
   c: "c.scm",
   cpp: "cpp.scm",
   c_sharp: "c_sharp.scm",
+  starlark: "starlark.scm",
 };
 
 const TS_EXTENSIONS: Set<string> = new Set([
@@ -62,12 +65,34 @@ const C_EXTENSIONS: Set<string> = new Set([".c", ".h"]);
 const CPP_EXTENSIONS: Set<string> = new Set([".cpp", ".cc", ".cxx", ".hpp"]);
 const CSHARP_EXTENSIONS: Set<string> = new Set([".cs"]);
 
+/** Bare filenames that are Starlark BUILD files (matched against basename). */
+const STARLARK_BUILD_BASENAMES: Set<string> = new Set([
+  "BUILD",
+  "BUILD.bazel",
+  "BUCK",
+]);
+
+/** Bare filenames that look like Starlark but should NOT be parsed (WORKSPACE files). */
+const STARLARK_SKIP_BASENAMES: Set<string> = new Set([
+  "WORKSPACE",
+  "WORKSPACE.bazel",
+  "MODULE.bazel",
+]);
+
 /**
  * Maps a relative file path to the Language enum value to
  * use when parsing it, or null if the file type is not
  * supported.
  */
 export function languageForPath(relPath: string): Language | null {
+  const basename = path.basename(relPath);
+
+  // Starlark WORKSPACE/MODULE files are intentionally excluded
+  if (STARLARK_SKIP_BASENAMES.has(basename)) return null;
+
+  // Starlark BUILD files — match by basename, not extension
+  if (STARLARK_BUILD_BASENAMES.has(basename)) return "starlark";
+
   const ext = path.extname(relPath).toLowerCase();
   if (TSX_EXTENSIONS.has(ext)) return "tsx";
   if (TS_EXTENSIONS.has(ext)) return "typescript";

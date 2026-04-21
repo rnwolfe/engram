@@ -23,6 +23,8 @@ export const RELATION_TYPES = {
   CONTROLLER_OWNS: "controller_owns",
   // Kubernetes RBAC
   RBAC_GRANTS: "rbac_grants",
+  // Build graph (from Bazel/Starlark ingestion)
+  BUILD_DEPENDS_ON: "build_depends_on",
 } as const;
 
 export type RelationType = (typeof RELATION_TYPES)[keyof typeof RELATION_TYPES];

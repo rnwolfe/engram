@@ -18,6 +18,7 @@ export const ENTITY_TYPES = {
   ISSUE: "issue",
   K8S_RESOURCE_KIND: "k8s_resource_kind",
   RBAC_PERMISSION: "rbac_permission",
+  BAZEL_TARGET: "bazel_target",
 } as const;
 
 export type EntityType = (typeof ENTITY_TYPES)[keyof typeof ENTITY_TYPES];
