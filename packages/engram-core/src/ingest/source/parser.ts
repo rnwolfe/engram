@@ -5,7 +5,17 @@ import type { QueryCapture } from "web-tree-sitter";
 import { Parser, Query, Language as TreeSitterLanguage } from "web-tree-sitter";
 
 /** Languages supported by the source parser. */
-export type Language = "typescript" | "tsx" | "go" | "python" | "rust" | "java";
+export type Language =
+  | "typescript"
+  | "tsx"
+  | "go"
+  | "python"
+  | "rust"
+  | "java"
+  | "ruby"
+  | "c"
+  | "cpp"
+  | "c_sharp";
 
 const GRAMMAR_FILES: Record<Language, string> = {
   typescript: "tree-sitter-typescript.wasm",
@@ -14,6 +24,10 @@ const GRAMMAR_FILES: Record<Language, string> = {
   python: "tree-sitter-python.wasm",
   rust: "tree-sitter-rust.wasm",
   java: "tree-sitter-java.wasm",
+  ruby: "tree-sitter-ruby.wasm",
+  c: "tree-sitter-c.wasm",
+  cpp: "tree-sitter-cpp.wasm",
+  c_sharp: "tree-sitter-c_sharp.wasm",
 };
 
 /** Maps each language to its tree-sitter query file. */
@@ -24,6 +38,10 @@ const QUERY_FILES: Record<Language, string> = {
   python: "python.scm",
   rust: "rust.scm",
   java: "java.scm",
+  ruby: "ruby.scm",
+  c: "c.scm",
+  cpp: "cpp.scm",
+  c_sharp: "c_sharp.scm",
 };
 
 const TS_EXTENSIONS: Set<string> = new Set([
@@ -39,10 +57,15 @@ const GO_EXTENSIONS: Set<string> = new Set([".go"]);
 const PYTHON_EXTENSIONS: Set<string> = new Set([".py", ".pyw"]);
 const RUST_EXTENSIONS: Set<string> = new Set([".rs"]);
 const JAVA_EXTENSIONS: Set<string> = new Set([".java"]);
+const RUBY_EXTENSIONS: Set<string> = new Set([".rb"]);
+const C_EXTENSIONS: Set<string> = new Set([".c", ".h"]);
+const CPP_EXTENSIONS: Set<string> = new Set([".cpp", ".cc", ".cxx", ".hpp"]);
+const CSHARP_EXTENSIONS: Set<string> = new Set([".cs"]);
 
 /**
- * Maps a relative file path to the Language enum value to use when parsing it,
- * or null if the file type is not supported.
+ * Maps a relative file path to the Language enum value to
+ * use when parsing it, or null if the file type is not
+ * supported.
  */
 export function languageForPath(relPath: string): Language | null {
   const ext = path.extname(relPath).toLowerCase();
@@ -52,6 +75,10 @@ export function languageForPath(relPath: string): Language | null {
   if (PYTHON_EXTENSIONS.has(ext)) return "python";
   if (RUST_EXTENSIONS.has(ext)) return "rust";
   if (JAVA_EXTENSIONS.has(ext)) return "java";
+  if (RUBY_EXTENSIONS.has(ext)) return "ruby";
+  if (C_EXTENSIONS.has(ext)) return "c";
+  if (CPP_EXTENSIONS.has(ext)) return "cpp";
+  if (CSHARP_EXTENSIONS.has(ext)) return "c_sharp";
   return null;
 }
 
