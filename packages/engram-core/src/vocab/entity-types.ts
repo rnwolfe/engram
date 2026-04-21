@@ -17,6 +17,7 @@ export const ENTITY_TYPES = {
   PULL_REQUEST: "pull_request",
   ISSUE: "issue",
   K8S_RESOURCE_KIND: "k8s_resource_kind",
+  RBAC_PERMISSION: "rbac_permission",
 } as const;
 
 export type EntityType = (typeof ENTITY_TYPES)[keyof typeof ENTITY_TYPES];

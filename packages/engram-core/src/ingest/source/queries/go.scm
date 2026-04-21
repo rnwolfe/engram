@@ -21,3 +21,12 @@
   name: (field_identifier) @setup.name
   (#eq? @setup.name "SetupWithManager")
   body: (block) @setup.body)
+
+; --- Struct type declarations at file scope (kubebuilder RBAC markers) ---
+; Captures the name of each struct type so the extractor can walk preceding sibling
+; comments to find adjacent // +kubebuilder:rbac: markers.
+(source_file
+  (type_declaration
+    (type_spec
+      name: (type_identifier) @rbac.struct.name
+      type: (struct_type))))
