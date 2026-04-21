@@ -10,6 +10,7 @@ import { Command } from "commander";
 import { addEdge, addEntity, addEpisode, createGraph } from "engram-core";
 import { registerAdd } from "../../src/commands/add.js";
 import { registerDecay } from "../../src/commands/decay.js";
+import { registerEmbed } from "../../src/commands/embed.js";
 import { registerExport } from "../../src/commands/export.js";
 import { registerHistory } from "../../src/commands/history.js";
 import { registerIngest } from "../../src/commands/ingest.js";
@@ -33,6 +34,7 @@ function makeProgram(): Command {
   registerExport(program);
   registerVerify(program);
   registerMaintenance(program);
+  registerEmbed(program);
   return program;
 }
 
@@ -527,7 +529,9 @@ describe("engram decay", () => {
         process.exit = origExit;
       }
       expect(exitCode).toBe(1);
-      expect(errors.join("\n")).toContain("--format must be 'table' or 'json'");
+      expect(errors.join("\n")).toContain(
+        "--format must be 'text', 'table', or 'json'",
+      );
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -891,6 +895,207 @@ describe("engram history", () => {
       expect(errors.join("\n")).toContain(
         "Error: --format must be 'text' or 'json'",
       );
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("engram add --format json", () => {
+  it("outputs JSON with id, source_type, timestamp", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      createGraph(dbPath).db.close();
+      const program = makeProgram();
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => logs.push(args.join(" "));
+      try {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "add",
+          "test note",
+          "--format",
+          "json",
+          "--db",
+          dbPath,
+        ]);
+      } finally {
+        console.log = origLog;
+      }
+      const parsed = JSON.parse(logs.join("\n"));
+      expect(typeof parsed.id).toBe("string");
+      expect(parsed.source_type).toBe("manual");
+      expect(typeof parsed.timestamp).toBe("string");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("-j shorthand produces same JSON shape", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      createGraph(dbPath).db.close();
+      const program = makeProgram();
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => logs.push(args.join(" "));
+      try {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "add",
+          "test note",
+          "-j",
+          "--db",
+          dbPath,
+        ]);
+      } finally {
+        console.log = origLog;
+      }
+      const parsed = JSON.parse(logs.join("\n"));
+      expect(typeof parsed.id).toBe("string");
+      expect(parsed.source_type).toBe("manual");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("engram verify --format json", () => {
+  it("outputs {ok: true, violations: []} on a clean graph", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      createGraph(dbPath).db.close();
+      const program = makeProgram();
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => logs.push(args.join(" "));
+      try {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "verify",
+          "--format",
+          "json",
+          "--db",
+          dbPath,
+        ]);
+      } finally {
+        console.log = origLog;
+      }
+      const parsed = JSON.parse(logs.join("\n"));
+      expect(parsed.ok).toBe(true);
+      expect(Array.isArray(parsed.violations)).toBe(true);
+      expect(parsed.violations).toHaveLength(0);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("-j shorthand produces same JSON shape", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      createGraph(dbPath).db.close();
+      const program = makeProgram();
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => logs.push(args.join(" "));
+      try {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "verify",
+          "-j",
+          "--db",
+          dbPath,
+        ]);
+      } finally {
+        console.log = origLog;
+      }
+      const parsed = JSON.parse(logs.join("\n"));
+      expect(parsed.ok).toBe(true);
+      expect(Array.isArray(parsed.violations)).toBe(true);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("engram embed --status --json", () => {
+  it("outputs structured JSON with mode, model, entityCoverage, episodeCoverage", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      createGraph(dbPath).db.close();
+      const program = makeProgram();
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => logs.push(args.join(" "));
+      try {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "embed",
+          "--status",
+          "--json",
+          "--db",
+          dbPath,
+        ]);
+      } finally {
+        console.log = origLog;
+      }
+      const parsed = JSON.parse(logs.join("\n"));
+      expect(parsed.mode).toBe("status");
+      expect(typeof parsed.db).toBe("string");
+      expect(typeof parsed.entityCoverage).toBe("object");
+      expect(typeof parsed.episodeCoverage).toBe("object");
+      expect(typeof parsed.entityCoverage.embedded).toBe("number");
+      expect(typeof parsed.entityCoverage.total).toBe("number");
+      expect(typeof parsed.entityCoverage.pct).toBe("number");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("engram embed --check --json", () => {
+  it("outputs {ok: false, exitCode: 1, status: 'unconfigured'} when no model configured", async () => {
+    const { tmpDir, dbPath } = tmpDb();
+    try {
+      createGraph(dbPath).db.close();
+      const program = makeProgram();
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => logs.push(args.join(" "));
+      let exitCode: number | undefined;
+      const origExit = process.exit;
+      process.exit = (code?: number) => {
+        exitCode = code;
+        throw new Error(`process.exit(${code})`);
+      };
+      try {
+        await program.parseAsync([
+          "node",
+          "engram",
+          "embed",
+          "--check",
+          "--json",
+          "--db",
+          dbPath,
+        ]);
+      } catch {
+        // expected — process.exit throws when exitCode != 0
+      } finally {
+        console.log = origLog;
+        process.exit = origExit;
+      }
+      expect(exitCode).toBe(1);
+      const parsed = JSON.parse(logs.join("\n"));
+      expect(parsed.mode).toBe("check");
+      expect(parsed.ok).toBe(false);
+      expect(parsed.exitCode).toBe(1);
+      expect(parsed.status).toBe("unconfigured");
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }

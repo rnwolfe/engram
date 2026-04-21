@@ -65,7 +65,11 @@ export function registerDecay(program: Command): void {
     .description("Show knowledge decay report")
     .option("--stale-days <n>", "days without evidence to mark as stale", "180")
     .option("--dormant-days <n>", "days of owner inactivity to flag", "90")
-    .option("--format <fmt>", "output format: table or json", "table")
+    .option(
+      "--format <fmt>",
+      "output format: text (alias: table) or json",
+      "text",
+    )
     .option("-j", "shorthand for --format json")
     .option("--db <path>", "path to .engram file", ".engram")
     .addHelpText(
@@ -81,7 +85,7 @@ Examples:
   # Tighten both thresholds
   engram decay --stale-days 60 --dormant-days 30
 
-  # JSON output for scripting
+  # Machine-readable JSON output
   engram decay --format json
 
 When to use:
@@ -110,8 +114,10 @@ See also:
         );
         process.exit(1);
       }
-      if (format !== "table" && format !== "json") {
-        console.error(`${c.red("Error:")} --format must be 'table' or 'json'`);
+      if (format !== "text" && format !== "table" && format !== "json") {
+        console.error(
+          `${c.red("Error:")} --format must be 'text', 'table', or 'json'`,
+        );
         process.exit(1);
       }
 
@@ -144,7 +150,7 @@ See also:
       if (format === "json") {
         console.log(JSON.stringify(report, null, 2));
       } else {
-        renderTable(report);
+        renderTable(report); // handles both 'text' and 'table'
       }
     });
 }

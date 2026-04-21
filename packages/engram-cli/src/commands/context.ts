@@ -1280,7 +1280,7 @@ export function registerContext(program: Command): void {
     .option(
       "--min-confidence <n>",
       "minimum confidence (0.0–1.0) for a discussion hit to be included; prefer silence to noise",
-      "0.0",
+      "0.8",
     )
     .option(
       "-v, --verbose",
