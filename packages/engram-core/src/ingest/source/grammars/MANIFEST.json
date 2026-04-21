@@ -28,5 +28,25 @@
     "version": "0.23.5",
     "commit": "94703d5a6bed02b98e438d7cad1136c01a60ba2c",
     "source": "https://github.com/tree-sitter/tree-sitter-java"
+  },
+  "ruby": {
+    "version": "0.23.1",
+    "commit": "",
+    "source": "https://github.com/tree-sitter/tree-sitter-ruby"
+  },
+  "c": {
+    "version": "0.24.1",
+    "commit": "",
+    "source": "https://github.com/tree-sitter/tree-sitter-c"
+  },
+  "cpp": {
+    "version": "0.23.4",
+    "commit": "",
+    "source": "https://github.com/tree-sitter/tree-sitter-cpp"
+  },
+  "c_sharp": {
+    "version": "0.23.5",
+    "commit": "",
+    "source": "https://github.com/tree-sitter/tree-sitter-c-sharp"
   }
 }

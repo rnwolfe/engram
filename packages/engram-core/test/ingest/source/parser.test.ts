@@ -53,6 +53,42 @@ describe("languageForPath", () => {
     expect(languageForPath("src/foo.rs")).toBe("rust");
   });
 
+  it("maps .java to java", () => {
+    expect(languageForPath("src/Foo.java")).toBe("java");
+  });
+
+  it("maps .rb to ruby", () => {
+    expect(languageForPath("lib/foo.rb")).toBe("ruby");
+  });
+
+  it("maps .c to c", () => {
+    expect(languageForPath("src/main.c")).toBe("c");
+  });
+
+  it("maps .h to c", () => {
+    expect(languageForPath("include/types.h")).toBe("c");
+  });
+
+  it("maps .cpp to cpp", () => {
+    expect(languageForPath("src/engine.cpp")).toBe("cpp");
+  });
+
+  it("maps .cc to cpp", () => {
+    expect(languageForPath("src/engine.cc")).toBe("cpp");
+  });
+
+  it("maps .cxx to cpp", () => {
+    expect(languageForPath("src/engine.cxx")).toBe("cpp");
+  });
+
+  it("maps .hpp to cpp", () => {
+    expect(languageForPath("include/engine.hpp")).toBe("cpp");
+  });
+
+  it("maps .cs to c_sharp", () => {
+    expect(languageForPath("src/Program.cs")).toBe("c_sharp");
+  });
+
   it("returns null for files without extension", () => {
     expect(languageForPath("Makefile")).toBeNull();
   });
@@ -135,6 +171,36 @@ describe("SourceParser", () => {
   it("parses Rust source — root is source_file node", () => {
     const tree = parser.parse("pub fn main() {}", "rust");
     expect(tree.rootNode.type).toBe("source_file");
+    expect(tree.rootNode.hasError).toBe(false);
+  });
+
+  it("parses Ruby source — root is program node", () => {
+    const tree = parser.parse("class Foo\nend\n", "ruby");
+    expect(tree.rootNode.type).toBe("program");
+    expect(tree.rootNode.hasError).toBe(false);
+  });
+
+  it("parses C source — root is translation_unit node", () => {
+    const tree = parser.parse("int main(void) { return 0; }\n", "c");
+    expect(tree.rootNode.type).toBe("translation_unit");
+    expect(tree.rootNode.hasError).toBe(false);
+  });
+
+  it("parses C++ source — root is translation_unit node", () => {
+    const tree = parser.parse(
+      "class Foo {};\nint main() { return 0; }\n",
+      "cpp",
+    );
+    expect(tree.rootNode.type).toBe("translation_unit");
+    expect(tree.rootNode.hasError).toBe(false);
+  });
+
+  it("parses C# source — root is compilation_unit node", () => {
+    const tree = parser.parse(
+      "public class Program { static void Main() {} }\n",
+      "c_sharp",
+    );
+    expect(tree.rootNode.type).toBe("compilation_unit");
     expect(tree.rootNode.hasError).toBe(false);
   });
 

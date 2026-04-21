@@ -21,9 +21,13 @@ import {
   INGESTION_SOURCE_TYPES,
   RELATION_TYPES,
 } from "../../vocab/index.js";
+import { extractC } from "./extractors/c.js";
+import { extractCSharp } from "./extractors/c_sharp.js";
+import { extractCpp } from "./extractors/cpp.js";
 import { extractGo } from "./extractors/go.js";
 import { extractJava } from "./extractors/java.js";
 import { extractPython } from "./extractors/python.js";
+import { extractRuby } from "./extractors/ruby.js";
 import { extractRust } from "./extractors/rust.js";
 import type { EntityRef, ExtractedFile } from "./extractors/types.js";
 import { extractTypeScript, resolveImport } from "./extractors/typescript.js";
@@ -42,6 +46,10 @@ function extractFile(
   if (lang === "java") return extractJava(captures);
   if (lang === "python") return extractPython(captures);
   if (lang === "rust") return extractRust(captures);
+  if (lang === "ruby") return extractRuby(captures);
+  if (lang === "c") return extractC(captures);
+  if (lang === "cpp") return extractCpp(captures);
+  if (lang === "c_sharp") return extractCSharp(captures);
   return extractTypeScript(captures);
 }
 
