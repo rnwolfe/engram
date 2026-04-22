@@ -168,7 +168,7 @@ export class GoogleWorkspaceAdapter implements EnrichmentAdapter {
 
   scopeSchema: ScopeSchema = googleWorkspaceScopeSchema;
 
-  supportsCursor = false;
+  supportsCursor = true;
 
   private fetchFn: GWFetchFn;
 
@@ -288,8 +288,9 @@ export class GoogleWorkspaceAdapter implements EnrichmentAdapter {
     },
     dryRun?: boolean,
   ): Promise<void> {
-    // Read cursor from last successful run for this scope
-    const since = readIsoCursor(graph, INGESTION_SOURCE, scope);
+    // Read cursor from last successful run for this scope.
+    // In dry-run mode skip cursor so the count reflects all in-scope docs.
+    const since = dryRun ? null : readIsoCursor(graph, INGESTION_SOURCE, scope);
 
     // Enumerate docs from Drive
     let discoveredDocs: import("./google-workspace-discovery.js").DriveFileItem[];

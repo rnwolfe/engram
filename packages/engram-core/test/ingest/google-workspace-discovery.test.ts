@@ -17,6 +17,8 @@ import {
 } from "../../src/ingest/adapters/google-workspace-discovery.js";
 import type { DocsDocument } from "../../src/ingest/adapters/google-workspace-helpers.js";
 import { validateScope } from "../../src/ingest/adapters/google-workspace-helpers.js";
+import { readIsoCursor } from "../../src/ingest/cursor.js";
+import { INGESTION_SOURCE_TYPES } from "../../src/vocab/index.js";
 
 // ---------------------------------------------------------------------------
 // Test fixtures & helpers
@@ -217,6 +219,18 @@ describe("parseFolderScope", () => {
   test("throws on invalid recursive value", () => {
     expect(() => parseFolderScope("folder:abc?recursive=yes")).toThrow(
       "Invalid value for recursive",
+    );
+  });
+
+  test("throws on folder ID containing single quote (injection guard)", () => {
+    expect(() => parseFolderScope("folder:abc'def")).toThrow(
+      "invalid folder ID",
+    );
+  });
+
+  test("throws on folder ID with query string containing single quote", () => {
+    expect(() => parseFolderScope("folder:abc'def?recursive=true")).toThrow(
+      "invalid folder ID",
     );
   });
 });
@@ -667,6 +681,14 @@ describe("GoogleWorkspaceAdapter.enrich — folder scope integration", () => {
     });
 
     expect(result1.episodesCreated).toBe(2);
+
+    // Assert cursor was stored after the first run
+    const storedCursor = readIsoCursor(
+      graph,
+      INGESTION_SOURCE_TYPES.GOOGLE_WORKSPACE,
+      `folder:${FOLDER}`,
+    );
+    expect(storedCursor).toBe("2024-06-01T00:00:00Z");
 
     // Second run: only DOC_NEW has a newer modifiedTime beyond the cursor
     // The cursor after run 1 is 2024-06-01T00:00:00Z

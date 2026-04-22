@@ -57,12 +57,22 @@ export function parseFolderScope(scope: string): ParsedFolderScope {
     if (!folderId) {
       throw new Error("folder scope must include a folder ID: folder:<id>");
     }
+    if (!/^[A-Za-z0-9_-]+$/.test(folderId)) {
+      throw new Error(
+        `invalid folder ID: expected alphanumeric/underscore/dash characters only`,
+      );
+    }
     return { folderId, recursive: false };
   }
 
   const folderId = rest.slice(0, qIdx).trim();
   if (!folderId) {
     throw new Error("folder scope must include a folder ID: folder:<id>");
+  }
+  if (!/^[A-Za-z0-9_-]+$/.test(folderId)) {
+    throw new Error(
+      `invalid folder ID: expected alphanumeric/underscore/dash characters only`,
+    );
   }
 
   const queryString = rest.slice(qIdx + 1);
@@ -335,13 +345,16 @@ export async function enumerateQueryDocs(
  * Returns `null` if the list is empty or no item has a `modifiedTime`.
  */
 export function computeDiscoveryCursor(items: DriveFileItem[]): string | null {
-  let max: string | null = null;
+  let maxSeen: string | null = null;
   for (const item of items) {
     if (item.modifiedTime) {
-      if (max === null || item.modifiedTime > max) {
-        max = item.modifiedTime;
+      if (
+        !maxSeen ||
+        new Date(item.modifiedTime).getTime() > new Date(maxSeen).getTime()
+      ) {
+        maxSeen = item.modifiedTime;
       }
     }
   }
-  return max;
+  return maxSeen;
 }
