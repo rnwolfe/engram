@@ -26,34 +26,46 @@ user before deletion.
 
 Read `forge.toml` for `[project].base_branch` (default: `main`) and `[project].repo`.
 
-If `forge.toml` is missing, assume `base_branch = main`.
+If `forge.toml` is missing or `repo` is absent, derive `$REPO` from the checkout:
+
+```bash
+REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null \
+  || git remote get-url origin | sed -E 's#(git@github.com:|https://github.com/)##; s#\.git$##')
+```
 
 ---
 
 ## Step 1 — Discover State
 
-Run these in parallel to build a complete picture before taking any action:
+Start with a fetch so the local view of `origin/$BASE_BRANCH` and remote tracking refs
+is current. This also ensures merged-branch detection compares against actual remote state:
 
 ```bash
-# 1. All worktrees
+git fetch origin --prune
+```
+
+Then run these in parallel:
+
+```bash
+# 1. All worktrees with full details (path, branch, HEAD)
 git worktree list --porcelain
 
-# 2. Local branches merged into base (ancestry-based — misses squash merges)
-git branch --merged $BASE_BRANCH
+# 2. Local branches merged into remote base by ancestry (misses squash merges)
+git branch --merged origin/$BASE_BRANCH
 
-# 3. All local branches with upstream tracking info
+# 3. All local branches with upstream tracking info (shows [gone] for deleted remotes)
 git branch -vv
 
-# 4. Remote tracking refs
-git remote show origin
+# 4. Per-branch last-commit timestamp for staleness classification
+git for-each-ref --format='%(refname:short) %(committerdate:iso8601)' refs/heads/
 
-# 5. Open PRs (to avoid deleting a branch with active work)
+# 5. Open PRs (branches with open PRs are never deleted)
 gh pr list --repo $REPO --state open --json headRefName,number,title --limit 100
 
-# 6. Recently merged PRs (catches squash merges that git cannot detect via ancestry)
-gh pr list --repo $REPO --state merged --json headRefName,number,title,mergedAt --limit 50
+# 6. Recently merged PRs — use a high limit to catch old squash-merged branches
+gh pr list --repo $REPO --state merged --json headRefName,number,title,mergedAt --limit 200
 
-# 7. Stash list (not cleaned up, but surfaced for the user)
+# 7. Stash list (surfaced for the user, never auto-dropped)
 git stash list
 
 # 8. Working tree status
@@ -63,20 +75,25 @@ git status --short
 git rev-parse --abbrev-ref HEAD
 ```
 
-**Important — squash merge detection:** This repo uses squash-merge PRs. Squash merges do not produce a traceable ancestry link, so `git branch --merged` will not include them. A branch is considered "merged" if it appears in either `git branch --merged` OR in `gh pr list --state merged` with a matching `headRefName`. Always cross-reference both sources.
+**Squash merge detection:** Squash merges don't produce traceable git ancestry, so
+`git branch --merged` won't include them. Cross-reference `gh pr list --state merged`:
+a branch is in `merged_local` if its name matches a `headRefName` in the merged PR list,
+even if git ancestry doesn't confirm it. Always cite which PR confirmed the merge.
 
-Build four lists from this data:
+Build four lists:
 
 | List | Criteria |
 |------|----------|
-| **merged_local** | Local branches found in `git branch --merged $BASE_BRANCH` OR whose `headRefName` appears in the merged PR list — excluding `$BASE_BRANCH` itself and the current branch |
-| **dead_remote_tracking** | Remote tracking refs where the remote branch no longer exists (detected via `git branch -vv` showing `[origin/X: gone]`) |
-| **stale_worktrees** | Non-main worktrees whose branch is in `merged_local` OR whose remote tracking ref is gone |
-| **ambiguous** | Local branches not in `merged_local` but with no open PR and no recent commits (>14 days stale on remote) — these need user confirmation |
+| **merged_local** | Local branches found in `git branch --merged origin/$BASE_BRANCH` OR whose name matches a `headRefName` in the merged PR list — excluding `$BASE_BRANCH` itself and the current branch |
+| **dead_remote_tracking** | Branches showing `[origin/X: gone]` in `git branch -vv` (the `git fetch --prune` above already removed the stale refs; this list is for local branches that tracked them) |
+| **stale_worktrees** | Non-main worktrees whose branch is in `merged_local` only — a gone upstream alone is not sufficient proof of merge |
+| **ambiguous** | Local branches not in `merged_local`, with no open PR, and whose last commit is >14 days old (from `git for-each-ref` timestamps) — these need user confirmation; also includes worktrees whose upstream is gone but branch is not confirmed merged |
 
-A branch with an **open PR** is never in any deletion list — skip it silently.
+A branch with an **open PR** is excluded from all deletion lists. It will appear in the
+plan under "Nothing to do" as an informational item — it is not silently omitted.
 
-If `git stash list` returns any entries, note them in the plan. Stashes are never auto-dropped — they need human review. If the working tree has uncommitted changes on the base branch, note them too.
+If `git stash list` returns entries, note them in the plan. Stashes are never auto-dropped.
+If the working tree has uncommitted changes, note them too.
 
 ---
 
@@ -88,7 +105,7 @@ Print a structured plan before touching anything:
 Cleanup plan
 ────────────────────────────────────────
 
-Worktrees to remove (branch merged):
+Worktrees to remove (branch confirmed merged):
   .worktrees/issue-42-auth-refactor    branch: autodev/issue-42-auth-refactor [merged via PR #42]
   .worktrees/issue-38-fix-decay        branch: autodev/issue-38-fix-decay [merged via PR #38]
 
@@ -98,11 +115,13 @@ Local branches to delete (merged into main):
   fix/old-typo                     [squash PR #47, merged 2026-04-19]
 
 Remote tracking refs to prune:
-  origin/autodev/issue-42-auth-refactor  [gone]
-  origin/autodev/issue-38-fix-decay      [gone]
+  (already pruned by git fetch --prune above)
 
-Ambiguous branches (not merged, no open PR, >14 days stale):
-  docs/readme-source-languages   last commit: 2026-04-15   [needs confirmation]
+Ambiguous (not confirmed merged, no open PR, >14 days since last commit):
+  docs/readme-source-languages   last commit: 2026-04-08   [needs confirmation]
+
+Ambiguous worktrees (upstream gone, branch not confirmed merged):
+  .worktrees/spike-auth            branch: spike/auth [upstream gone, unconfirmed]
 
 Nothing to do:
   main                           [base branch, protected]
@@ -114,10 +133,7 @@ Stashes (not auto-dropped — human review needed):
 
 Working tree (uncommitted changes on main — not touched):
   M docs/internal/STATUS.md
-  M docs/internal/VISION.md
 ```
-
-For squash-merged branches, note which PR confirmed the merge — this is the evidence used if `-d` refuses.
 
 In `--dry-run` mode, stop here and exit.
 
@@ -125,62 +141,63 @@ In `--dry-run` mode, stop here and exit.
 
 ## Step 3 — Confirm
 
-If `--yes` is set, skip confirmation for `merged_local` and `dead_remote_tracking` only.
-Always prompt for `ambiguous` branches regardless of flags.
+If `--yes` is set, skip confirmation for `merged_local` items only — `--yes` counts as
+explicit confirmation that merged-PR evidence is sufficient. Still always prompt for
+`ambiguous` branches and `ambiguous worktrees` regardless of flags.
 
-For the merged/dead items (unless `--yes`):
-
-```
-Proceed with deleting merged branches and pruning dead tracking refs? [Y/n]
-```
-
-For each ambiguous branch, ask individually:
+For the merged items (unless `--yes`):
 
 ```
-Branch 'docs/readme-source-languages' has no open PR and hasn't been pushed in 14 days.
-  Last commit: "docs: update readme" (2026-04-15)
+Proceed with deleting merged branches and removing their worktrees? [Y/n]
+```
+
+For each ambiguous branch or worktree, prompt individually:
+
+```
+Branch 'docs/readme-source-languages' has no open PR and last commit was 14 days ago.
+  Last commit: "docs: update readme" (2026-04-08)
   Delete this branch? [y/N]
+
+Worktree '.worktrees/spike-auth' has a gone upstream but branch 'spike/auth' is not confirmed merged.
+  Delete this worktree and branch? [y/N]
 ```
 
-Default is **No** for ambiguous branches.
+Default is **No** for all ambiguous items.
 
 ---
 
 ## Step 4 — Execute
 
-Execute in this order (order matters — remove worktrees before branches):
+Execute in this order (worktrees before branches — a branch can't be deleted while a
+worktree references it):
 
 ### 4a — Remove stale worktrees
 
+Use the path discovered from `git worktree list --porcelain`, not a reconstructed path.
+Before removing, check that specific worktree for uncommitted changes:
+
 ```bash
-git worktree remove --force ".worktrees/$SLUG"
+git -C "$WORKTREE_PATH" status --short
 ```
 
-If the worktree has uncommitted changes, report it and skip rather than force-removing.
-The `--force` flag is safe here only because we checked the branch is merged.
+If the worktree has uncommitted changes, report it and skip — do not force-remove.
+Only use `--force` when the worktree is clean and the branch is confirmed merged:
+
+```bash
+git worktree remove --force "$WORKTREE_PATH"
+```
 
 ### 4b — Delete confirmed local branches
 
 ```bash
-git branch -d $BRANCH         # safe delete (refuses if unmerged by ancestry)
+git branch -d $BRANCH         # safe delete (refuses if not in ancestry)
 ```
 
-If `-d` fails because the branch was squash-merged (not in git ancestry): this is expected.
-The merge evidence is the PR — you already cited it in the plan. Use `-D` for squash-merged
-branches only, and only after the user has confirmed (or `--yes` was passed and you cited
-the PR number). Never use `-D` without that evidence. Never use `-D` for ambiguous branches
-regardless of flags.
+If `-d` refuses because the branch is squash-merged (expected — it's not in ancestry):
+use `-D`, but only when the branch is in `merged_local` via PR evidence. Never use `-D`
+for ambiguous branches. Passing `--yes` counts as explicit confirmation for merged branches.
 
-### 4c — Prune remote tracking refs
-
-```bash
-git fetch --prune origin
-```
-
-This cleans all dead `origin/*` tracking refs in one shot — safer and faster than
-deleting them one by one.
-
-### 4d — Delete remote branches for confirmed-merged items
+### 4c — Delete remote branches for confirmed-merged items
 
 For each branch in `merged_local` that still exists on the remote:
 
@@ -188,24 +205,21 @@ For each branch in `merged_local` that still exists on the remote:
 git push origin --delete $BRANCH
 ```
 
-Only do this for branches confirmed merged (not ambiguous). If the remote branch is
-already gone (404), log it and continue — not an error.
+Only for confirmed-merged branches. If already gone (404), log and continue — not an error.
 
-### 4e — Check out base branch
+### 4d — Check out base branch
 
 ```bash
 git checkout $BASE_BRANCH
 git pull origin $BASE_BRANCH --ff-only
 ```
 
-If the current branch is the base branch, just pull. If `--ff-only` fails (diverged),
-report the situation without force-resetting. The user needs to know.
+If already on the base branch, just pull. If `--ff-only` fails (diverged), report
+without force-resetting — the user needs to resolve this manually.
 
 ---
 
 ## Step 5 — Verify and Report
-
-Run a final state check:
 
 ```bash
 git worktree list
@@ -218,10 +232,10 @@ Print a completion summary:
 ```
 Cleanup complete
 ────────────────────────────────────────
-Removed worktrees:     2
+Removed worktrees:       2
 Deleted local branches:  3  (autodev/issue-42-auth-refactor, autodev/issue-38-fix-decay, fix/old-typo)
 Deleted remote branches: 2  (autodev/issue-42-auth-refactor, autodev/issue-38-fix-decay)
-Pruned tracking refs:    2
+Pruned tracking refs:    2  (via git fetch --prune)
 Skipped (open PR):       1  (fix/cli-ux-audit → PR #251)
 Skipped (ambiguous):     1  (docs/readme-source-languages — user kept)
 
@@ -230,15 +244,16 @@ Status:           clean
 Unpushed commits: none
 ```
 
-If anything was skipped or failed, list it clearly so the user knows what still needs attention.
+List anything skipped or failed so the user knows what still needs attention.
 
 ---
 
 ## Guardrails
 
 - **Never delete `main` or the configured `base_branch`** — even if somehow merged into itself.
-- **Never delete a branch with an open PR** — check PR list first.
-- **Never force-delete (`-D`) without explicit user confirmation** — use `-d` and let it fail safe.
-- **Never remove a worktree with uncommitted changes** — report it and skip.
+- **Never delete a branch with an open PR** — check PR list before any deletion.
+- **Never force-delete (`-D`) without merge evidence** — use `-d` first; `-D` only for branches confirmed merged via PR. Passing `--yes` counts as explicit confirmation for merged branches only.
+- **Never remove a worktree with uncommitted changes** — check `git -C $PATH status` first; skip and report if dirty.
+- **Never remove a worktree solely because its upstream is gone** — a deleted remote branch is not proof of merge; treat as ambiguous and prompt.
 - **Never `git reset --hard`** — if the base branch can't fast-forward, report and stop.
-- If `git worktree remove` fails for any reason other than uncommitted changes, report the error and continue with the rest of the cleanup rather than aborting.
+- If `git worktree remove` fails for any non-dirty reason, report the error and continue.
