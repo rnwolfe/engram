@@ -1,6 +1,6 @@
 # Engram — Status
 
-> Last synced: 2026-04-20
+> Last synced: 2026-04-21
 > Latest release: **v0.2.0** (2026-04-19)
 
 ## Phase 1 — Foundation (v0.1) — shipped 2026-04-08
@@ -53,6 +53,15 @@
 - [x] Sweep phase — archive episodes for deleted source files (#108)
 - [x] `engram ingest source` subcommand (#109)
 - [x] Source ingestion docs + self-ingest verification (#110)
+- [x] Language expansion — Go, Python (#235), Rust (#232), Java (#233), Ruby, C, C++, C# (#234)
+- [x] Orchestrator generalized for extractor-declared entities and edges (#241)
+
+#### Kubernetes operator graph (epic #236)
+
+- [x] Starlark/BUILD tree-sitter extractor for Bazel dependency graph (#237)
+- [x] Kubebuilder `+kubebuilder:rbac` markers as RBAC permission edges (#238, #247, #249)
+- [x] controller-runtime `SetupWithManager` watches graph extraction (#239)
+- [ ] YAML source extractor for Kubernetes CRDs, Roles, RoleBindings (#240) — issue closed without implementation; needs re-opening if still wanted
 
 #### Plugin system
 
@@ -104,18 +113,23 @@
 
 - [x] Config noise filter; term-matching entities ranked higher (#137)
 
+#### Plugin migration (ADR-008)
+
+- [x] Gerrit adapter migrated from built-in to in-repo plugin (#222)
+- [x] `engram plugin install` and `uninstall` subcommands — wire first-party plugins into XDG (#223)
+- [x] VISION.md phase 2 updated for in-repo plugin adapter model (#224)
+- [x] `plugin-create` skill for guided adapter authoring (#231)
+
+#### Retrieval
+
+- [x] Retrieval precision + context provider viability epic (#111)
+
 #### Documentation
 
 - [x] README v0.2 overhaul — plugins, Gerrit, reconcile, companion, token-budget semantics (#221)
 - [x] Various CLI fixes in #168-#179 (embed default, port validation, sparse-results gating, piped-intro suppression, etc.)
 
 ## Phase 2 — In flight / Next up
-
-### Open, ready for work (`backlog/ready`)
-
-- [ ] #222 — Migrate Gerrit adapter from built-in to in-repo plugin (ADR-008 reference port; blocks v0.3.0 tag)
-- [ ] #223 — `engram plugin install` subcommand (wire first-party plugins into XDG; blocks Gerrit migration UX)
-- [ ] #224 — docs: update VISION.md phase 2 for in-repo plugin model
 
 ### Open, needs refinement (`backlog/needs-refinement`)
 
@@ -127,7 +141,6 @@
 - [ ] #192 — Buganizer spike (verify public API alignment)
 - [ ] #203 — `engram sync` — config-driven multi-source orchestration
 - [ ] #123 — Harness plugin core + Gemini CLI adapter (D3 Deliverable 2)
-- [ ] #111 — epic: retrieval precision + context provider viability
 - [ ] #116 — **Workflow benchmark** (priority/high, research) — Gate G1 for narrative projections per ADR-004. Flagged in most recent `/product` check: `decision_page`, `contradiction_report`, and `topic_cluster` shipped in v0.2.0 without G1 exit criteria met.
 
 ## Phase 3 — Maturity — not started
