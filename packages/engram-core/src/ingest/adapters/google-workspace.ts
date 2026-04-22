@@ -18,7 +18,7 @@ import { ulid } from "ulid";
 import type { EngramGraph } from "../../format/index.js";
 import { ENGINE_VERSION } from "../../format/version.js";
 import { addEntityAlias, resolveEntity } from "../../graph/aliases.js";
-import { addEdge } from "../../graph/edges.js";
+import { addEdge, findEdges } from "../../graph/edges.js";
 import { addEntity } from "../../graph/entities.js";
 import {
   addEpisode,
@@ -196,8 +196,8 @@ export class GoogleWorkspaceAdapter implements EnrichmentAdapter {
       );
     }
 
-    const run = createIngestionRun(graph, scope);
-    const runId = run.id;
+    const run = opts.dryRun ? null : createIngestionRun(graph, scope);
+    const runId = run?.id ?? "";
 
     const counts = {
       episodesCreated: 0,
@@ -221,16 +221,20 @@ export class GoogleWorkspaceAdapter implements EnrichmentAdapter {
         );
       }
 
-      completeIngestionRun(graph, runId, null, {
-        episodes: counts.episodesCreated,
-        entities: counts.entitiesCreated,
-        edges: counts.edgesCreated,
-      });
+      if (!opts.dryRun && run) {
+        completeIngestionRun(graph, runId, null, {
+          episodes: counts.episodesCreated,
+          entities: counts.entitiesCreated,
+          edges: counts.edgesCreated,
+        });
+      }
 
       return { ...counts, runId };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      failIngestionRun(graph, runId, msg);
+      if (!opts.dryRun && run) {
+        failIngestionRun(graph, runId, msg);
+      }
       throw err;
     }
   }
@@ -421,20 +425,28 @@ export class GoogleWorkspaceAdapter implements EnrichmentAdapter {
         counts,
       );
 
-      addEdge(
-        graph,
-        {
-          source_id: ownerEntityId,
-          target_id: docEntityId,
-          relation_type: RELATION_TYPES.AUTHORED,
-          edge_kind: "observed",
-          fact: `${owner.emailAddress} authored ${canonicalName}`,
-          valid_from: modifiedTime,
-          confidence: 1.0,
-        },
-        evidence,
-      );
-      counts.edgesCreated++;
+      const existingAuthoredEdges = findEdges(graph, {
+        source_id: ownerEntityId,
+        target_id: docEntityId,
+        relation_type: RELATION_TYPES.AUTHORED,
+        edge_kind: "observed",
+      });
+      if (existingAuthoredEdges.length === 0) {
+        addEdge(
+          graph,
+          {
+            source_id: ownerEntityId,
+            target_id: docEntityId,
+            relation_type: RELATION_TYPES.AUTHORED,
+            edge_kind: "observed",
+            fact: `${owner.emailAddress} authored ${canonicalName}`,
+            valid_from: modifiedTime,
+            confidence: 1.0,
+          },
+          evidence,
+        );
+        counts.edgesCreated++;
+      }
     }
 
     // Ingest last modifying user + edited edge
@@ -449,20 +461,28 @@ export class GoogleWorkspaceAdapter implements EnrichmentAdapter {
         counts,
       );
 
-      addEdge(
-        graph,
-        {
-          source_id: editorEntityId,
-          target_id: docEntityId,
-          relation_type: RELATION_TYPES.EDITED,
-          edge_kind: "observed",
-          fact: `${lastEditor.emailAddress} last edited ${canonicalName}`,
-          valid_from: modifiedTime,
-          confidence: 1.0,
-        },
-        evidence,
-      );
-      counts.edgesCreated++;
+      const existingEditedEdges = findEdges(graph, {
+        source_id: editorEntityId,
+        target_id: docEntityId,
+        relation_type: RELATION_TYPES.EDITED,
+        edge_kind: "observed",
+      });
+      if (existingEditedEdges.length === 0) {
+        addEdge(
+          graph,
+          {
+            source_id: editorEntityId,
+            target_id: docEntityId,
+            relation_type: RELATION_TYPES.EDITED,
+            edge_kind: "observed",
+            fact: `${lastEditor.emailAddress} last edited ${canonicalName}`,
+            valid_from: modifiedTime,
+            confidence: 1.0,
+          },
+          evidence,
+        );
+        counts.edgesCreated++;
+      }
     }
   }
 }

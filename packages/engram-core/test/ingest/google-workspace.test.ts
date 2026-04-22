@@ -319,9 +319,7 @@ describe("GoogleWorkspaceAdapter.enrich — integration", () => {
 
     // Graph integrity
     const verify = verifyGraph(graph);
-    expect(
-      verify.violations.filter((v) => v.severity === "error"),
-    ).toHaveLength(0);
+    expect(verify.violations).toHaveLength(0);
   });
 
   test("re-ingest with same revisionId skips without writing", async () => {
@@ -343,9 +341,7 @@ describe("GoogleWorkspaceAdapter.enrich — integration", () => {
     expect(result2.episodesSkipped).toBe(1);
 
     const verify = verifyGraph(graph);
-    expect(
-      verify.violations.filter((v) => v.severity === "error"),
-    ).toHaveLength(0);
+    expect(verify.violations).toHaveLength(0);
   });
 
   test("re-ingest with new revisionId supersedes existing episode", async () => {
@@ -387,9 +383,7 @@ describe("GoogleWorkspaceAdapter.enrich — integration", () => {
     expect(allEps[0].superseded_by).not.toBeNull();
 
     const verify = verifyGraph(graph);
-    expect(
-      verify.violations.filter((v) => v.severity === "error"),
-    ).toHaveLength(0);
+    expect(verify.violations).toHaveLength(0);
   });
 
   test("docs: scope with multiple IDs ingests each", async () => {
@@ -411,9 +405,7 @@ describe("GoogleWorkspaceAdapter.enrich — integration", () => {
     expect(result.episodesCreated).toBe(2);
 
     const verify = verifyGraph(graph);
-    expect(
-      verify.violations.filter((v) => v.severity === "error"),
-    ).toHaveLength(0);
+    expect(verify.violations).toHaveLength(0);
   });
 
   test("404 on one doc in docs: list logs and continues", async () => {
@@ -436,9 +428,7 @@ describe("GoogleWorkspaceAdapter.enrich — integration", () => {
     expect(result.episodesSkipped).toBe(1);
 
     const verify = verifyGraph(graph);
-    expect(
-      verify.violations.filter((v) => v.severity === "error"),
-    ).toHaveLength(0);
+    expect(verify.violations).toHaveLength(0);
   });
 
   test("401 without refresh throws auth_failure immediately", async () => {
