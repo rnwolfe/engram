@@ -1,5 +1,8 @@
 /**
- * google-workspace.ts — Google Workspace enrichment adapter (MVP: Google Docs).
+ * index.ts — Google Workspace enrichment adapter (in-repo plugin).
+ *
+ * Ported from packages/engram-core/src/ingest/adapters/google-workspace.ts
+ * into the in-repo plugin package.
  *
  * Ingests explicitly-specified Google Docs as revision-aware episodes.
  * Supports oauth2 (ADC-minted at CLI layer) and bearer token auth.
@@ -7,57 +10,62 @@
  * Scope formats:
  *   doc:<docId>          — single document
  *   docs:<id>,<id>,...   — comma-separated list
+ *   folder:<id>          — all docs in a Drive folder (flat)
+ *   folder:<id>?recursive=true — all docs in a folder tree (BFS)
+ *   query:<drive-q>      — arbitrary Drive search query
  *
  * Revision-aware supersession:
  *   - First ingest: addEpisode()
  *   - Re-ingest, same revisionId: skip
  *   - Re-ingest, new revisionId: supersedeEpisode()
+ *
+ * Default export: GoogleWorkspaceAdapter instance (required by js-module plugin contract).
  */
 
-import { ulid } from "ulid";
-import type { EngramGraph } from "../../format/index.js";
-import { ENGINE_VERSION } from "../../format/version.js";
-import { addEntityAlias, resolveEntity } from "../../graph/aliases.js";
-import { addEdge, findEdges } from "../../graph/edges.js";
-import { addEntity } from "../../graph/entities.js";
-import {
-  addEpisode,
-  getCurrentEpisode,
-  supersedeEpisode,
-} from "../../graph/episodes.js";
-import {
-  ENTITY_TYPES,
-  EPISODE_SOURCE_TYPES,
-  INGESTION_SOURCE_TYPES,
-  RELATION_TYPES,
-} from "../../vocab/index.js";
 import type {
   AuthCredential,
+  EngramGraph,
   EnrichmentAdapter,
   EnrichOpts,
+  IngestResult,
   ScopeSchema,
-} from "../adapter.js";
+} from "engram-core";
 import {
+  addEdge,
+  addEntity,
+  addEntityAlias,
+  addEpisode,
   applyCompatShim,
   assertAuthKind,
+  ENGINE_VERSION,
+  ENTITY_TYPES,
   EnrichmentAdapterError,
-} from "../adapter.js";
-import { readIsoCursor, writeCursor } from "../cursor.js";
-import type { IngestResult } from "../git.js";
+  EPISODE_SOURCE_TYPES,
+  findEdges,
+  getCurrentEpisode,
+  INGESTION_SOURCE_TYPES,
+  RELATION_TYPES,
+  readIsoCursor,
+  resolveEntity,
+  supersedeEpisode,
+  writeCursor,
+} from "engram-core";
+import { ulid } from "ulid";
+import type { DriveFileItem } from "./discovery.js";
 import {
   computeDiscoveryCursor,
   enumerateFolderDocs,
   enumerateQueryDocs,
   parseFolderScope,
-} from "./google-workspace-discovery.js";
-import type { GWFetchFn } from "./google-workspace-helpers.js";
+} from "./discovery.js";
+import type { GWFetchFn } from "./helpers.js";
 import {
   extractDocText,
   fetchDoc,
   fetchDriveMeta,
   parseScope,
   validateScope,
-} from "./google-workspace-helpers.js";
+} from "./helpers.js";
 
 // ---------------------------------------------------------------------------
 // Scope schema
@@ -293,7 +301,7 @@ export class GoogleWorkspaceAdapter implements EnrichmentAdapter {
     const since = dryRun ? null : readIsoCursor(graph, INGESTION_SOURCE, scope);
 
     // Enumerate docs from Drive
-    let discoveredDocs: import("./google-workspace-discovery.js").DriveFileItem[];
+    let discoveredDocs: DriveFileItem[];
 
     if (scope.startsWith("folder:")) {
       const { folderId, recursive } = parseFolderScope(scope);
@@ -639,3 +647,6 @@ function ensurePersonEntity(
   counts.entitiesCreated++;
   return entity.id;
 }
+
+// Default export required by the js-module plugin transport contract.
+export default new GoogleWorkspaceAdapter();

@@ -1,5 +1,8 @@
 /**
- * google-workspace-helpers.ts — Internal helpers for the Google Workspace adapter.
+ * helpers.ts — Internal helpers for the Google Workspace adapter.
+ *
+ * Ported from packages/engram-core/src/ingest/adapters/google-workspace-helpers.ts
+ * into the in-repo plugin package.
  *
  * Provides:
  * - Scope parsing (doc:<id>, docs:<id>,<id>,...)
@@ -8,7 +11,7 @@
  * - Error-classified HTTP fetch helpers
  */
 
-import { EnrichmentAdapterError } from "../adapter.js";
+import { EnrichmentAdapterError } from "engram-core";
 
 // ---------------------------------------------------------------------------
 // Google Docs API types (only fields we use)

@@ -13,6 +13,7 @@
   "dependencies": {
     "@clack/prompts": "^0.9.0",
     "@engram/engram-web": "workspace:*",
+    "@engram/plugin-google-workspace": "workspace:*",
     "commander": "^13.0.0",
     "engram-core": "workspace:*",
     "google-auth-library": "^9.0.0",

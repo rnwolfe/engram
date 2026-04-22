@@ -156,10 +156,6 @@ export {
   GitHubAuthError,
   githubScopeSchema,
 } from "./ingest/adapters/github.js";
-export {
-  GoogleWorkspaceAdapter,
-  googleWorkspaceScopeSchema,
-} from "./ingest/adapters/google-workspace.js";
 export type {
   PluginReferencePattern,
   ReferencePattern,

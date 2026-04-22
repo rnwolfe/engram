@@ -11,7 +11,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { intro, log, outro, spinner } from "@clack/prompts";
-
+import { GoogleWorkspaceAdapter } from "@engram/plugin-google-workspace";
 // git and markdown ingest use execFileSync / synchronous SQLite — the event
 // loop is blocked for the duration, so spinner intervals cannot fire.
 // For those commands we log a "starting" line and print results when done.
@@ -26,7 +26,6 @@ import {
   closeGraph,
   EnrichmentAdapterError,
   GitHubAdapter,
-  GoogleWorkspaceAdapter,
   ingestGitRepo,
   ingestMarkdown,
   ingestSource,
