@@ -11,5 +11,17 @@
       "description": "Gerrit project name (e.g. 'my-project' or 'org/sub-project')",
       "pattern": "^[^/][^/]*(/[^/]+)*[^/]$|^[^/]$"
     }
+  },
+  "description": "Ingest Gerrit code-review changes as episodes",
+  "docs": {
+    "summary": "Fetches Gerrit changes and ingests them as episodes. Change owners and reviewers become person entities with authored/reviewed edges. Supports cursor-based incremental re-ingest.",
+    "auth_setup": "For authenticated instances, create an HTTP password in your Gerrit profile (Settings → HTTP Credentials) and pass it with --auth basic --token \"user:password\".",
+    "scope_examples": [
+      {
+        "scope": "my-project",
+        "description": "All changes in project my-project"
+      },
+      { "scope": "org/sub-project", "description": "Nested Gerrit project" }
+    ]
   }
 }

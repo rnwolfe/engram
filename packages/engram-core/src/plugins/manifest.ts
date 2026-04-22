@@ -22,6 +22,15 @@ export interface PluginVocabExtensions {
   relation_types?: string[];
 }
 
+export interface PluginDocs {
+  /** 2–4 sentence overview shown by `engram plugin info`. */
+  summary?: string;
+  /** What the user must do before first use (auth setup, credentials, etc.). */
+  auth_setup?: string;
+  /** 3–6 representative scope examples. */
+  scope_examples?: Array<{ scope: string; description: string }>;
+}
+
 export interface PluginManifest {
   name: string;
   version: string;
@@ -30,6 +39,10 @@ export interface PluginManifest {
   entry: string;
   capabilities: PluginCapabilities;
   vocab_extensions?: PluginVocabExtensions;
+  /** One-line description shown in `plugin list` output. */
+  description?: string;
+  /** Extended documentation surfaced by `plugin info` and at install time. */
+  docs?: PluginDocs;
 }
 
 export class ManifestValidationError extends Error {
@@ -182,6 +195,14 @@ export function loadManifest(pluginDir: string): PluginManifest {
     vocab_extensions:
       "vocab_extensions" in obj
         ? (obj.vocab_extensions as PluginVocabExtensions)
+        : undefined,
+    description:
+      typeof obj.description === "string" ? obj.description : undefined,
+    docs:
+      typeof obj.docs === "object" &&
+      obj.docs !== null &&
+      !Array.isArray(obj.docs)
+        ? (obj.docs as PluginDocs)
         : undefined,
   };
 }
