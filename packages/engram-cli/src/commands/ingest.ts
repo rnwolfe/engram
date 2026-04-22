@@ -596,8 +596,11 @@ Auth modes (--auth):
   bearer  Pass a raw OAuth2/bearer token via --token or GOOGLE_WORKSPACE_TOKEN
 
 Scope:
-  --scope doc:<docId>           Single Google Doc
-  --scope docs:<id>,<id>,...    Multiple Google Docs
+  --scope doc:<docId>                 Single Google Doc
+  --scope docs:<id>,<id>,...          Multiple Google Docs (explicit list)
+  --scope folder:<folderId>           All Docs in a Drive folder (flat)
+  --scope folder:<folderId>?recursive=true  All Docs in folder tree (BFS)
+  --scope query:<drive-q>             Docs matching a Drive search query
 
 Examples:
   # Ingest a doc using ADC
@@ -608,11 +611,22 @@ Examples:
     --scope docs:1Bxi…,2Cyi… \\
     --auth bearer --token ya29.…
 
-  # Dry-run preview
-  engram ingest enrich google-workspace --scope doc:<id> --dry-run
+  # Ingest all Docs in a Drive folder (flat)
+  engram ingest enrich google-workspace --scope folder:1A2B3C4D5E6F7G8H
+
+  # Ingest all Docs in a folder tree (recursively)
+  engram ingest enrich google-workspace --scope "folder:1A2B3C4D5E6F7G8H?recursive=true"
+
+  # Ingest Docs matching a Drive search query
+  engram ingest enrich google-workspace --scope "query:name contains 'spec'"
+
+  # Dry-run preview (runs enumeration but skips content fetch)
+  engram ingest enrich google-workspace --scope folder:<id> --dry-run
 
 When to use:
   Index Google Docs for temporal context, ownership, and change tracking.
+  Use folder: or query: scopes for bulk ingest without listing every doc ID.
+  Subsequent runs use a modifiedTime cursor to fetch only changed docs.
   Combine with engram ingest git for full project history.
 
 See also:
@@ -620,7 +634,7 @@ See also:
     )
     .option(
       "--scope <value>",
-      "Google Workspace scope: doc:<id> or docs:<id>,<id>,...",
+      "Google Workspace scope: doc:<id>, docs:<id>,..., folder:<id>, or query:<q>",
     )
     .option(
       "--auth <mode>",

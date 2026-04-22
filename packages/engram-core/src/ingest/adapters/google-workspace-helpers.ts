@@ -92,8 +92,14 @@ export interface DrivePermission {
  * Parses a Google Workspace scope string into a list of document IDs.
  *
  * Accepted formats:
- * - `doc:<id>`          — single document
- * - `docs:<id>,<id>`   — comma-separated list of document IDs
+ * - `doc:<id>`                     — single document
+ * - `docs:<id>,<id>`              — comma-separated list of document IDs
+ * - `folder:<id>`                  — all docs in a Drive folder (flat)
+ * - `folder:<id>?recursive=true`  — all docs in a folder tree (BFS)
+ * - `query:<drive-q>`             — arbitrary Drive search query
+ *
+ * For `folder:` and `query:` scopes this function returns an empty array —
+ * the adapter discovers doc IDs at enrich time via Drive API enumeration.
  */
 export function parseScope(scope: string): string[] {
   if (scope.startsWith("doc:")) {
@@ -113,9 +119,103 @@ export function parseScope(scope: string): string[] {
       );
     return ids;
   }
+  if (scope.startsWith("folder:")) {
+    // Validated elsewhere (parseFolderScope) — return empty so adapter takes
+    // the discovery path
+    return [];
+  }
+  if (scope.startsWith("query:")) {
+    // Validated elsewhere — return empty so adapter takes the discovery path
+    return [];
+  }
   throw new Error(
-    `Unsupported scope format: ${JSON.stringify(scope)}. Use 'doc:<id>' or 'docs:<id>,<id>,...'`,
+    `Unsupported scope format: ${JSON.stringify(scope)}. ` +
+      `Use 'doc:<id>', 'docs:<id>,<id>,...', 'folder:<id>', or 'query:<q>'`,
   );
+}
+
+/**
+ * Validate a Google Workspace scope string.
+ * Throws with a descriptive message on invalid input.
+ *
+ * Accepted formats:
+ * - `doc:<id>`                     — single document
+ * - `docs:<id>,<id>`              — comma-separated list of document IDs
+ * - `folder:<id>`                  — all docs in a Drive folder (flat)
+ * - `folder:<id>?recursive=true`  — all docs in a folder tree (BFS)
+ * - `folder:<id>?recursive=false` — explicitly flat (same as no param)
+ * - `query:<drive-q>`             — arbitrary Drive search query (non-empty)
+ */
+export function validateScope(scope: string): void {
+  if (scope.startsWith("doc:")) {
+    const id = scope.slice(4).trim();
+    if (!id) throw new Error("doc scope must include a document ID: doc:<id>");
+    return;
+  }
+  if (scope.startsWith("docs:")) {
+    const raw = scope.slice(5);
+    const ids = raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (ids.length === 0)
+      throw new Error(
+        "docs scope must include at least one document ID: docs:<id>,<id>,...",
+      );
+    return;
+  }
+  if (scope.startsWith("folder:")) {
+    validateFolderScope(scope);
+    return;
+  }
+  if (scope.startsWith("query:")) {
+    const q = scope.slice("query:".length).trim();
+    if (!q) {
+      throw new Error(
+        "query scope must include a non-empty Drive query: query:<q>",
+      );
+    }
+    return;
+  }
+  throw new Error(
+    `Unsupported scope format: ${JSON.stringify(scope)}. ` +
+      `Use 'doc:<id>', 'docs:<id>,<id>,...', 'folder:<id>', or 'query:<q>'`,
+  );
+}
+
+/**
+ * Validate a folder:<id> scope string inline (no import needed).
+ */
+function validateFolderScope(scope: string): void {
+  const rest = scope.slice("folder:".length);
+  const qIdx = rest.indexOf("?");
+  const folderId = qIdx === -1 ? rest.trim() : rest.slice(0, qIdx).trim();
+
+  if (!folderId) {
+    throw new Error("folder scope must include a folder ID: folder:<id>");
+  }
+
+  if (qIdx !== -1) {
+    const queryString = rest.slice(qIdx + 1);
+    const params = new URLSearchParams(queryString);
+    for (const key of params.keys()) {
+      if (key !== "recursive") {
+        throw new Error(
+          `Unknown query parameter in folder scope: '${key}'. Valid keys: recursive`,
+        );
+      }
+    }
+    const recursiveVal = params.get("recursive");
+    if (
+      recursiveVal !== null &&
+      recursiveVal !== "true" &&
+      recursiveVal !== "false"
+    ) {
+      throw new Error(
+        `Invalid value for recursive in folder scope: '${recursiveVal}'. Use true or false`,
+      );
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
