@@ -44,6 +44,7 @@ union type (for function signatures and parameter narrowing).
 | `K8S_RESOURCE_KIND` | `"k8s_resource_kind"` | Kubernetes resource type (e.g. Deployment, ReplicaSet) |
 | `RBAC_PERMISSION` | `"rbac_permission"` | Kubernetes RBAC permission (group/resource#verb tuple) |
 | `BAZEL_TARGET` | `"bazel_target"` | Bazel/Buck build target (from BUILD file ingestion) |
+| `DOCUMENT` | `"document"` | External document (Google Doc, Confluence page, etc.) |
 
 ## Source types — two registries
 
@@ -64,6 +65,7 @@ via `INGESTION_TO_EPISODE_SOURCES`.
 | `SOURCE` | `"source"` | `ingest/source/index.ts` |
 | `MARKDOWN` | `"markdown"` | `ingest/markdown.ts` |
 | `TEXT` | `"text"` | `ingest/text.ts` |
+| `GOOGLE_WORKSPACE` | `"google_workspace"` | `ingest/adapters/google-workspace.ts` |
 
 ### `EPISODE_SOURCE_TYPES`
 
@@ -75,6 +77,7 @@ via `INGESTION_TO_EPISODE_SOURCES`.
 | `MANUAL` | `"manual"` | text ingestion |
 | `DOCUMENT` | `"document"` | markdown ingestion |
 | `SOURCE_FILE` | `"source"` | source ingestion |
+| `GOOGLE_DOC` | `"google_doc"` | Google Workspace adapter |
 
 ## Relation types (`RELATION_TYPES`)
 
@@ -92,6 +95,8 @@ via `INGESTION_TO_EPISODE_SOURCES`.
 | `CONTROLLER_OWNS` | `"controller_owns"` | controller-runtime: controller owns this resource kind (Owns) |
 | `RBAC_GRANTS` | `"rbac_grants"` | Controller struct is granted RBAC permission via kubebuilder marker |
 | `BUILD_DEPENDS_ON` | `"build_depends_on"` | Bazel target depends on another target (from BUILD file ingestion) |
+| `AUTHORED` | `"authored"` | Person authored a document (owner in Google Drive) |
+| `EDITED` | `"edited"` | Person last edited a document (lastModifyingUser in Google Drive) |
 
 ## Adding a new value
 

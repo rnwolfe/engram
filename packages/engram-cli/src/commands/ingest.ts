@@ -26,6 +26,7 @@ import {
   closeGraph,
   EnrichmentAdapterError,
   GitHubAdapter,
+  GoogleWorkspaceAdapter,
   ingestGitRepo,
   ingestMarkdown,
   ingestSource,
@@ -574,6 +575,208 @@ See also:
     closeGraph(graph);
     if (process.stdout.isTTY) outro("Done");
   });
+
+  // ---------------------------------------------------------------------------
+  // ingest enrich google-workspace
+  // ---------------------------------------------------------------------------
+
+  interface IngestGoogleWorkspaceOpts extends IngestEnrichOpts {
+    auth?: "adc" | "bearer";
+  }
+
+  enrich
+    .command("google-workspace")
+    .description("Ingest Google Docs as revision-aware episodes")
+    .addHelpText(
+      "after",
+      `
+Auth modes (--auth):
+  adc     Application Default Credentials (default). Run:
+          gcloud auth application-default login
+  bearer  Pass a raw OAuth2/bearer token via --token or GOOGLE_WORKSPACE_TOKEN
+
+Scope:
+  --scope doc:<docId>           Single Google Doc
+  --scope docs:<id>,<id>,...    Multiple Google Docs
+
+Examples:
+  # Ingest a doc using ADC
+  engram ingest enrich google-workspace --scope doc:1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms
+
+  # Ingest multiple docs with a bearer token
+  engram ingest enrich google-workspace \\
+    --scope docs:1Bxi…,2Cyi… \\
+    --auth bearer --token ya29.…
+
+  # Dry-run preview
+  engram ingest enrich google-workspace --scope doc:<id> --dry-run
+
+When to use:
+  Index Google Docs for temporal context, ownership, and change tracking.
+  Combine with engram ingest git for full project history.
+
+See also:
+  engram ingest enrich github   Enrich with GitHub PRs and issues`,
+    )
+    .option(
+      "--scope <value>",
+      "Google Workspace scope: doc:<id> or docs:<id>,<id>,...",
+    )
+    .option(
+      "--auth <mode>",
+      "auth mode: adc (Application Default Credentials) or bearer",
+      "adc",
+    )
+    .option(
+      "--token <token>",
+      "bearer token (required when --auth bearer). Env: GOOGLE_WORKSPACE_TOKEN",
+    )
+    .option("--dry-run", "preview what would be created without writing")
+    .option(
+      "-v, --verbose",
+      "print extra details (auth mode, doc titles)",
+      false,
+    )
+    .option("--db <path>", "path to .engram file", ".engram")
+    .action(async (opts: IngestGoogleWorkspaceOpts) => {
+      if (process.stdout.isTTY) intro("engram ingest enrich google-workspace");
+
+      const adapter = new GoogleWorkspaceAdapter();
+
+      // Validate scope
+      if (!opts.scope) {
+        log.error(`--scope is required.\n${adapter.scopeSchema.description}`);
+        process.exit(1);
+      }
+      try {
+        adapter.scopeSchema.validate(opts.scope);
+      } catch (err) {
+        log.error(
+          `Invalid scope: ${err instanceof Error ? err.message : String(err)}\n${adapter.scopeSchema.description}`,
+        );
+        process.exit(1);
+      }
+
+      // Build auth credential
+      const authMode = opts.auth ?? "adc";
+      let authCred: import("engram-core").AuthCredential;
+
+      if (authMode === "bearer") {
+        const token = opts.token ?? process.env.GOOGLE_WORKSPACE_TOKEN;
+        if (!token) {
+          log.error(
+            "Bearer auth requires --token or GOOGLE_WORKSPACE_TOKEN env var.",
+          );
+          process.exit(1);
+        }
+        authCred = { kind: "bearer", token };
+      } else {
+        // ADC — dynamically import google-auth-library (CLI-layer only)
+        let adcToken: string;
+        let refreshFn: (() => Promise<string>) | undefined;
+        try {
+          const { GoogleAuth } = await import("google-auth-library");
+          const gauth = new GoogleAuth({
+            scopes: [
+              "https://www.googleapis.com/auth/documents.readonly",
+              "https://www.googleapis.com/auth/drive.readonly",
+            ],
+          });
+          const client = await gauth.getClient();
+          const tokenResp = await client.getAccessToken();
+          if (!tokenResp.token) {
+            throw new Error("ADC returned an empty token");
+          }
+          adcToken = tokenResp.token;
+          // Provide a refresh callback so the adapter can retry on 401
+          refreshFn = async () => {
+            const t = await client.getAccessToken();
+            if (!t.token)
+              throw new Error("ADC token refresh returned empty token");
+            return t.token;
+          };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          log.error(
+            `Failed to obtain Application Default Credentials: ${msg}\n` +
+              "Run: gcloud auth application-default login",
+          );
+          process.exit(1);
+        }
+        // adcToken is assigned inside the try block above; if we reach here it is defined
+        authCred = {
+          kind: "oauth2",
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+          token: adcToken as string,
+          scopes: [
+            "https://www.googleapis.com/auth/documents.readonly",
+            "https://www.googleapis.com/auth/drive.readonly",
+          ],
+          refresh: refreshFn,
+        };
+      }
+
+      if (opts.verbose) {
+        log.info(`Auth: ${authMode}`);
+      }
+
+      const dbPath = resolveDbPath(path.resolve(opts.db));
+      let graph: import("engram-core").EngramGraph;
+      try {
+        graph = openGraph(dbPath);
+      } catch (err) {
+        log.error(
+          `Cannot open graph: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        process.exit(1);
+        return; // unreachable, satisfies definite assignment
+      }
+
+      const s = spinner();
+      s.start(`Ingesting Google Workspace docs (${opts.scope})`);
+
+      try {
+        const result = await adapter.enrich(graph, {
+          auth: authCred,
+          scope: opts.scope,
+          dryRun: opts.dryRun,
+        });
+        s.stop("Google Workspace ingestion complete");
+        log.info(
+          [
+            `Episodes: ${result.episodesCreated} created, ${result.episodesSkipped} skipped`,
+            `Entities: ${result.entitiesCreated} created`,
+            `Edges:    ${result.edgesCreated} created`,
+          ].join("\n"),
+        );
+      } catch (err) {
+        s.stop("Google Workspace ingestion failed");
+        if (err instanceof EnrichmentAdapterError) {
+          switch (err.code) {
+            case "auth_failure":
+              log.error(
+                "Auth failed. Check your credentials.\n" +
+                  "For ADC: run gcloud auth application-default login\n" +
+                  "For bearer: verify your token is valid",
+              );
+              break;
+            case "rate_limited":
+              log.error(err.message);
+              log.warn("Wait a moment and retry.");
+              break;
+            default:
+              log.error(err.message);
+          }
+        } else {
+          log.error(err instanceof Error ? err.message : String(err));
+        }
+        closeGraph(graph);
+        process.exit(1);
+      }
+
+      closeGraph(graph);
+      if (process.stdout.isTTY) outro("Done");
+    });
 
   registerPluginEnrichSubcommands(enrich);
 }

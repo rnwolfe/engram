@@ -16,6 +16,8 @@ export const INGESTION_SOURCE_TYPES = {
   SOURCE: "source",
   MARKDOWN: "markdown",
   TEXT: "text",
+  /** Google Workspace ingestion (Docs, etc.). */
+  GOOGLE_WORKSPACE: "google_workspace",
 } as const;
 
 export type IngestionSourceType =
@@ -30,6 +32,8 @@ export const EPISODE_SOURCE_TYPES = {
   MANUAL: "manual",
   DOCUMENT: "document",
   SOURCE_FILE: "source",
+  /** A Google Doc revision episode. */
+  GOOGLE_DOC: "google_doc",
 } as const;
 
 export type EpisodeSourceType =
@@ -49,4 +53,5 @@ export const INGESTION_TO_EPISODE_SOURCES = {
   [INGESTION_SOURCE_TYPES.SOURCE]: [EPISODE_SOURCE_TYPES.SOURCE_FILE],
   [INGESTION_SOURCE_TYPES.MARKDOWN]: [EPISODE_SOURCE_TYPES.DOCUMENT],
   [INGESTION_SOURCE_TYPES.TEXT]: [EPISODE_SOURCE_TYPES.MANUAL],
+  [INGESTION_SOURCE_TYPES.GOOGLE_WORKSPACE]: [EPISODE_SOURCE_TYPES.GOOGLE_DOC],
 } as const;
