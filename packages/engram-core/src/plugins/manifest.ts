@@ -198,11 +198,24 @@ export function loadManifest(pluginDir: string): PluginManifest {
         : undefined,
     description:
       typeof obj.description === "string" ? obj.description : undefined,
-    docs:
-      typeof obj.docs === "object" &&
-      obj.docs !== null &&
-      !Array.isArray(obj.docs)
-        ? (obj.docs as PluginDocs)
-        : undefined,
+    docs: (() => {
+      if (
+        typeof obj.docs !== "object" ||
+        obj.docs === null ||
+        Array.isArray(obj.docs)
+      ) {
+        return undefined;
+      }
+      const docsObj = obj.docs as Record<string, unknown>;
+      if (
+        "scope_examples" in docsObj &&
+        !Array.isArray(docsObj.scope_examples)
+      ) {
+        throw new ManifestValidationError(
+          `manifest.json in '${pluginDir}': 'docs.scope_examples' must be an array`,
+        );
+      }
+      return docsObj as PluginDocs;
+    })(),
   };
 }

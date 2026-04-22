@@ -35,9 +35,9 @@ interface PluginDocs {
 }
 ```
 
-All sub-fields are optional. The manifest loader passes `docs` through as-is
-without further validation — only the outer type check (`object`, not array,
-not null) is enforced.
+All sub-fields are optional. The manifest loader validates the outer type
+(`object`, not array, not null) and additionally asserts that `scope_examples`,
+if present, is an array (throws `ManifestValidationError` otherwise).
 
 ---
 
@@ -91,7 +91,7 @@ Renders a formatted info card with:
 ### `plugin install <name>`
 
 After the success message, if `docs.auth_setup` is present in the manifest,
-prints a "Before first use" hint block (word-wrapped at 80 chars).
+prints a "Before first use" hint block (word-wrapped at 78 chars).
 
 ---
 

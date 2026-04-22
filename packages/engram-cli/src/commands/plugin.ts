@@ -69,6 +69,9 @@ function copyDir(src: string, dest: string): void {
 
 /**
  * Word-wrap a string to a given column width. Returns an array of lines.
+ *
+ * Long tokens (e.g. URLs) that exceed `width` are placed on their own line.
+ * We do not split tokens — hyphenation is not implemented.
  */
 function wrapText(text: string, width: number): string[] {
   const words = text.split(/\s+/);
@@ -446,12 +449,25 @@ function registerInfo(plugin: Command): void {
       const root = opts.bundledRoot ?? bundledPluginsRoot();
 
       const discovered = discoverPlugins(projectRoot, root ?? undefined);
-      const pd = discovered.find((p) => p.name === name);
+      let pd = discovered.find((p) => p.name === name);
+
+      // Fall back to bundled plugins (search order: project > user > bundled)
+      if (!pd && root) {
+        const bundled = listBundledPlugins(root);
+        if (bundled.includes(name)) {
+          pd = {
+            name,
+            dir: path.join(root, name),
+            scope: "user",
+            source: "bundled",
+          };
+        }
+      }
 
       if (!pd) {
         process.stderr.write(
           `error: plugin '${name}' not found in any plugin directory\n` +
-            `  Run \`engram plugin list\` to see available plugins.\n`,
+            `  Run \`engram plugin list --available\` to see bundled plugins.\n`,
         );
         process.exitCode = 1;
         return;
