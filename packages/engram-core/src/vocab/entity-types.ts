@@ -19,6 +19,8 @@ export const ENTITY_TYPES = {
   K8S_RESOURCE_KIND: "k8s_resource_kind",
   RBAC_PERMISSION: "rbac_permission",
   BAZEL_TARGET: "bazel_target",
+  /** A document entity (e.g. a Google Doc, a Confluence page). */
+  DOCUMENT: "document",
 } as const;
 
 export type EntityType = (typeof ENTITY_TYPES)[keyof typeof ENTITY_TYPES];

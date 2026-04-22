@@ -25,6 +25,9 @@ export const RELATION_TYPES = {
   RBAC_GRANTS: "rbac_grants",
   // Build graph (from Bazel/Starlark ingestion)
   BUILD_DEPENDS_ON: "build_depends_on",
+  // Document authorship (Google Workspace, Confluence, etc.)
+  AUTHORED: "authored",
+  EDITED: "edited",
 } as const;
 
 export type RelationType = (typeof RELATION_TYPES)[keyof typeof RELATION_TYPES];
