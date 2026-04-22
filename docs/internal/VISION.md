@@ -63,7 +63,7 @@ The `.engram` format, the core engine, and the "money command":
 - **`engram reconcile`**: lint loop that re-evaluates active projections against new substrate state, refreshing or superseding stale ones. The Karpathy-wiki maintenance pass, made temporal.
 - **`engram export wiki`**: materialize projections to a folder of markdown files for direct human reading and git-tracked snapshots.
 - **Stale-knowledge benchmark in EngRAMark**: ground-truth `reconcile` correctness over substrate evolution — author projections at commit X, advance to commit Y, measure how well the system identifies what changed.
-- **Source code ingestion** via tree-sitter — file/module/symbol entities and structural edges for TypeScript, JavaScript, Go, Python, Rust, Java, Ruby, C, C++, C#, and Starlark/BUILD. Kubernetes-operator extras (kubebuilder RBAC markers, controller-runtime watches, K8s manifest CRDs/Roles/RoleBindings) extend the graph beyond syntactic structure.
+- **Source code ingestion** via tree-sitter — file/module/symbol entities and structural edges for TypeScript, JavaScript, Go, Python, Rust, Java, Ruby, C, C++, C#, and Starlark/BUILD. Kubernetes-operator extras (kubebuilder RBAC markers, controller-runtime watches) extend the graph beyond syntactic structure; YAML manifest extraction (CRDs, Roles, RoleBindings) is planned but not yet implemented.
 - Team/tribal knowledge merging with explicit reconciliation
 - EngRAMark against Kubernetes
 - **First-party plugin adapters** — Jira, Linear, GitLab, and Google Docs ship as in-repo plugins (`packages/plugins/<name>/`) loaded via the plugin system. Gerrit has already migrated. See [ADR-008](internal/DECISIONS.md#adr-008----first-party-adapters-ship-as-in-repo-plugins).

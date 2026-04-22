@@ -61,7 +61,7 @@
 - [x] Starlark/BUILD tree-sitter extractor for Bazel dependency graph (#237)
 - [x] Kubebuilder `+kubebuilder:rbac` markers as RBAC permission edges (#238, #247, #249)
 - [x] controller-runtime `SetupWithManager` watches graph extraction (#239)
-- [x] YAML source extractor for Kubernetes CRDs, Roles, RoleBindings (#240)
+- [ ] YAML source extractor for Kubernetes CRDs, Roles, RoleBindings (#240) — issue closed without implementation; needs re-opening if still wanted
 
 #### Plugin system
 
