@@ -11,5 +11,21 @@
       "description": "doc:<id> | docs:<id>,<id>,... | folder:<id>[?recursive=true] | query:<drive-q>",
       "pattern": "^(doc:|docs:|folder:|query:).+"
     }
+  },
+  "description": "Ingest Google Docs as revision-aware episodes",
+  "docs": {
+    "summary": "Ingests Google Docs as revision-aware episodes using the Drive and Docs APIs. Supports ADC and bearer token auth. Folder and query scopes enumerate docs automatically.",
+    "auth_setup": "Run `gcloud auth application-default login --scopes https://www.googleapis.com/auth/documents.readonly,https://www.googleapis.com/auth/drive.readonly` to configure Application Default Credentials.",
+    "scope_examples": [
+      { "scope": "doc:<id>", "description": "Single document by ID" },
+      {
+        "scope": "folder:<id>?recursive=true",
+        "description": "Recursive folder traversal"
+      },
+      {
+        "scope": "query:'me' in owners",
+        "description": "All docs owned by the authenticated user"
+      }
+    ]
   }
 }

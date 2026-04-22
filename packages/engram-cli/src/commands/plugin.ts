@@ -67,6 +67,31 @@ function copyDir(src: string, dest: string): void {
   }
 }
 
+/**
+ * Word-wrap a string to a given column width. Returns an array of lines.
+ *
+ * Long tokens (e.g. URLs) that exceed `width` are placed on their own line.
+ * We do not split tokens — hyphenation is not implemented.
+ */
+function wrapText(text: string, width: number): string[] {
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    if (!word) continue;
+    if (!current) {
+      current = word;
+    } else if (current.length + 1 + word.length <= width) {
+      current += ` ${word}`;
+    } else {
+      lines.push(current);
+      current = word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
 // ---------------------------------------------------------------------------
 // plugin list
 // ---------------------------------------------------------------------------
@@ -134,6 +159,7 @@ function registerList(plugin: Command): void {
         scope: string;
         source: string;
         status: string;
+        description: string;
       }> = [];
 
       for (const pd of discovered) {
@@ -146,6 +172,7 @@ function registerList(plugin: Command): void {
             scope: pd.scope,
             source: pd.source,
             status: "OK",
+            description: manifest.description ?? "",
           });
         } catch (err) {
           rows.push({
@@ -158,6 +185,7 @@ function registerList(plugin: Command): void {
               err instanceof ManifestValidationError
                 ? `FAILED: ${err.message}`
                 : `FAILED: ${err instanceof Error ? err.message : String(err)}`,
+            description: "",
           });
         }
       }
@@ -170,6 +198,7 @@ function registerList(plugin: Command): void {
         "SCOPE",
         "SOURCE",
         "STATUS",
+        "DESCRIPTION",
       ];
       const colWidths = headers.map((h, i) => {
         const key = [
@@ -179,6 +208,7 @@ function registerList(plugin: Command): void {
           "scope",
           "source",
           "status",
+          "description",
         ][i] as keyof (typeof rows)[0];
         return Math.max(h.length, ...rows.map((r) => r[key].length));
       });
@@ -200,6 +230,7 @@ function registerList(plugin: Command): void {
             r.scope,
             r.source,
             r.status,
+            r.description,
           ]),
         ),
       ];
@@ -286,6 +317,19 @@ function registerInstall(plugin: Command): void {
       log.success(
         `Installed plugin '${name}' → ${dest} (${method === "symlink" ? "symlinked" : "copied"})`,
       );
+
+      // Show auth_setup hint if present in the manifest
+      try {
+        const manifest = loadManifest(src);
+        if (manifest.docs?.auth_setup) {
+          const wrapped = wrapText(manifest.docs.auth_setup, 78);
+          log.info(
+            `Before first use:\n${wrapped.map((l) => `    ${l}`).join("\n")}`,
+          );
+        }
+      } catch {
+        // Non-fatal: manifest already validated above, ignore re-read errors
+      }
     });
 }
 
@@ -386,6 +430,113 @@ function registerUninstall(plugin: Command): void {
 }
 
 // ---------------------------------------------------------------------------
+// plugin info
+// ---------------------------------------------------------------------------
+
+interface PluginInfoOpts {
+  project?: string;
+  bundledRoot?: string;
+}
+
+function registerInfo(plugin: Command): void {
+  plugin
+    .command("info <name>")
+    .description("Show detailed information about a discovered plugin")
+    .option("--project <path>", "check project-local plugins too")
+    .option("--bundled-root <path>", "override bundled plugins root (testing)")
+    .action(async (name: string, opts: PluginInfoOpts) => {
+      const projectRoot = path.resolve(opts.project ?? ".");
+      const root = opts.bundledRoot ?? bundledPluginsRoot();
+
+      const discovered = discoverPlugins(projectRoot, root ?? undefined);
+      let pd = discovered.find((p) => p.name === name);
+
+      // Fall back to bundled plugins (search order: project > user > bundled)
+      if (!pd && root) {
+        const bundled = listBundledPlugins(root);
+        if (bundled.includes(name)) {
+          pd = {
+            name,
+            dir: path.join(root, name),
+            scope: "user",
+            source: "bundled",
+          };
+        }
+      }
+
+      if (!pd) {
+        process.stderr.write(
+          `error: plugin '${name}' not found in any plugin directory\n` +
+            `  Run \`engram plugin list --available\` to see bundled plugins.\n`,
+        );
+        process.exitCode = 1;
+        return;
+      }
+
+      let manifest: ReturnType<typeof loadManifest>;
+      try {
+        manifest = loadManifest(pd.dir);
+      } catch (err) {
+        process.stderr.write(
+          `error: failed to load manifest for '${name}': ${err instanceof Error ? err.message : String(err)}\n`,
+        );
+        process.exitCode = 1;
+        return;
+      }
+
+      const caps = manifest.capabilities;
+      const authList = caps.supported_auth.join(", ");
+      const cursor = caps.supports_cursor ? "yes" : "no";
+      const scopePattern = caps.scope_schema.description;
+
+      // Header
+      process.stdout.write(`Plugin: ${manifest.name}  v${manifest.version}\n`);
+      process.stdout.write(`Auth:   ${authList}\n`);
+      process.stdout.write(`Cursor: ${cursor}\n`);
+      process.stdout.write(`Scope:  ${scopePattern}\n`);
+
+      // Overview (docs.summary)
+      if (manifest.docs?.summary) {
+        process.stdout.write(`\nOverview\n`);
+        const lines = wrapText(manifest.docs.summary, 78);
+        for (const line of lines) {
+          process.stdout.write(`  ${line}\n`);
+        }
+      }
+
+      // Auth setup
+      if (manifest.docs?.auth_setup) {
+        process.stdout.write(`\nAuth setup\n`);
+        const lines = wrapText(manifest.docs.auth_setup, 78);
+        for (const line of lines) {
+          process.stdout.write(`  ${line}\n`);
+        }
+      }
+
+      // Scope examples
+      if (
+        manifest.docs?.scope_examples &&
+        manifest.docs.scope_examples.length > 0
+      ) {
+        process.stdout.write(`\nExamples\n`);
+        const maxScope = Math.max(
+          ...manifest.docs.scope_examples.map((e) => e.scope.length),
+        );
+        for (const ex of manifest.docs.scope_examples) {
+          const padded = ex.scope.padEnd(maxScope);
+          process.stdout.write(`  ${padded}   ${ex.description}\n`);
+        }
+      }
+
+      // README path
+      const readmePath = path.join(pd.dir, "README.md");
+      if (fs.existsSync(readmePath)) {
+        process.stdout.write(`\nREADME: ${readmePath}\n`);
+      }
+    });
+}
+
+// ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------
 
@@ -395,4 +546,5 @@ export function registerPlugin(program: Command): void {
   registerList(plugin);
   registerInstall(plugin);
   registerUninstall(plugin);
+  registerInfo(plugin);
 }
