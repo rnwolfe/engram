@@ -6,19 +6,17 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { getCurrentEpisode } from "../../src/graph/episodes.js";
-import type { EngramGraph } from "../../src/index.js";
-import { closeGraph, createGraph, verifyGraph } from "../../src/index.js";
-import { GoogleWorkspaceAdapter } from "../../src/ingest/adapters/google-workspace.js";
-import type {
-  DocsDocument,
-  DocsStructuralElement,
-} from "../../src/ingest/adapters/google-workspace-helpers.js";
+import type { EngramGraph } from "engram-core";
 import {
-  extractDocText,
-  parseScope,
-} from "../../src/ingest/adapters/google-workspace-helpers.js";
-import { EPISODE_SOURCE_TYPES } from "../../src/vocab/index.js";
+  closeGraph,
+  createGraph,
+  EPISODE_SOURCE_TYPES,
+  getCurrentEpisode,
+  verifyGraph,
+} from "engram-core";
+import type { DocsDocument, DocsStructuralElement } from "../src/helpers.js";
+import { extractDocText, parseScope } from "../src/helpers.js";
+import { GoogleWorkspaceAdapter } from "../src/index.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

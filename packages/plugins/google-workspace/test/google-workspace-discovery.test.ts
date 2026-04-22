@@ -6,19 +6,23 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import type { EngramGraph } from "../../src/index.js";
-import { closeGraph, createGraph, verifyGraph } from "../../src/index.js";
-import { GoogleWorkspaceAdapter } from "../../src/ingest/adapters/google-workspace.js";
+import type { EngramGraph } from "engram-core";
+import {
+  closeGraph,
+  createGraph,
+  INGESTION_SOURCE_TYPES,
+  readIsoCursor,
+  verifyGraph,
+} from "engram-core";
 import {
   computeDiscoveryCursor,
   enumerateFolderDocs,
   enumerateQueryDocs,
   parseFolderScope,
-} from "../../src/ingest/adapters/google-workspace-discovery.js";
-import type { DocsDocument } from "../../src/ingest/adapters/google-workspace-helpers.js";
-import { validateScope } from "../../src/ingest/adapters/google-workspace-helpers.js";
-import { readIsoCursor } from "../../src/ingest/cursor.js";
-import { INGESTION_SOURCE_TYPES } from "../../src/vocab/index.js";
+} from "../src/discovery.js";
+import type { DocsDocument } from "../src/helpers.js";
+import { validateScope } from "../src/helpers.js";
+import { GoogleWorkspaceAdapter } from "../src/index.js";
 
 // ---------------------------------------------------------------------------
 // Test fixtures & helpers

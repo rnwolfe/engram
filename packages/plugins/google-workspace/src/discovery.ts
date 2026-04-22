@@ -1,5 +1,8 @@
 /**
- * google-workspace-discovery.ts — Drive discovery helpers for folder and query scopes.
+ * discovery.ts — Drive discovery helpers for folder and query scopes.
+ *
+ * Ported from packages/engram-core/src/ingest/adapters/google-workspace-discovery.ts
+ * into the in-repo plugin package.
  *
  * Provides:
  * - `enumerateFolderDocs()` — list all Google Docs in a Drive folder (flat or recursive BFS)
@@ -16,9 +19,9 @@
  *   new cursor.
  */
 
-import { EnrichmentAdapterError } from "../adapter.js";
-import type { GWFetchFn } from "./google-workspace-helpers.js";
-import { apiGetGW } from "./google-workspace-helpers.js";
+import { EnrichmentAdapterError } from "engram-core";
+import type { GWFetchFn } from "./helpers.js";
+import { apiGetGW } from "./helpers.js";
 
 // ---------------------------------------------------------------------------
 // Drive API types (only fields we use)

@@ -1,0 +1,15 @@
+{
+  "name": "google-workspace",
+  "version": "0.1.0",
+  "contract_version": 1,
+  "transport": "js-module",
+  "entry": "src/index.ts",
+  "capabilities": {
+    "supported_auth": ["oauth2", "bearer"],
+    "supports_cursor": true,
+    "scope_schema": {
+      "description": "doc:<id> | docs:<id>,<id>,... | folder:<id>[?recursive=true] | query:<drive-q>",
+      "pattern": "^(doc:|docs:|folder:|query:).+"
+    }
+  }
+}
