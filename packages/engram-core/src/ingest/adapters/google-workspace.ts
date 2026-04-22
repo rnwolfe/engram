@@ -42,14 +42,21 @@ import {
   assertAuthKind,
   EnrichmentAdapterError,
 } from "../adapter.js";
-import { writeCursor } from "../cursor.js";
+import { readIsoCursor, writeCursor } from "../cursor.js";
 import type { IngestResult } from "../git.js";
+import {
+  computeDiscoveryCursor,
+  enumerateFolderDocs,
+  enumerateQueryDocs,
+  parseFolderScope,
+} from "./google-workspace-discovery.js";
 import type { GWFetchFn } from "./google-workspace-helpers.js";
 import {
   extractDocText,
   fetchDoc,
   fetchDriveMeta,
   parseScope,
+  validateScope,
 } from "./google-workspace-helpers.js";
 
 // ---------------------------------------------------------------------------
@@ -58,14 +65,22 @@ import {
 
 /**
  * ScopeSchema for the Google Workspace adapter.
- * Accepts 'doc:<id>' or 'docs:<id>,<id>,...'.
+ *
+ * Accepted formats:
+ *   doc:<id>                     — single document
+ *   docs:<id>,<id>,...          — comma-separated list
+ *   folder:<id>                  — all docs in a Drive folder (flat)
+ *   folder:<id>?recursive=true  — all docs in a folder tree (BFS)
+ *   query:<drive-q>             — arbitrary Drive search query
  */
 export const googleWorkspaceScopeSchema: ScopeSchema = {
   description:
-    "Google Workspace scope. Use 'doc:<docId>' for a single document or 'docs:<id>,<id>,...' for multiple.",
+    "Google Workspace scope. " +
+    "Use 'doc:<id>' for a single document, 'docs:<id>,<id>,...' for multiple, " +
+    "'folder:<id>' (or 'folder:<id>?recursive=true') for folder enumeration, " +
+    "or 'query:<drive-q>' for a Drive search.",
   validate(scope: string): void {
-    // Delegate to the helper — it throws on invalid input
-    parseScope(scope);
+    validateScope(scope);
   },
 };
 
@@ -175,8 +190,6 @@ export class GoogleWorkspaceAdapter implements EnrichmentAdapter {
 
     googleWorkspaceScopeSchema.validate(scope);
 
-    const docIds = parseScope(scope);
-
     // Resolve token from auth credential
     const auth = opts.auth;
     let token: string | undefined;
@@ -210,23 +223,38 @@ export class GoogleWorkspaceAdapter implements EnrichmentAdapter {
     };
 
     try {
-      for (const docId of docIds) {
-        await this.ingestDoc(
+      // Discovery scopes (folder:, query:) need Drive enumeration first
+      if (scope.startsWith("folder:") || scope.startsWith("query:")) {
+        await this.enrichDiscovery(
           graph,
-          docId,
+          scope,
           token,
           refreshFn,
+          runId,
           counts,
           opts.dryRun,
         );
-      }
+      } else {
+        // Explicit doc / docs scopes
+        const docIds = parseScope(scope);
+        for (const docId of docIds) {
+          await this.ingestDoc(
+            graph,
+            docId,
+            token,
+            refreshFn,
+            counts,
+            opts.dryRun,
+          );
+        }
 
-      if (!opts.dryRun && run) {
-        completeIngestionRun(graph, runId, null, {
-          episodes: counts.episodesCreated,
-          entities: counts.entitiesCreated,
-          edges: counts.edgesCreated,
-        });
+        if (!opts.dryRun && run) {
+          completeIngestionRun(graph, runId, null, {
+            episodes: counts.episodesCreated,
+            entities: counts.entitiesCreated,
+            edges: counts.edgesCreated,
+          });
+        }
       }
 
       return { ...counts, runId };
@@ -236,6 +264,101 @@ export class GoogleWorkspaceAdapter implements EnrichmentAdapter {
         failIngestionRun(graph, runId, msg);
       }
       throw err;
+    }
+  }
+
+  /**
+   * Handle folder:<id> and query:<q> discovery scopes.
+   * Enumerates docs via Drive API, fans out to ingestDoc, and stores cursor.
+   */
+  private async enrichDiscovery(
+    graph: EngramGraph,
+    scope: string,
+    token: string,
+    refreshFn: (() => Promise<string>) | undefined,
+    runId: string,
+    counts: {
+      episodesCreated: number;
+      episodesSkipped: number;
+      entitiesCreated: number;
+      entitiesResolved: number;
+      edgesCreated: number;
+      edgesSuperseded: number;
+      episodeIds: string[];
+    },
+    dryRun?: boolean,
+  ): Promise<void> {
+    // Read cursor from last successful run for this scope
+    const since = readIsoCursor(graph, INGESTION_SOURCE, scope);
+
+    // Enumerate docs from Drive
+    let discoveredDocs: import("./google-workspace-discovery.js").DriveFileItem[];
+
+    if (scope.startsWith("folder:")) {
+      const { folderId, recursive } = parseFolderScope(scope);
+      discoveredDocs = await enumerateFolderDocs(
+        this.fetchFn,
+        token,
+        folderId,
+        recursive,
+        since,
+      );
+    } else {
+      // query: scope
+      const userQuery = scope.slice("query:".length).trim();
+      discoveredDocs = await enumerateQueryDocs(
+        this.fetchFn,
+        token,
+        userQuery,
+        since,
+      );
+    }
+
+    if (dryRun) {
+      const docIds = discoveredDocs.map((d) => d.id);
+      process.stderr.write(
+        `[dry-run] google-workspace: scope '${scope}' would ingest ${docIds.length} doc(s): ${docIds.slice(0, 5).join(", ")}${docIds.length > 5 ? ` ... and ${docIds.length - 5} more` : ""}\n`,
+      );
+      counts.episodesSkipped += docIds.length;
+      return;
+    }
+
+    // Fan out: ingest each discovered doc
+    for (const driveItem of discoveredDocs) {
+      try {
+        await this.ingestDoc(
+          graph,
+          driveItem.id,
+          token,
+          refreshFn,
+          counts,
+          false,
+        );
+      } catch (err) {
+        if (
+          err instanceof EnrichmentAdapterError &&
+          err.code === "data_error"
+        ) {
+          // Individual doc 404 or similar: log and continue
+          process.stderr.write(
+            `google-workspace: skipping doc ${driveItem.id}: ${err.message}\n`,
+          );
+          counts.episodesSkipped++;
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    // Compute and store cursor (max modifiedTime seen in this batch)
+    const newCursor = computeDiscoveryCursor(discoveredDocs);
+
+    if (runId) {
+      completeIngestionRun(graph, runId, newCursor, {
+        episodes: counts.episodesCreated,
+        entities: counts.entitiesCreated,
+        edges: counts.edgesCreated,
+      });
     }
   }
 
