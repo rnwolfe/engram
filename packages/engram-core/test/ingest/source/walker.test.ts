@@ -240,4 +240,183 @@ describe("walk()", () => {
       expect(paths).not.toContain("yarn.lock");
     });
   });
+
+  describe("expanded DENY_DIRS — vendor/generated heuristics", () => {
+    let tmpDir: string;
+
+    beforeEach(() => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "engram-walker-vendor-"));
+    });
+
+    afterEach(() => {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    function makeFile(relPath: string, content = "export const x = 1;"): void {
+      const abs = path.join(tmpDir, relPath);
+      fs.mkdirSync(path.dirname(abs), { recursive: true });
+      fs.writeFileSync(abs, content);
+    }
+
+    const newDenyDirs = [
+      "vendor",
+      "third_party",
+      "_vendor",
+      "extern",
+      "generated",
+      "gen",
+      "pb",
+      "proto_gen",
+      "testdata",
+    ];
+
+    for (const dir of newDenyDirs) {
+      it(`never yields files inside ${dir}/ at repo root`, async () => {
+        makeFile(`${dir}/index.ts`);
+        makeFile("src/index.ts");
+        const paths = await collectPaths({ root: tmpDir });
+        expect(paths.some((p) => p.startsWith(`${dir}/`))).toBe(false);
+        expect(paths).toContain("src/index.ts");
+      });
+    }
+
+    it("never yields vendor/ even with respectGitignore: false", async () => {
+      makeFile("vendor/dep.ts");
+      makeFile("src/main.ts");
+      const paths = await collectPaths({
+        root: tmpDir,
+        respectGitignore: false,
+      });
+      expect(paths.some((p) => p.startsWith("vendor/"))).toBe(false);
+      expect(paths).toContain("src/main.ts");
+    });
+
+    it("never yields testdata/ nested inside src/", async () => {
+      makeFile("src/testdata/fixture.ts");
+      makeFile("src/main.ts");
+      const paths = await collectPaths({ root: tmpDir });
+      expect(paths.some((p) => p.includes("testdata/"))).toBe(false);
+      expect(paths).toContain("src/main.ts");
+    });
+  });
+
+  describe(".engramignore support", () => {
+    let tmpDir: string;
+
+    beforeEach(() => {
+      tmpDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), "engram-walker-engramignore-"),
+      );
+    });
+
+    afterEach(() => {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    function makeFile(relPath: string, content = "export const x = 1;"): void {
+      const abs = path.join(tmpDir, relPath);
+      fs.mkdirSync(path.dirname(abs), { recursive: true });
+      fs.writeFileSync(abs, content);
+    }
+
+    function writeEngramignore(dirRelPath: string, content: string): void {
+      const abs = path.join(tmpDir, dirRelPath, ".engramignore");
+      fs.mkdirSync(path.dirname(abs), { recursive: true });
+      fs.writeFileSync(abs, content);
+    }
+
+    it("root .engramignore pattern excludes matching files", async () => {
+      // Use 'proto/output' — neither 'proto' nor 'output' is a DENY_DIR
+      makeFile("proto/output/foo.pb.ts");
+      makeFile("src/main.ts");
+      writeEngramignore("", "proto/output/\n");
+
+      const paths = await collectPaths({ root: tmpDir });
+      expect(paths.some((p) => p.startsWith("proto/output/"))).toBe(false);
+      expect(paths).toContain("src/main.ts");
+    });
+
+    it("subdirectory .engramignore excludes paths relative to that subdirectory", async () => {
+      makeFile("src/auto/generated.ts");
+      makeFile("src/main.ts");
+      writeEngramignore("src", "auto/\n");
+
+      const paths = await collectPaths({ root: tmpDir });
+      expect(paths).not.toContain("src/auto/generated.ts");
+      expect(paths).toContain("src/main.ts");
+    });
+
+    it("negation pattern in .engramignore re-includes a file excluded by broader pattern", async () => {
+      // Use 'proto/output' — neither 'proto' nor 'output' is a DENY_DIR
+      // Note: per gitignore semantics, negating a file inside a dir-excluded path
+      // does not work. Instead we use a glob pattern (*.pb.ts) and negate the specific file.
+      makeFile("proto/output/all.pb.ts");
+      makeFile("proto/output/custom.ts"); // .pb extension omitted — re-included by negation
+      makeFile("proto/output/other.pb.ts");
+      makeFile("src/main.ts");
+      // Exclude *.pb.ts files in proto/output but re-include custom.ts
+      writeEngramignore("", "proto/output/*.pb.ts\n!proto/output/custom.ts\n");
+
+      const paths = await collectPaths({ root: tmpDir });
+      expect(paths).not.toContain("proto/output/all.pb.ts");
+      expect(paths).not.toContain("proto/output/other.pb.ts");
+      expect(paths).toContain("proto/output/custom.ts");
+      expect(paths).toContain("src/main.ts");
+    });
+
+    it("respectEngramignore: false bypasses .engramignore but keeps denylist", async () => {
+      // Use 'proto/output' — neither 'proto' nor 'output' is a DENY_DIR
+      makeFile("proto/output/all.pb.ts");
+      makeFile("src/main.ts");
+      // Also make sure denylist (vendor) is still excluded
+      makeFile("vendor/dep.ts");
+      writeEngramignore("", "proto/output/\n");
+
+      const paths = await collectPaths({
+        root: tmpDir,
+        respectEngramignore: false,
+      });
+      // .engramignore is bypassed — proto/output/ files come through
+      expect(paths).toContain("proto/output/all.pb.ts");
+      expect(paths).toContain("src/main.ts");
+      // denylist still applies
+      expect(paths.some((p) => p.startsWith("vendor/"))).toBe(false);
+    });
+
+    it(".engramignore file itself is never yielded as a FileEntry", async () => {
+      makeFile("src/main.ts");
+      writeEngramignore("", "# empty\n");
+
+      const paths = await collectPaths({ root: tmpDir });
+      expect(paths.some((p) => p.endsWith(".engramignore"))).toBe(false);
+      expect(paths).toContain("src/main.ts");
+    });
+
+    it("walker checks .engramignore at each directory level (chain traversal)", async () => {
+      // Root ignores nothing; subdirectory ignores deep.ts
+      makeFile("src/deep/deep.ts");
+      makeFile("src/main.ts");
+      writeEngramignore("src", "deep/\n");
+
+      const paths = await collectPaths({ root: tmpDir });
+      expect(paths).not.toContain("src/deep/deep.ts");
+      expect(paths).toContain("src/main.ts");
+    });
+
+    it(".engramignore exclusion is independent of .gitignore (both checked)", async () => {
+      makeFile("src/gitignored.ts");
+      makeFile("src/engramignored.ts");
+      makeFile("src/main.ts");
+
+      // .gitignore excludes gitignored.ts
+      fs.writeFileSync(path.join(tmpDir, ".gitignore"), "src/gitignored.ts\n");
+      // .engramignore excludes engramignored.ts
+      writeEngramignore("", "src/engramignored.ts\n");
+
+      const paths = await collectPaths({ root: tmpDir });
+      expect(paths).not.toContain("src/gitignored.ts");
+      expect(paths).not.toContain("src/engramignored.ts");
+      expect(paths).toContain("src/main.ts");
+    });
+  });
 });

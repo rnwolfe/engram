@@ -16,6 +16,7 @@ export interface WalkOptions {
   root: string;
   exclude?: string[];
   respectGitignore?: boolean; // default true
+  respectEngramignore?: boolean; // default true
   maxFileBytes?: number; // default 1_048_576
 }
 
@@ -27,6 +28,18 @@ const DENY_DIRS = new Set([
   "out",
   "target",
   "coverage",
+  // vendor / third-party
+  "vendor",
+  "third_party",
+  "_vendor",
+  "extern",
+  // generated / proto output
+  "generated",
+  "gen",
+  "pb",
+  "proto_gen",
+  // test fixtures
+  "testdata",
 ]);
 
 /** File glob patterns that are always excluded */
@@ -49,6 +62,7 @@ const DENY_FILE_PATTERNS = [
   /^\.gitignore$/,
   /^\.gitattributes$/,
   /^\.gitmodules$/,
+  /^\.engramignore$/,
 ];
 
 const DEFAULT_MAX_FILE_BYTES = 1_048_576; // 1MB
@@ -89,6 +103,21 @@ function loadGitignore(dirPath: string): Ignore | null {
 }
 
 /**
+ * Load .engramignore file and return an `ignore` instance, or null if not found.
+ */
+function loadEngramignore(dirPath: string): Ignore | null {
+  const engramignorePath = path.join(dirPath, ".engramignore");
+  try {
+    const content = fs.readFileSync(engramignorePath, "utf8");
+    const ig = ignore();
+    ig.add(content);
+    return ig;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Walk a directory tree, yielding FileEntry objects for each ingestable file.
  */
 export async function* walk(opts: WalkOptions): AsyncIterable<FileEntry> {
@@ -96,6 +125,7 @@ export async function* walk(opts: WalkOptions): AsyncIterable<FileEntry> {
     root,
     exclude = [],
     respectGitignore = true,
+    respectEngramignore = true,
     maxFileBytes = DEFAULT_MAX_FILE_BYTES,
   } = opts;
 
@@ -112,6 +142,8 @@ export async function* walk(opts: WalkOptions): AsyncIterable<FileEntry> {
 
   // gitignore instances per directory path (keyed by absPath)
   const gitignoreCache = new Map<string, Ignore | null>();
+  // engramignore instances per directory path (keyed by absPath)
+  const engramignoreCache = new Map<string, Ignore | null>();
 
   function getGitignore(dirPath: string): Ignore | null {
     const cached = gitignoreCache.get(dirPath);
@@ -120,6 +152,16 @@ export async function* walk(opts: WalkOptions): AsyncIterable<FileEntry> {
     }
     const ig = respectGitignore ? loadGitignore(dirPath) : null;
     gitignoreCache.set(dirPath, ig);
+    return ig;
+  }
+
+  function getEngramignore(dirPath: string): Ignore | null {
+    const cached = engramignoreCache.get(dirPath);
+    if (cached !== undefined) {
+      return cached;
+    }
+    const ig = respectEngramignore ? loadEngramignore(dirPath) : null;
+    engramignoreCache.set(dirPath, ig);
     return ig;
   }
 
@@ -140,6 +182,42 @@ export async function* walk(opts: WalkOptions): AsyncIterable<FileEntry> {
       const ig = getGitignore(dirAbsPath);
       if (ig) {
         // Check relative to this directory
+        const relToDir = parts.slice(depth).join("/");
+        if (ig.ignores(relToDir)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Check if a path (relative to root, posix) is ignored by any .engramignore
+   * in the chain from root to the file's parent directory.
+   *
+   * Precedence: denylist (hard floor) → .engramignore → .gitignore → user excludes
+   *
+   * A negation in .engramignore can re-include a path excluded by .gitignore
+   * because .engramignore is checked independently. The caller applies both
+   * checks; if .engramignore explicitly negates a pattern it was not excluded
+   * by .engramignore (returns false here), so the file is included even if
+   * .gitignore would exclude it.
+   *
+   * Implementation note: the `ignore` library's `ignores()` returns false for
+   * paths that match a negation pattern (i.e. the path is not ignored). We
+   * therefore use `ignores()` directly — a negation re-includes automatically.
+   */
+  function isEngramignored(relPosix: string): boolean {
+    if (!respectEngramignore) return false;
+
+    const parts = relPosix.split("/");
+
+    for (let depth = 0; depth < parts.length; depth++) {
+      const dirRelParts = parts.slice(0, depth);
+      const dirAbsPath =
+        dirRelParts.length === 0 ? absRoot : path.join(absRoot, ...dirRelParts);
+      const ig = getEngramignore(dirAbsPath);
+      if (ig) {
         const relToDir = parts.slice(depth).join("/");
         if (ig.ignores(relToDir)) {
           return true;
@@ -180,7 +258,7 @@ export async function* walk(opts: WalkOptions): AsyncIterable<FileEntry> {
       }
 
       if (stat.isDirectory()) {
-        // Apply denylist for directories (always enforced)
+        // Apply denylist for directories (always enforced — hard floor)
         if (isDeniedDir(entryName)) {
           continue;
         }
@@ -196,6 +274,13 @@ export async function* walk(opts: WalkOptions): AsyncIterable<FileEntry> {
 
         // Apply root user excludes
         if (exclude.length > 0 && rootUserIg.ignores(relPosix)) {
+          continue;
+        }
+
+        // Apply .engramignore chain
+        // Checked before .gitignore so that a negation in .engramignore can
+        // re-include a path that .gitignore would otherwise exclude.
+        if (respectEngramignore && isEngramignored(relPosix)) {
           continue;
         }
 

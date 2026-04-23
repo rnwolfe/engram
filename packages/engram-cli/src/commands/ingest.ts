@@ -54,6 +54,7 @@ interface IngestMdOpts {
 interface IngestSourceOpts {
   exclude?: string[];
   gitignore: boolean;
+  engramignore: boolean;
   dryRun?: boolean;
   verbose?: boolean;
   db: string;
@@ -239,6 +240,17 @@ Examples:
   # Verbose per-file output
   engram ingest source --verbose
 
+Exclusion precedence (highest to lowest):
+  1. Built-in denylist dirs (node_modules, vendor, generated, testdata, …)
+  2. .engramignore  — per-directory ignore file (gitignore glob syntax).
+     Place a .engramignore at the repo root or any subdirectory.
+     Supports negation patterns to re-include paths:
+       proto/gen/        # exclude everything under proto/gen/
+       !proto/gen/custom.ts  # …except this one file
+     Use --no-engramignore to bypass .engramignore (denylist still applies).
+  3. .gitignore      — use --no-gitignore to bypass
+  4. --exclude flags
+
 When to use:
   Run after engram ingest git to add symbol-level entities (functions,
   classes, modules) for code navigation queries.
@@ -255,6 +267,10 @@ See also:
     .option(
       "--no-gitignore",
       "skip .gitignore application (denylist still applies)",
+    )
+    .option(
+      "--no-engramignore",
+      "skip .engramignore application (denylist still applies)",
     )
     .option("--dry-run", "walk and report counts without writing")
     .option("-v, --verbose", "emit per-file progress output")
@@ -318,6 +334,7 @@ See also:
           root: resolvedSource,
           exclude: opts.exclude?.length ? opts.exclude : undefined,
           respectGitignore: opts.gitignore,
+          respectEngramignore: opts.engramignore,
           dryRun: opts.dryRun,
           onProgress,
         });
