@@ -12,13 +12,14 @@
  */
 
 export class InvalidAsOfError extends Error {
-  constructor(received: string) {
+  constructor(received: string, message?: string) {
     super(
-      `--as-of: cannot parse "${received}". ` +
-        "Accepted forms: ISO8601 UTC (e.g. 2026-01-15T14:22:00Z), " +
-        "bare date (2026-01-15), " +
-        "or relative string (yesterday, last week, last month, last year, " +
-        "<N> seconds|minutes|hours|days|weeks|months|years ago).",
+      message ??
+        `--as-of: cannot parse "${received}". ` +
+          "Accepted forms: ISO8601 UTC (e.g. 2026-01-15T14:22:00Z), " +
+          "bare date (2026-01-15), " +
+          "or relative string (yesterday, last week, last month, last year, " +
+          "<N> seconds|minutes|hours|days|weeks|months|years ago).",
     );
     this.name = "InvalidAsOfError";
   }
@@ -104,13 +105,11 @@ export function resolveAsOf(
   }
 
   // --- ISO8601 with explicit time and timezone ---
-  // Accept anything the Date constructor can parse with a Z or +offset suffix.
-  // Require the raw (trimmed) input to contain a T and a timezone marker.
+  // Only accept datetimes with an explicit Z or +/-offset suffix (UTC required).
+  // Timezone-naive datetime strings (e.g. "2026-01-15T14:22") are rejected —
+  // new Date() would silently interpret them in local time, not UTC.
   const rawTrimmed = input.trim();
-  if (
-    /T.*(\+|-|\d{2}Z|Z)/.test(rawTrimmed) ||
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(rawTrimmed)
-  ) {
+  if (/T.*(\+|-|\d{2}Z|Z)/.test(rawTrimmed)) {
     const resolved = new Date(rawTrimmed);
     if (!Number.isNaN(resolved.getTime())) {
       assertNotFuture(resolved, now, input);
@@ -123,6 +122,9 @@ export function resolveAsOf(
 
 function assertNotFuture(resolved: Date, now: Date, input: string): void {
   if (resolved.getTime() > now.getTime()) {
-    throw new Error(`--as-of cannot be in the future (received: "${input}")`);
+    throw new InvalidAsOfError(
+      input,
+      `--as-of cannot be in the future (received: "${input}")`,
+    );
   }
 }
