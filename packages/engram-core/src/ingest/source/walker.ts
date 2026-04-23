@@ -195,17 +195,17 @@ export async function* walk(opts: WalkOptions): AsyncIterable<FileEntry> {
    * Check if a path (relative to root, posix) is ignored by any .engramignore
    * in the chain from root to the file's parent directory.
    *
-   * Precedence: denylist (hard floor) → .engramignore → .gitignore → user excludes
-   *
-   * A negation in .engramignore can re-include a path excluded by .gitignore
-   * because .engramignore is checked independently. The caller applies both
-   * checks; if .engramignore explicitly negates a pattern it was not excluded
-   * by .engramignore (returns false here), so the file is included even if
-   * .gitignore would exclude it.
+   * .engramignore and .gitignore are independent sequential filters — each is
+   * checked separately and a file must pass both to be included. Negation
+   * patterns in .engramignore only work within .engramignore itself (e.g.
+   * `*.pb.ts` followed by `!custom.ts` in the same file). They cannot
+   * re-include a path that .gitignore has excluded, because .gitignore is a
+   * separate gate applied after .engramignore.
    *
    * Implementation note: the `ignore` library's `ignores()` returns false for
    * paths that match a negation pattern (i.e. the path is not ignored). We
-   * therefore use `ignores()` directly — a negation re-includes automatically.
+   * therefore use `ignores()` directly — a negation re-includes automatically
+   * within the scope of .engramignore.
    */
   function isEngramignored(relPosix: string): boolean {
     if (!respectEngramignore) return false;
@@ -277,9 +277,8 @@ export async function* walk(opts: WalkOptions): AsyncIterable<FileEntry> {
           continue;
         }
 
-        // Apply .engramignore chain
-        // Checked before .gitignore so that a negation in .engramignore can
-        // re-include a path that .gitignore would otherwise exclude.
+        // Apply .engramignore chain (independent of .gitignore — negation only
+        // works within .engramignore itself, not across the .gitignore gate)
         if (respectEngramignore && isEngramignored(relPosix)) {
           continue;
         }

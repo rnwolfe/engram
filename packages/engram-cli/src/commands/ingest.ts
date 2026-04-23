@@ -242,14 +242,16 @@ Examples:
 
 Exclusion precedence (highest to lowest):
   1. Built-in denylist dirs (node_modules, vendor, generated, testdata, …)
-  2. .engramignore  — per-directory ignore file (gitignore glob syntax).
+  2. --exclude flags
+  3. .engramignore  — per-directory ignore file (gitignore glob syntax).
      Place a .engramignore at the repo root or any subdirectory.
-     Supports negation patterns to re-include paths:
+     Supports negation patterns to re-include paths excluded by .engramignore:
        proto/gen/        # exclude everything under proto/gen/
        !proto/gen/custom.ts  # …except this one file
+     Note: negation only works within .engramignore itself — it cannot
+     re-include a path that .gitignore has excluded (they are independent gates).
      Use --no-engramignore to bypass .engramignore (denylist still applies).
-  3. .gitignore      — use --no-gitignore to bypass
-  4. --exclude flags
+  4. .gitignore      — use --no-gitignore to bypass
 
 When to use:
   Run after engram ingest git to add symbol-level entities (functions,
