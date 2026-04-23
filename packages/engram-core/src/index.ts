@@ -227,9 +227,21 @@ export type {
   SyncSource,
 } from "./sync/types.js";
 export { resolveSyncAuth } from "./sync/types.js";
-export type { ResolvedAsOf, TemporalSnapshot } from "./temporal/index.js";
+export type {
+  DecisionReversal,
+  DiffEdgeEntry,
+  DiffEdges,
+  DiffOpts,
+  DiffProjectionEntry,
+  DiffProjections,
+  GraphDiff,
+  OwnershipShift,
+  ResolvedAsOf,
+  TemporalSnapshot,
+} from "./temporal/index.js";
 export {
   checkActiveEdgeConflict,
+  diffGraph,
   getFactHistory,
   getSnapshot,
   InvalidAsOfError,
