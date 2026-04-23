@@ -262,12 +262,25 @@ export function diffGraph(
     }
   }
 
-  // Apply projection kind filter
+  // Apply projection kind + entity anchor filters (AND-semantics)
   const filterProjections = (
     entries: DiffProjectionEntry[],
   ): DiffProjectionEntry[] => {
-    if (!opts.projectionKind) return entries;
-    return entries.filter((e) => e.projection.kind === opts.projectionKind);
+    return entries.filter((e) => {
+      if (opts.projectionKind && e.projection.kind !== opts.projectionKind) {
+        return false;
+      }
+      if (opts.entityId) {
+        // Only include projections anchored on the requested entity
+        if (
+          e.projection.anchor_type !== "entity" ||
+          e.projection.anchor_id !== opts.entityId
+        ) {
+          return false;
+        }
+      }
+      return true;
+    });
   };
 
   // ── Ownership shifts ────────────────────────────────────────────────────────
@@ -343,7 +356,7 @@ export function diffGraph(
       invalidated: applyEdgeFilters(invalidated),
       superseded: applyEdgeFilters(superseded),
       unchanged: applyEdgeFilters(unchanged),
-      transient: applyEdgeFilters(transient),
+      transient: opts.includeTransient ? applyEdgeFilters(transient) : [],
     },
     projections: {
       created: filterProjections(projCreated),

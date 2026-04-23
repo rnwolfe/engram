@@ -302,13 +302,10 @@ function renderMarkdownOutput(
 }
 
 function buildCitationArray(entry: DiffEdgeEntry | DiffProjectionEntry) {
-  // Citations reference the edge/projection ID as the "episode" anchor
-  // Full evidence resolution would require additional DB lookups; we provide
-  // the structural ID here for reference.
   if ("edge" in entry) {
-    return [{ episode_id: entry.edge.id, source_type: "edge" }];
+    return [{ edge_id: entry.edge.id, source_type: "edge" }];
   }
-  return [{ episode_id: entry.projection.id, source_type: "projection" }];
+  return [{ projection_id: entry.projection.id, source_type: "projection" }];
 }
 
 function renderJsonOutput(

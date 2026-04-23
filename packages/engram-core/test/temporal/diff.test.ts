@@ -261,7 +261,7 @@ describe("diffGraph — transient edges", () => {
       [{ episode_id: ep2.id, extractor: "test" }],
     );
 
-    const diff = diffGraph(graph, tsA, tsB);
+    const diff = diffGraph(graph, tsA, tsB, { includeTransient: true });
 
     // The transient edge (added and superseded between A and B) should be in transient
     expect(diff.edges.transient).toHaveLength(1);
