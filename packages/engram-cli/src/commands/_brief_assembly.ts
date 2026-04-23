@@ -4,6 +4,7 @@
 
 import type { EngramGraph } from "engram-core";
 import {
+  ENTITY_TYPES,
   EPISODE_SOURCE_TYPES,
   getEntity,
   listActiveProjections,
@@ -16,11 +17,8 @@ import {
   searchEntitiesFts,
 } from "./_retrieval.js";
 
-// ---------------------------------------------------------------------------
-// Episode row helpers
-// ---------------------------------------------------------------------------
-
 const EXCERPT_MAX = 400;
+const FILE_ENTITY_TYPES = new Set([ENTITY_TYPES.FILE, ENTITY_TYPES.MODULE]);
 
 function excerptContent(content: string): string {
   const trimmed = content.trim();
@@ -38,20 +36,30 @@ interface EpisodeRow {
   content: string;
 }
 
-function fetchEpisodeBySourceRef(
+/**
+ * Fetch a GitHub PR or issue episode by PR/issue number.
+ * The GitHub adapter stores source_ref as the html_url (e.g. https://github.com/org/repo/pull/42).
+ * We match on exact number, #-prefixed number, and URL suffix patterns.
+ */
+function fetchEpisodeByRef(
   graph: EngramGraph,
   sourceType: string,
-  sourceRef: string,
+  ref: string,
 ): EpisodeRow | null {
-  for (const ref of [sourceRef, `#${sourceRef}`]) {
+  // Determine URL path segment based on source type
+  const urlSegment =
+    sourceType === EPISODE_SOURCE_TYPES.GITHUB_PR ? "pull" : "issues";
+
+  for (const candidate of [ref, `#${ref}`, `%/${urlSegment}/${ref}`]) {
+    const op = candidate.includes("%") ? "LIKE" : "=";
     const row = graph.db
       .query<EpisodeRow, [string, string]>(
         `SELECT id, source_type, source_ref, actor, timestamp, content
          FROM episodes
-         WHERE source_type = ? AND source_ref = ? AND status = 'active'
+         WHERE source_type = ? AND source_ref ${op} ? AND status = 'active'
          LIMIT 1`,
       )
-      .get(sourceType, ref);
+      .get(sourceType, candidate);
     if (row) return row;
   }
   return null;
@@ -67,10 +75,6 @@ function toCitedEpisode(row: EpisodeRow): CitedEpisode {
     excerpt: excerptContent(row.content),
   };
 }
-
-// ---------------------------------------------------------------------------
-// Entity / projection DB helpers
-// ---------------------------------------------------------------------------
 
 interface EntityLinkRow {
   id: string;
@@ -88,8 +92,7 @@ function getEpisodeLinkedEntities(
         `SELECT e.id, e.canonical_name, e.entity_type
          FROM entity_evidence ee
          JOIN entities e ON e.id = ee.entity_id
-         WHERE ee.episode_id = ?
-           AND e.status = 'active'
+         WHERE ee.episode_id = ? AND e.status = 'active'
          ORDER BY e.entity_type, e.canonical_name`,
       )
       .all(episodeId);
@@ -128,6 +131,29 @@ function getProjectionsOverlappingEntities(
   }
 }
 
+/** Build a stale lookup map from a single listActiveProjections scan. */
+function buildStaleMap(graph: EngramGraph): Map<string, boolean> {
+  const map = new Map<string, boolean>();
+  for (const r of listActiveProjections(graph, {})) {
+    map.set(r.projection.id, r.stale);
+  }
+  return map;
+}
+
+const EMPTY_BRIEF = (
+  target: string,
+  kind: BriefDigest["target_kind"],
+): BriefDigest => ({
+  target,
+  target_kind: kind,
+  who: [],
+  history: [],
+  connections: [],
+  risk: [],
+  introducing_episode: null,
+  truncated: false,
+});
+
 // ---------------------------------------------------------------------------
 // Assembly — PR mode
 // ---------------------------------------------------------------------------
@@ -136,25 +162,13 @@ export async function assemblePrDigest(
   graph: EngramGraph,
   prRef: string,
 ): Promise<BriefDigest> {
-  const episodeRow = fetchEpisodeBySourceRef(
+  const episodeRow = fetchEpisodeByRef(
     graph,
     EPISODE_SOURCE_TYPES.GITHUB_PR,
     prRef,
   );
-
-  if (!episodeRow) {
-    return {
-      target: `pr:${prRef}`,
-      target_kind: "pr",
-      touched_files: [],
-      who: [],
-      history: [],
-      connections: [],
-      risk: [],
-      introducing_episode: null,
-      truncated: false,
-    };
-  }
+  if (!episodeRow)
+    return { ...EMPTY_BRIEF(`pr:${prRef}`, "pr"), touched_files: [] };
 
   const introducingEpisode = toCitedEpisode(episodeRow);
   const prTitle = episodeRow.content.split("\n")[0]?.trim() || `PR #${prRef}`;
@@ -165,11 +179,8 @@ export async function assemblePrDigest(
   else if (contentLower.includes("closed")) prStatus = "closed";
 
   const linkedEntities = getEpisodeLinkedEntities(graph, episodeRow.id);
-  const fileEntities = linkedEntities.filter(
-    (e) =>
-      e.entity_type === "file" ||
-      e.entity_type === "source_file" ||
-      e.entity_type === "module",
+  const fileEntities = linkedEntities.filter((e) =>
+    FILE_ENTITY_TYPES.has(e.entity_type as never),
   );
   const touchedFiles = fileEntities.map((e) => e.canonical_name);
   const fileEntityIds = fileEntities.map((e) => e.id);
@@ -233,6 +244,7 @@ export async function assemblePrDigest(
     }
   }
 
+  const staleMap = buildStaleMap(graph);
   const risk: BriefDigest["risk"] = [];
   const riskSeen = new Set<string>();
   for (const proj of getProjectionsOverlappingEntities(graph, fileEntityIds)) {
@@ -242,9 +254,6 @@ export async function assemblePrDigest(
     )
       continue;
     riskSeen.add(proj.projection_id);
-    const projResult = listActiveProjections(graph, {}).find(
-      (r) => r.projection.id === proj.projection_id,
-    );
     const title =
       prStatus === "open"
         ? `${proj.title} [would be invalidated if merged]`
@@ -253,7 +262,7 @@ export async function assemblePrDigest(
       kind: proj.kind,
       title,
       overlap_files: touchedFiles.slice(0, 3),
-      stale: projResult?.stale,
+      stale: staleMap.get(proj.projection_id),
     });
   }
 
@@ -280,25 +289,13 @@ export async function assembleIssueDigest(
   graph: EngramGraph,
   issueRef: string,
 ): Promise<BriefDigest> {
-  const episodeRow = fetchEpisodeBySourceRef(
+  const episodeRow = fetchEpisodeByRef(
     graph,
     EPISODE_SOURCE_TYPES.GITHUB_ISSUE,
     issueRef,
   );
-
-  if (!episodeRow) {
-    return {
-      target: `issue:${issueRef}`,
-      target_kind: "issue",
-      issue_labels: [],
-      who: [],
-      history: [],
-      connections: [],
-      risk: [],
-      introducing_episode: null,
-      truncated: false,
-    };
-  }
+  if (!episodeRow)
+    return { ...EMPTY_BRIEF(`issue:${issueRef}`, "issue"), issue_labels: [] };
 
   const introducingEpisode = toCitedEpisode(episodeRow);
   const issueTitle =
@@ -311,7 +308,6 @@ export async function assembleIssueDigest(
         .map((l) => l.trim())
         .filter(Boolean)
     : [];
-
   const issueStatus = episodeRow.content.toLowerCase().includes("closed")
     ? "closed"
     : "open";
@@ -320,12 +316,12 @@ export async function assembleIssueDigest(
   if (episodeRow.actor) who.push({ name: episodeRow.actor, role: "reporter" });
   const assigneesMatch = episodeRow.content.match(/Assignee[s]?:\s*(.+)/i);
   if (assigneesMatch) {
-    for (const assignee of assigneesMatch[1]
+    for (const a of assigneesMatch[1]
       .split(/[,;]/)
-      .map((a) => a.trim())
+      .map((s) => s.trim())
       .filter(Boolean)) {
-      if (!who.find((w) => w.name === assignee))
-        who.push({ name: assignee, role: "assignee" });
+      if (!who.find((w) => w.name === a))
+        who.push({ name: a, role: "assignee" });
     }
   }
 
@@ -352,7 +348,7 @@ export async function assembleIssueDigest(
     for (const prRow of prRows) {
       const prTitle = prRow.content.split("\n")[0]?.trim() || "";
       const epRef = prRow.source_ref
-        ? prRow.source_ref.replace(/^#/, "")
+        ? prRow.source_ref.replace(/^#/, "").replace(/.*\/pull\//, "")
         : prRow.id;
       history.push({
         canonical_name: `PR #${epRef}: ${prTitle.slice(0, 60)}`,
@@ -361,7 +357,7 @@ export async function assembleIssueDigest(
       });
     }
   } catch {
-    // ignore
+    /* ignore */
   }
 
   const linkedEntities = getEpisodeLinkedEntities(graph, episodeRow.id);
@@ -450,9 +446,8 @@ async function assembleAnchorDigest(
   }
 
   const connections: BriefDigest["connections"] = [];
-  const projResults = listActiveProjections(graph, { anchor_id: entityId });
   const connectionIds = new Set<string>();
-  for (const result of projResults) {
+  for (const result of listActiveProjections(graph, { anchor_id: entityId })) {
     connectionIds.add(result.projection.id);
     connections.push({
       kind: result.projection.kind,
@@ -462,18 +457,16 @@ async function assembleAnchorDigest(
     });
   }
 
+  const staleMap = buildStaleMap(graph);
   const risk: BriefDigest["risk"] = [];
   for (const proj of getProjectionsOverlappingEntities(graph, [entityId])) {
-    if (connectionIds.has(proj.projection_id)) continue;
-    const projResult = listActiveProjections(graph, {}).find(
-      (r) => r.projection.id === proj.projection_id,
-    );
-    risk.push({
-      kind: proj.kind,
-      title: proj.title,
-      overlap_files: [label],
-      stale: projResult?.stale,
-    });
+    if (!connectionIds.has(proj.projection_id))
+      risk.push({
+        kind: proj.kind,
+        title: proj.title,
+        overlap_files: [label],
+        stale: staleMap.get(proj.projection_id),
+      });
   }
 
   return {
@@ -493,18 +486,7 @@ export async function assembleEntityDigest(
   entityId: string,
 ): Promise<BriefDigest> {
   const entity = getEntity(graph, entityId);
-  if (!entity) {
-    return {
-      target: `entity:${entityId}`,
-      target_kind: "entity",
-      who: [],
-      history: [],
-      connections: [],
-      risk: [],
-      introducing_episode: null,
-      truncated: false,
-    };
-  }
+  if (!entity) return EMPTY_BRIEF(`entity:${entityId}`, "entity");
   return assembleAnchorDigest(
     graph,
     entity.id,
@@ -518,24 +500,11 @@ export async function assembleTopicDigest(
   topic: string,
   exitOnAmbiguous: () => never,
 ): Promise<BriefDigest> {
-  const ftsRows = searchEntitiesFts(graph, topic, 10);
+  const ftsRows = searchEntitiesFts(graph, topic, 5);
+  if (ftsRows.length === 0) return EMPTY_BRIEF(topic, "topic");
 
-  if (ftsRows.length === 0) {
-    return {
-      target: topic,
-      target_kind: "topic",
-      who: [],
-      history: [],
-      connections: [],
-      risk: [],
-      introducing_episode: null,
-      truncated: false,
-    };
-  }
-
-  if (ftsRows.length > 3) {
+  if (ftsRows.length > 1) {
     const candidateLines = ftsRows
-      .slice(0, 10)
       .map((r) => `  ${r.canonical_name} [${r.entity_type}]`)
       .join("\n");
     console.error(
