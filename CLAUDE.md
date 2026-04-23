@@ -111,6 +111,7 @@ The `.engram` file is a SQLite database with this entity model:
 - `valid_from = NULL` means unknown start, `valid_until = NULL` means still current
 - `invalidated_at` is the transactional timestamp when the system learned a fact was superseded
 - Supersession is atomic: `supersedeEdge()` invalidates old + creates new in one transaction
+- Time-travel queries: use `engram context "<q>" --as-of "<when>"` to retrieve a context pack reflecting what the graph knew at a past point in time (learn-time filter: `created_at <= T AND (invalidated_at IS NULL OR invalidated_at > T)`); see `docs/internal/specs/as-of-queries.md`
 
 ### Read-Time Staleness (Projection Invariant)
 
@@ -273,6 +274,8 @@ When creating a PR that implements a GitHub issue:
 | `packages/engram-core/src/format/` | `.engram` file schema and migrations |
 | `packages/engram-core/src/graph/` | Entity, edge, alias, evidence CRUD |
 | `packages/engram-core/src/temporal/` | Temporal logic (validity, supersession, snapshots) |
+| `packages/engram-core/src/temporal/as-of.ts` | `resolveAsOf()` — parse `--as-of` strings (ISO, bare date, relative) into UTC timestamps; `InvalidAsOfError` |
+| `docs/internal/specs/as-of-queries.md` | Learn-time filter semantic, relative-string grammar, stale semantics, rationale for deferring `--active-only` |
 | `packages/engram-core/src/ai/` | AI provider layer (NullProvider, OllamaProvider, GeminiProvider) |
 | `packages/engram-core/src/ai/kinds/` | Built-in projection kind catalog files (YAML). User overrides via `$XDG_CONFIG_HOME/engram/kinds/` (fallback `~/.config/engram/kinds/`). |
 | `packages/engram-core/src/ai/kinds.ts` | Kind catalog loader — `loadKindCatalog()`, `KindEntry`, `KindCatalog` |

@@ -18,7 +18,9 @@ import {
   createProvider,
   getEntity,
   getEpisode,
+  InvalidAsOfError,
   openGraph,
+  resolveAsOf,
   resolveDbPath,
   search,
 } from "engram-core";
@@ -172,6 +174,13 @@ interface ContextOpts {
   maxEntities?: number;
   /** Hard cap on edges included, applied before the token budget loop. */
   maxEdges?: number;
+  /**
+   * ISO8601 UTC timestamp for time-travel queries. When set, the context pack
+   * reflects what the graph knew at that point in time (learn-time filter).
+   */
+  asOf?: string;
+  /** Raw user input for the as-of value, preserved for the pack header. */
+  asOfInput?: string;
 }
 
 interface EnrichedEntity {
@@ -220,17 +229,25 @@ interface ContextPack {
   edges: EnrichedEdge[];
   evidence: EvidenceExcerpt[];
   discussions: DirectEpisodeHit[];
+  /** Resolved ISO8601 UTC timestamp for as-of queries. Absent for current-time queries. */
+  as_of?: string;
+  /** Raw user input for the as-of value. Absent for current-time queries. */
+  as_of_input?: string;
 }
 
 function renderMarkdown(pack: ContextPack): string {
   const lines: string[] = [];
 
   lines.push(`## Context pack`);
+  const asOfSuffix = pack.as_of
+    ? ` | As-of: ${pack.as_of.slice(0, 10)} (${pack.as_of_input})`
+    : "";
   lines.push(
     `> Query: ${pack.query}  ` +
       `Budget: ${pack.tokenBudget} tokens | Used: ~${pack.tokenBudgetUsed} | ` +
       `${pack.entities.length + pack.edges.length} results` +
-      (pack.truncated > 0 ? ` (${pack.truncated} truncated by budget)` : ""),
+      (pack.truncated > 0 ? ` (${pack.truncated} truncated by budget)` : "") +
+      asOfSuffix,
   );
   lines.push("");
 
@@ -702,26 +719,32 @@ function searchEpisodesDirectly(
 
 /**
  * FTS query against edges_fts only.
+ * When asOf is provided, applies the learn-time filter instead of invalidated_at IS NULL.
  */
 function searchEdgesFts(
   graph: EngramGraph,
   ftsQuery: string,
   limit: number,
+  asOf?: string,
 ): EdgeFtsRow[] {
   try {
+    const activeFilter = asOf
+      ? "AND edges.created_at <= ? AND (edges.invalidated_at IS NULL OR edges.invalidated_at > ?)"
+      : "AND edges.invalidated_at IS NULL";
+    const params: unknown[] = asOf ? [ftsQuery, asOf, asOf] : [ftsQuery];
     return graph.db
-      .query<EdgeFtsRow, [string]>(
+      .query<EdgeFtsRow, unknown[]>(
         `SELECT edges.id, edges.fact, edges.edge_kind,
                 edges.valid_from, edges.valid_until,
                 bm25(edges_fts) AS rank
          FROM edges_fts
          JOIN edges ON edges._rowid = edges_fts.rowid
          WHERE edges_fts MATCH ?
-           AND edges.invalidated_at IS NULL
+           ${activeFilter}
          ORDER BY rank
          LIMIT ${limit}`,
       )
-      .all(ftsQuery);
+      .all(...params);
   } catch {
     return [];
   }
@@ -770,6 +793,8 @@ interface StructuralEdgeRow {
  * ownership, and supersession signals — ordered by relation-type priority.
  * Excludes authored_by (too noisy) and edges already shown via FTS.
  *
+ * When asOf is provided, applies the learn-time filter instead of invalidated_at IS NULL.
+ *
  * Used to surface relational signals when entity FTS returns only greppable
  * file entities that an agent could find via plain file search.
  */
@@ -778,16 +803,22 @@ function fetchStructuralEdges(
   entityIds: string[],
   excludeEdgeIds: Set<string>,
   limit: number,
+  asOf?: string,
 ): StructuralEdgeRow[] {
   if (entityIds.length === 0) return [];
   const placeholders = entityIds.map(() => "?").join(",");
+  const activeFilter = asOf
+    ? "AND created_at <= ? AND (invalidated_at IS NULL OR invalidated_at > ?)"
+    : "AND invalidated_at IS NULL";
+  const baseParams: string[] = [...entityIds, ...entityIds];
+  const asOfParams: string[] = asOf ? [asOf, asOf] : [];
   try {
     const rows = graph.db
       .query<StructuralEdgeRow, string[]>(
         `SELECT id, fact, edge_kind, relation_type, valid_from, valid_until
          FROM edges
          WHERE (source_id IN (${placeholders}) OR target_id IN (${placeholders}))
-           AND invalidated_at IS NULL
+           ${activeFilter}
            AND relation_type != 'authored_by'
          ORDER BY
            CASE relation_type
@@ -799,7 +830,7 @@ function fetchStructuralEdges(
            valid_from DESC NULLS LAST
          LIMIT ${limit * 2}`,
       )
-      .all(...entityIds, ...entityIds);
+      .all(...baseParams, ...asOfParams);
     return rows.filter((r) => !excludeEdgeIds.has(r.id)).slice(0, limit);
   } catch {
     return [];
@@ -881,7 +912,7 @@ async function assembleContextPack(
 
   // Run entity and edge FTS separately so episode content doesn't flood ranking.
   const entityRows = searchEntitiesFts(graph, escapedFts, 30);
-  const edgeRows = searchEdgesFts(graph, escapedFts, 20);
+  const edgeRows = searchEdgesFts(graph, escapedFts, 20, opts.asOf);
 
   const seenEntityIds = new Set(entityRows.map((r) => r.id));
 
@@ -1196,6 +1227,7 @@ async function assembleContextPack(
     foundEntityIds,
     seenEdgeIds,
     structuralLimit,
+    opts.asOf,
   );
   for (const row of structuralRows) {
     if (budgetExceeded()) {
@@ -1249,6 +1281,10 @@ async function assembleContextPack(
     edges,
     evidence: Array.from(evidenceMap.values()),
     discussions,
+    ...(opts.asOf !== undefined && {
+      as_of: opts.asOf,
+      as_of_input: opts.asOfInput,
+    }),
   };
 }
 
@@ -1265,6 +1301,7 @@ interface ContextCommandOpts {
   maxEntities?: string;
   maxEdges?: string;
   j?: boolean;
+  asOf?: string;
 }
 
 export function registerContext(program: Command): void {
@@ -1295,6 +1332,13 @@ export function registerContext(program: Command): void {
       "--max-edges <n>",
       "hard cap on edges included regardless of token budget (default: uncapped)",
     )
+    .option(
+      "--as-of <when>",
+      "assemble a context pack as of a past point in time. " +
+        "Accepts ISO8601 UTC (2026-01-15T14:22:00Z), bare date (2026-01-15), " +
+        "or relative strings (yesterday, last week, last month, last year, " +
+        "<N> days|weeks|months|years ago). Uses learn-time filter: edges known at T.",
+    )
     .addHelpText(
       "after",
       `
@@ -1314,6 +1358,15 @@ Examples:
   # JSON output for programmatic use
   engram context "database schema" --format json
 
+  # Time-travel: see what the graph knew 6 months ago
+  engram context "auth middleware" --as-of "6 months ago"
+
+  # Specific past date
+  engram context "why was X refactored" --as-of 2026-01-15
+
+  # Explicit datetime
+  engram context "database schema" --as-of 2026-01-15T14:22:00Z
+
 When to use:
   Call before modifying unfamiliar code, answering "why is this written
   this way?", or making multi-file changes. Output is Markdown by default
@@ -1321,6 +1374,10 @@ When to use:
 
   Use --max-entities / --max-edges when you need predictable output sizing
   regardless of token budget (e.g. when injecting into a fixed-size prompt).
+
+  Use --as-of to query the graph at a past point in time — useful for
+  understanding what was known before a major refactor or to audit what
+  the system believed at a specific date.
 
 See also:
   engram companion   Write a reusable agent prompt fragment
@@ -1373,6 +1430,24 @@ See also:
         }
       }
 
+      // Resolve --as-of if provided
+      let asOfIso: string | undefined;
+      let asOfInput: string | undefined;
+      if (opts.asOf !== undefined) {
+        try {
+          const resolved = resolveAsOf(opts.asOf);
+          asOfIso = resolved.iso;
+          asOfInput = resolved.input;
+        } catch (err) {
+          console.error(
+            err instanceof InvalidAsOfError || err instanceof Error
+              ? err.message
+              : String(err),
+          );
+          process.exit(1);
+        }
+      }
+
       let graph: EngramGraph | undefined;
       try {
         graph = openGraph(dbPath);
@@ -1391,6 +1466,8 @@ See also:
           verbose: opts.verbose,
           maxEntities,
           maxEdges,
+          asOf: asOfIso,
+          asOfInput,
         });
 
         if (opts.format === "json") {
