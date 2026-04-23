@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "name": "repo-git",
+      "type": "git",
+      "path": "."
+    },
+    {
+      "name": "repo-src",
+      "type": "source",
+      "root": "packages/"
+    },
+    {
+      "name": "engram-gh",
+      "type": "github",
+      "scope": "org/repo",
+      "auth": {
+        "kind": "bearer",
+        "tokenEnv": "GITHUB_TOKEN"
+      }
+    },
+    {
+      "name": "workspace-docs",
+      "type": "google_workspace",
+      "scope": "folder:root",
+      "auth": {
+        "kind": "service_account",
+        "keyJsonEnv": "GOOGLE_SERVICE_ACCOUNT_JSON"
+      }
+    }
+  ]
+}

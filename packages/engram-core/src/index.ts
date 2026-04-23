@@ -211,6 +211,22 @@ export {
   graphSearch,
   search,
 } from "./retrieval/index.js";
+export type { ValidationFailure } from "./sync/errors.js";
+export {
+  SyncConfigValidationError,
+  SyncSourceError,
+} from "./sync/errors.js";
+export { runSync, validateSyncConfig } from "./sync/run.js";
+export type {
+  RunSyncOpts,
+  SourceResult,
+  SourceStatus,
+  SyncAuthConfig,
+  SyncConfig,
+  SyncResult,
+  SyncSource,
+} from "./sync/types.js";
+export { resolveSyncAuth } from "./sync/types.js";
 export type { ResolvedAsOf, TemporalSnapshot } from "./temporal/index.js";
 export {
   checkActiveEdgeConflict,
