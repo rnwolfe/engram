@@ -18,3 +18,4 @@ export type {
   SyncSource,
 } from "./types.js";
 export { resolveSyncAuth } from "./types.js";
+export { validateAuthConfig } from "./validate.js";

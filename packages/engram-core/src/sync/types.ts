@@ -2,8 +2,6 @@
  * sync/types.ts — types for the config-driven sync orchestrator.
  */
 
-import type { AuthCredential } from "../ingest/adapter.js";
-
 // ---------------------------------------------------------------------------
 // Config schema
 // ---------------------------------------------------------------------------
@@ -115,44 +113,39 @@ export interface RunSyncOpts {
 // ---------------------------------------------------------------------------
 
 /**
- * Resolve a SyncAuthConfig to a runtime AuthCredential by reading env vars.
- * Returns null if a required env var is missing (caller reports the error).
+ * Check a SyncAuthConfig for missing env vars.
+ *
+ * Returns an array of all missing env var names (empty array = all present).
+ * Callers should report all missing vars together rather than stopping at the
+ * first, giving users a complete picture of what they need to set.
  */
-export function resolveSyncAuth(
-  authConfig: SyncAuthConfig,
-): { credential: AuthCredential } | { missing: string } {
+export function resolveSyncAuth(authConfig: SyncAuthConfig): string[] {
+  const missing: string[] = [];
+
   switch (authConfig.kind) {
     case "none":
-      return { credential: { kind: "none" } };
+      break;
 
-    case "bearer": {
-      const token = process.env[authConfig.tokenEnv];
-      if (!token) return { missing: authConfig.tokenEnv };
-      return { credential: { kind: "bearer", token } };
-    }
+    case "bearer":
+      if (!process.env[authConfig.tokenEnv]) missing.push(authConfig.tokenEnv);
+      break;
 
-    case "basic": {
-      const username = process.env[authConfig.usernameEnv];
-      const secret = process.env[authConfig.secretEnv];
-      if (!username) return { missing: authConfig.usernameEnv };
-      if (!secret) return { missing: authConfig.secretEnv };
-      return { credential: { kind: "basic", username, secret } };
-    }
+    case "basic":
+      if (!process.env[authConfig.usernameEnv])
+        missing.push(authConfig.usernameEnv);
+      if (!process.env[authConfig.secretEnv])
+        missing.push(authConfig.secretEnv);
+      break;
 
-    case "service_account": {
-      const keyJson = process.env[authConfig.keyJsonEnv];
-      if (!keyJson) return { missing: authConfig.keyJsonEnv };
-      return { credential: { kind: "service_account", keyJson } };
-    }
+    case "service_account":
+      if (!process.env[authConfig.keyJsonEnv])
+        missing.push(authConfig.keyJsonEnv);
+      break;
 
-    case "oauth2": {
-      const token = process.env[authConfig.tokenEnv];
-      if (!token) return { missing: authConfig.tokenEnv };
-      const rawScopes = authConfig.scopesEnv
-        ? process.env[authConfig.scopesEnv]
-        : undefined;
-      const scopes = rawScopes ? rawScopes.split(",").map((s) => s.trim()) : [];
-      return { credential: { kind: "oauth2", token, scopes } };
-    }
+    case "oauth2":
+      if (!process.env[authConfig.tokenEnv]) missing.push(authConfig.tokenEnv);
+      break;
   }
+
+  return missing;
 }
