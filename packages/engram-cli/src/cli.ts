@@ -6,6 +6,7 @@ import { registerAdd } from "./commands/add.js";
 import { registerCompanion } from "./commands/companion.js";
 import { registerContext } from "./commands/context.js";
 import { registerDecay } from "./commands/decay.js";
+import { registerDiff } from "./commands/diff.js";
 import { registerDoctor } from "./commands/doctor.js";
 import { registerEmbed } from "./commands/embed.js";
 import { registerExport } from "./commands/export.js";
@@ -48,6 +49,7 @@ Run 'engram <command> --help' for details on a command.`,
 registerInit(program);
 registerAdd(program);
 registerCompanion(program);
+registerDiff(program);
 registerContext(program);
 registerEmbed(program);
 registerSearch(program);
