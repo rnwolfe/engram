@@ -12,7 +12,7 @@
  *   - --since <duration>  (e.g. --since 30d)
  */
 
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import * as path from "node:path";
 import type { Command } from "commander";
 import type {
@@ -60,8 +60,7 @@ function parseDurationShorthand(s: string): number | null {
  */
 function resolveGitRef(ref: string, cwd: string): string | null {
   try {
-    // Get the commit timestamp for the ref
-    const out = execSync(`git log -1 --format=%cI ${ref}`, {
+    const out = execFileSync("git", ["log", "-1", "--format=%cI", ref], {
       cwd,
       stdio: ["pipe", "pipe", "pipe"],
       timeout: 5_000,
@@ -464,10 +463,25 @@ See also:
             rawA = opts.since;
             rawB = new Date().toISOString();
           } else if (refAArg?.includes("..")) {
-            // Range syntax: ref-a..ref-b
-            const parts = refAArg.split("..");
-            rawA = parts[0];
-            rawB = parts[1] ?? new Date().toISOString();
+            // Range syntax: ref-a..ref-b (two-dot only; reject three-dot)
+            const dotIdx = refAArg.indexOf("..");
+            const after = refAArg.slice(dotIdx + 2);
+            if (after.startsWith(".")) {
+              console.error(
+                `${c.red("Error:")} three-dot ranges are not supported — use ref-A..ref-B`,
+              );
+              closeGraph(graph);
+              process.exit(1);
+            }
+            rawA = refAArg.slice(0, dotIdx);
+            rawB = after || new Date().toISOString();
+            if (!rawA) {
+              console.error(
+                `${c.red("Error:")} ref-A is empty in range syntax — use ref-A..ref-B`,
+              );
+              closeGraph(graph);
+              process.exit(1);
+            }
           } else if (refAArg && refBArg) {
             rawA = refAArg;
             rawB = refBArg;

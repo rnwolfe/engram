@@ -120,7 +120,7 @@ function projectionsAt(
       `SELECT * FROM projections
         WHERE valid_from <= ?
           AND (valid_until IS NULL OR valid_until > ?)
-          AND (invalidated_at IS NULL OR invalidated_at >= ?)`,
+          AND (invalidated_at IS NULL OR invalidated_at > ?)`,
     )
     .all(at, at, at);
 
