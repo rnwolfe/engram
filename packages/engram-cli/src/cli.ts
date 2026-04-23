@@ -3,6 +3,7 @@
 import { Command } from "commander";
 import { ENGINE_VERSION } from "engram-core";
 import { registerAdd } from "./commands/add.js";
+import { registerBrief } from "./commands/brief.js";
 import { registerCompanion } from "./commands/companion.js";
 import { registerContext } from "./commands/context.js";
 import { registerDecay } from "./commands/decay.js";
@@ -71,5 +72,6 @@ registerVisualize(program);
 registerPlugin(program);
 registerSync(program);
 registerWhy(program);
+registerBrief(program);
 
 program.parse();
