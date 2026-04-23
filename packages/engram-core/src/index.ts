@@ -211,11 +211,13 @@ export {
   graphSearch,
   search,
 } from "./retrieval/index.js";
-export type { TemporalSnapshot } from "./temporal/index.js";
+export type { ResolvedAsOf, TemporalSnapshot } from "./temporal/index.js";
 export {
   checkActiveEdgeConflict,
   getFactHistory,
   getSnapshot,
+  InvalidAsOfError,
+  resolveAsOf,
   supersedeEdge,
 } from "./temporal/index.js";
 export type {

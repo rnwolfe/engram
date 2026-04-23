@@ -47,6 +47,13 @@ export interface FindEdgesQuery {
   valid_at?: string;
   /** If false (default), only active edges (invalidated_at IS NULL) are returned. */
   include_invalidated?: boolean;
+  /**
+   * ISO8601 UTC timestamp for learn-time filtering (as-of queries).
+   * When set, applies: created_at <= T AND (invalidated_at IS NULL OR invalidated_at > T)
+   * This reflects what the graph knew at that point in time.
+   * The validity window (valid_from/valid_until) is NOT filtered — only surfaced in output.
+   */
+  asOf?: string;
 }
 
 /**
@@ -176,10 +183,20 @@ export function findEdges(
     params.push(query.edge_kind);
   }
 
-  // Exclude invalidated edges unless include_invalidated is explicitly true.
-  // active_only is a legacy alias for the same behaviour.
-  if (query.active_only || !query.include_invalidated) {
-    conditions.push("invalidated_at IS NULL");
+  if (query.asOf !== undefined) {
+    // Learn-time filter: show edges the graph knew about at time T.
+    // An edge was known at T if it was created at or before T AND
+    // it had not yet been invalidated at T (or is still active).
+    conditions.push("created_at <= ?");
+    params.push(query.asOf);
+    conditions.push("(invalidated_at IS NULL OR invalidated_at > ?)");
+    params.push(query.asOf);
+  } else {
+    // Exclude invalidated edges unless include_invalidated is explicitly true.
+    // active_only is a legacy alias for the same behaviour.
+    if (query.active_only || !query.include_invalidated) {
+      conditions.push("invalidated_at IS NULL");
+    }
   }
 
   if (query.valid_at !== undefined) {
