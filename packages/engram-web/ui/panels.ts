@@ -339,3 +339,40 @@ export async function openEdgePanel(edgeId: string): Promise<void> {
   attachEvidenceHandlers();
   attachEntityLinkHandlers();
 }
+
+// ── Projection panel ──────────────────────────────────────
+
+interface ProjectionNodeData {
+  id: string;
+  canonical_name: string;
+  anchor_id?: string | null;
+  kind?: string;
+  stale?: boolean;
+  updated_at: string;
+}
+
+function renderProjectionPanel(data: ProjectionNodeData): string {
+  const staleHtml = data.stale
+    ? '<span class="badge stale-badge">stale</span>'
+    : "";
+  const anchorHtml = data.anchor_id
+    ? `<div class="panel-timestamps"><span>Anchor: ${esc(data.anchor_id)}</span></div>`
+    : "";
+  return `
+    <div class="panel-section">
+      <h2 class="panel-title">${esc(data.canonical_name)}</h2>
+      <div class="panel-meta">
+        <span class="badge type-badge">projection</span>
+        <span class="badge kind-badge">${esc(data.kind ?? "unknown")}</span>
+        ${staleHtml}
+      </div>
+      ${anchorHtml}
+      <div class="panel-timestamps">
+        <span>Created: ${fmtDate(data.updated_at)}</span>
+      </div>
+    </div>`;
+}
+
+export function openProjectionPanel(data: ProjectionNodeData): void {
+  showPanel(renderProjectionPanel(data));
+}

@@ -4,14 +4,17 @@
   "module": "src/index.ts",
   "type": "module",
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target node && bun build ui/main.ts --outdir dist/ui --minify && cp ui/main.css dist/ui/main.css && cp ui/index.html dist/ui/index.html",
+    "build": "bun build src/index.ts --outdir dist --target node && bun build ui/main.ts --outdir dist/ui --minify && bunx tailwindcss -i ui/input.css -o dist/ui/main.css --minify && cp ui/index.html dist/ui/index.html && mkdir -p dist/ui/fonts && cp node_modules/geist/dist/fonts/geist-mono/GeistMono-Regular.woff2 dist/ui/fonts/ && cp node_modules/geist/dist/fonts/geist-mono/GeistMono-Variable.woff2 dist/ui/fonts/",
     "test": "bun test"
   },
   "dependencies": {
     "cytoscape": "^3.33.2",
-    "engram-core": "workspace:*"
+    "engram-core": "workspace:*",
+    "geist": "^1.7.0"
   },
   "devDependencies": {
-    "@types/cytoscape": "^3.31.0"
+    "@tailwindcss/cli": "^4.2.4",
+    "@types/cytoscape": "^3.31.0",
+    "tailwindcss": "^4.2.4"
   }
 }

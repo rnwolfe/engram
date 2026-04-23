@@ -11,6 +11,7 @@ interface GraphData {
     entity_type: string;
     status: string;
     updated_at: string;
+    source_type?: string;
   }>;
   edges: Array<{
     id: string;
@@ -25,13 +26,14 @@ interface GraphData {
 }
 
 // Structural boilerplate types hidden by default to reduce hairball density
-const DEFAULT_HIDDEN_ENTITY_TYPES = new Set(["symbol"]);
+const DEFAULT_HIDDEN_ENTITY_TYPES = new Set(["symbol", "file", "module"]);
 const DEFAULT_HIDDEN_RELATION_TYPES = new Set(["defined_in", "contains"]);
 
 const activeFilters = {
   entityTypes: new Set<string>(),
   relationTypes: new Set<string>(),
   edgeKinds: new Set<string>(),
+  sourceTypes: new Set<string>(),
   hideOrphans: false,
   minDegree: 0,
 };
@@ -51,6 +53,22 @@ export function applyFilters(): void {
       node.hide();
     }
   });
+
+  // Hide nodes by source type (nodes with no source_type always shown)
+  if (activeFilters.sourceTypes.size > 0) {
+    cy.nodes().forEach((node) => {
+      if (node.hidden()) return;
+      const st = node.data("source_type") as string | undefined;
+      if (
+        st !== undefined &&
+        st !== null &&
+        st !== "" &&
+        !activeFilters.sourceTypes.has(st)
+      ) {
+        node.hide();
+      }
+    });
+  }
 
   // Hide edges by relation type
   cy.edges().forEach((edge) => {
@@ -170,6 +188,7 @@ export function initFilters(
   activeFilters.entityTypes.clear();
   activeFilters.relationTypes.clear();
   activeFilters.edgeKinds.clear();
+  activeFilters.sourceTypes.clear();
   activeFilters.hideOrphans = false;
   activeFilters.minDegree = 0;
 
@@ -181,6 +200,13 @@ export function initFilters(
     ...new Set(data.edges.map((e) => e.relation_type)),
   ].sort();
   const edgeKinds = [...new Set(data.edges.map((e) => e.edge_kind))].sort();
+  const sourceTypes = [
+    ...new Set(
+      data.nodes
+        .map((n) => n.source_type)
+        .filter((s): s is string => s !== undefined && s !== null && s !== ""),
+    ),
+  ].sort();
 
   sidebar.innerHTML = "";
 
@@ -216,6 +242,17 @@ export function initFilters(
       "Edge kind",
       edgeKinds,
       activeFilters.edgeKinds,
+      new Set(),
+      applyFilters,
+    );
+  }
+
+  if (sourceTypes.length > 0) {
+    buildCheckboxSection(
+      sidebar,
+      "Source type",
+      sourceTypes,
+      activeFilters.sourceTypes,
       new Set(),
       applyFilters,
     );

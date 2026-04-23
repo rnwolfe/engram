@@ -21,6 +21,8 @@ export const ENTITY_TYPES = {
   BAZEL_TARGET: "bazel_target",
   /** A document entity (e.g. a Google Doc, a Confluence page). */
   DOCUMENT: "document",
+  /** Synthetic viz-layer type: a projection node surfaced in /api/graph (not stored in entities table). */
+  PROJECTION: "projection",
 } as const;
 
 export type EntityType = (typeof ENTITY_TYPES)[keyof typeof ENTITY_TYPES];
