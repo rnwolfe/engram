@@ -19,10 +19,8 @@ import * as path from "node:path";
 import type { Command } from "commander";
 import type { EngramGraph } from "engram-core";
 import { closeGraph, openGraph, resolveDbPath } from "engram-core";
-import {
-  assembleAreaDigest,
-  assemblePersonDigest,
-} from "./_onboard_assembly.js";
+import { assembleAreaDigest } from "./_onboard_assembly.js";
+import { assemblePersonDigest } from "./_onboard_person.js";
 import type { OnboardDigest } from "./_onboard_render.js";
 import {
   renderOnboardJson,
