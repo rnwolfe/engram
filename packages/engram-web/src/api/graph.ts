@@ -6,7 +6,12 @@
  */
 
 import type { EngramGraph } from "engram-core";
-import { findEdges, findEntities, listActiveProjections } from "engram-core";
+import {
+  ENTITY_TYPES,
+  findEdges,
+  findEntities,
+  listActiveProjections,
+} from "engram-core";
 
 export interface GraphNode {
   id: string;
@@ -49,12 +54,16 @@ function buildSourceTypeMap(graph: EngramGraph): Map<string, string> {
   try {
     const rows = graph.db
       .query<{ entity_id: string; source_type: string }, []>(
-        `SELECT ee.entity_id, ep.source_type
-         FROM entity_evidence ee
-         JOIN episodes ep ON ep.id = ee.episode_id
-         WHERE ep.status = 'active'
-         GROUP BY ee.entity_id
-         ORDER BY count(*) DESC`,
+        `SELECT entity_id, source_type
+         FROM (
+           SELECT ee.entity_id, ep.source_type, count(*) AS cnt
+           FROM entity_evidence ee
+           JOIN episodes ep ON ep.id = ee.episode_id
+           WHERE ep.status = 'active'
+           GROUP BY ee.entity_id, ep.source_type
+           ORDER BY ee.entity_id, cnt DESC
+         )
+         GROUP BY entity_id`,
       )
       .all();
 
@@ -97,7 +106,7 @@ export function handleGraph(
       nodes.push({
         id: p.id,
         canonical_name: p.title || `${p.kind} projection`,
-        entity_type: "projection",
+        entity_type: ENTITY_TYPES.PROJECTION,
         status: p.invalidated_at ? "invalidated" : "active",
         updated_at: p.created_at,
         anchor_id: p.anchor_id,
