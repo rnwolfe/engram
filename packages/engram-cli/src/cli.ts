@@ -24,6 +24,7 @@ import { registerStatus } from "./commands/status.js";
 import { registerSync } from "./commands/sync.js";
 import { registerVerify } from "./commands/verify.js";
 import { registerVisualize } from "./commands/visualize.js";
+import { registerWhy } from "./commands/why.js";
 
 const program = new Command()
   .name("engram")
@@ -67,5 +68,6 @@ registerReconcile(program);
 registerVisualize(program);
 registerPlugin(program);
 registerSync(program);
+registerWhy(program);
 
 program.parse();
