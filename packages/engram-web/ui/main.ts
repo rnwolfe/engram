@@ -248,7 +248,57 @@ function isHelpModalOpen(): boolean {
 
 // ── Toolbar ───────────────────────────────────────────────
 
+function wireSidebarToggle(): void {
+  const sidebar = document.getElementById("filter-sidebar");
+  const toggleBtn = document.getElementById("btn-sidebar-toggle");
+  const backdrop = document.getElementById("sidebar-backdrop");
+  if (!sidebar || !toggleBtn) return;
+
+  const isMobile = () => window.innerWidth <= 768;
+
+  function openSidebar(): void {
+    sidebar!.classList.add("sidebar-open");
+    sidebar!.classList.remove("collapsed");
+    backdrop?.classList.remove("hidden");
+    toggleBtn!.setAttribute("aria-expanded", "true");
+  }
+
+  function closeSidebar(): void {
+    if (isMobile()) {
+      sidebar!.classList.remove("sidebar-open");
+      backdrop?.classList.add("hidden");
+    } else {
+      sidebar!.classList.add("collapsed");
+    }
+    toggleBtn!.setAttribute("aria-expanded", "false");
+  }
+
+  function isSidebarVisible(): boolean {
+    if (isMobile()) return sidebar!.classList.contains("sidebar-open");
+    return !sidebar!.classList.contains("collapsed");
+  }
+
+  toggleBtn.addEventListener("click", () => {
+    if (isSidebarVisible()) {
+      closeSidebar();
+    } else {
+      openSidebar();
+    }
+  });
+
+  // Backdrop tap closes sidebar on mobile
+  backdrop?.addEventListener("click", () => closeSidebar());
+
+  // On mobile, start with sidebar closed
+  if (isMobile()) {
+    sidebar.classList.remove("sidebar-open");
+    toggleBtn.setAttribute("aria-expanded", "false");
+  }
+}
+
 function wireToolbar(): void {
+  wireSidebarToggle();
+
   const fitBtn = document.getElementById("btn-fit");
   const resetBtn = document.getElementById("btn-reset-layout");
   const helpBtn = document.getElementById("btn-help");
