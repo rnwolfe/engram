@@ -71,6 +71,7 @@ export interface SourceIngestOptions {
   root: string;
   exclude?: string[];
   respectGitignore?: boolean;
+  respectEngramignore?: boolean;
   dryRun?: boolean;
   onProgress?: (event: ProgressEvent) => void;
 }
@@ -254,7 +255,14 @@ export async function ingestSource(
   graph: EngramGraph,
   opts: SourceIngestOptions,
 ): Promise<SourceIngestResult> {
-  const { root, exclude, respectGitignore, dryRun = false, onProgress } = opts;
+  const {
+    root,
+    exclude,
+    respectGitignore,
+    respectEngramignore,
+    dryRun = false,
+    onProgress,
+  } = opts;
 
   const result: SourceIngestResult = {
     filesScanned: 0,
@@ -289,7 +297,12 @@ export async function ingestSource(
   let dryCounter = 0;
 
   try {
-    for await (const entry of walk({ root, exclude, respectGitignore })) {
+    for await (const entry of walk({
+      root,
+      exclude,
+      respectGitignore,
+      respectEngramignore,
+    })) {
       result.filesScanned++;
       const { relPath, contentHash, body } = entry;
       const sourceRef = `${relPath}@${contentHash}`;
