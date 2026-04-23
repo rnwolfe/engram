@@ -21,6 +21,7 @@ import { registerSearch } from "./commands/search.js";
 import { registerShow } from "./commands/show.js";
 import { registerStats } from "./commands/stats.js";
 import { registerStatus } from "./commands/status.js";
+import { registerSync } from "./commands/sync.js";
 import { registerVerify } from "./commands/verify.js";
 import { registerVisualize } from "./commands/visualize.js";
 
@@ -65,5 +66,6 @@ registerMaintenance(program);
 registerReconcile(program);
 registerVisualize(program);
 registerPlugin(program);
+registerSync(program);
 
 program.parse();

@@ -45,6 +45,11 @@ engram/
 │   │   │   │   ├── markdown.ts
 │   │   │   │   ├── text.ts
 │   │   │   │   └── source/            # Source code ingestion (tree-sitter)
+│   │   │   ├── sync/         # Config-driven sync orchestrator
+│   │   │   │   ├── types.ts         # SyncConfig, SyncSource, SyncResult, SyncAuthConfig
+│   │   │   │   ├── errors.ts        # SyncConfigValidationError, SyncSourceError
+│   │   │   │   ├── run.ts           # runSync() orchestrator + validateSyncConfig()
+│   │   │   │   └── index.ts         # barrel export
 │   │   │   │       ├── index.ts       # Orchestrator — ingestSource() entry point
 │   │   │   │       ├── walker.ts      # File walker (respects .gitignore, denylist)
 │   │   │   │       ├── parser.ts      # tree-sitter WASM wrapper
@@ -146,6 +151,8 @@ This distinction is critical for trust. Never present inferred edges as observed
 Two layers:
 1. **VCS layer (universal)**: git commits, blame, co-change analysis. No API tokens needed. Produces the structural graph.
 2. **Enrichment adapters (pluggable)**: GitHub PRs/issues, Gerrit, future Jira/etc. Each implements `EnrichmentAdapter` interface (v2). New adapters must import `entity_type`, `source_type`, and `relation_type` values from `packages/engram-core/src/vocab/`.
+
+**Preferred entry point**: For routine multi-source ingestion, use `engram sync` with a `.engram.config.json` rather than composing individual `engram ingest` commands. See `docs/internal/specs/sync-orchestration.md`.
 
 **Adapter contract v2 — key conventions:**
 - **Auth**: Use `AuthCredential` union (`bearer`, `basic`, `service_account`, `oauth2`, `none`) via `opts.auth`. Declare accepted kinds in `supportedAuth: AuthCredential['kind'][]`. Use `assertAuthKind()` helper before processing.
@@ -279,6 +286,9 @@ When creating a PR that implements a GitHub issue:
 | `packages/engram-core/src/ai/` | AI provider layer (NullProvider, OllamaProvider, GeminiProvider) |
 | `packages/engram-core/src/ai/kinds/` | Built-in projection kind catalog files (YAML). User overrides via `$XDG_CONFIG_HOME/engram/kinds/` (fallback `~/.config/engram/kinds/`). |
 | `packages/engram-core/src/ai/kinds.ts` | Kind catalog loader — `loadKindCatalog()`, `KindEntry`, `KindCatalog` |
+| `packages/engram-core/src/sync/run.ts` | `runSync()` orchestrator + `validateSyncConfig()` — preferred multi-source entry point |
+| `docs/internal/specs/sync-orchestration.md` | Config schema, discovery, adapter resolution, failure semantics, exit codes |
+| `docs/examples/.engram.config.json` | Example sync config file |
 | `packages/engram-core/src/ingest/git.ts` | Git VCS ingestion (the "money command" engine) |
 | `packages/engram-core/src/ingest/adapter.ts` | EnrichmentAdapter interface (v2) — AuthCredential, ScopeSchema, applyCompatShim, assertAuthKind |
 | `packages/engram-core/src/ingest/cursor.ts` | Cursor helpers — readIsoCursor, readNumericCursor, writeCursor |
