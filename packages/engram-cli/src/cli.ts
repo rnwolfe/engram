@@ -15,6 +15,7 @@ import { registerHistory } from "./commands/history.js";
 import { registerIngest } from "./commands/ingest.js";
 import { registerInit } from "./commands/init.js";
 import { registerMaintenance } from "./commands/maintenance.js";
+import { registerOnboard } from "./commands/onboard.js";
 import { registerOwnership } from "./commands/ownership.js";
 import { registerPlugin } from "./commands/plugin.js";
 import { registerProject } from "./commands/project.js";
@@ -73,5 +74,6 @@ registerPlugin(program);
 registerSync(program);
 registerWhy(program);
 registerBrief(program);
+registerOnboard(program);
 
 program.parse();
