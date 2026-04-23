@@ -7,7 +7,7 @@
  */
 
 import type { EngramGraph, Entity, Episode } from "engram-core";
-import { getEpisode } from "engram-core";
+import { EPISODE_SOURCE_TYPES, getEpisode, RELATION_TYPES } from "engram-core";
 
 // ---------------------------------------------------------------------------
 // Token budget helpers
@@ -429,17 +429,22 @@ export function getEntityPrIssueEpisodes(
 ): EpisodeSearchRow[] {
   try {
     return graph.db
-      .query<EpisodeSearchRow, [string]>(
+      .query<EpisodeSearchRow, [string, string, string, string]>(
         `SELECT ep.id, ep.source_type, ep.source_ref, ep.actor, ep.timestamp, ep.content
          FROM entity_evidence ee
          JOIN episodes ep ON ep.id = ee.episode_id
          WHERE ee.entity_id = ?
-           AND ep.source_type IN ('github_pr', 'github_issue', 'git_commit')
+           AND ep.source_type IN (?, ?, ?)
            AND ep.status = 'active'
          ORDER BY ep.timestamp DESC
          LIMIT ${limit}`,
       )
-      .all(entityId);
+      .all(
+        entityId,
+        EPISODE_SOURCE_TYPES.GITHUB_PR,
+        EPISODE_SOURCE_TYPES.GITHUB_ISSUE,
+        EPISODE_SOURCE_TYPES.GIT_COMMIT,
+      );
   } catch {
     return [];
   }
@@ -488,16 +493,16 @@ export function getCoChangeNeighbors(
 ): CoChangeRow[] {
   try {
     return graph.db
-      .query<CoChangeRow, [string, string]>(
+      .query<CoChangeRow, [string, string, string]>(
         `SELECT id, fact, edge_kind, weight, source_id, target_id, valid_from
          FROM edges
          WHERE (source_id = ? OR target_id = ?)
-           AND relation_type = 'co_changes_with'
+           AND relation_type = ?
            AND invalidated_at IS NULL
          ORDER BY weight DESC
          LIMIT ${limit}`,
       )
-      .all(entityId, entityId);
+      .all(entityId, entityId, RELATION_TYPES.CO_CHANGES_WITH);
   } catch {
     return [];
   }
@@ -521,15 +526,15 @@ export function getOwnershipEdges(
 ): OwnerEdgeRow[] {
   try {
     return graph.db
-      .query<OwnerEdgeRow, [string, string]>(
+      .query<OwnerEdgeRow, [string, string, string]>(
         `SELECT id, fact, edge_kind, valid_from, source_id, target_id
          FROM edges
          WHERE (source_id = ? OR target_id = ?)
-           AND relation_type = 'likely_owner_of'
+           AND relation_type = ?
            AND invalidated_at IS NULL
          ORDER BY valid_from DESC NULLS LAST`,
       )
-      .all(entityId, entityId);
+      .all(entityId, entityId, RELATION_TYPES.LIKELY_OWNER_OF);
   } catch {
     return [];
   }

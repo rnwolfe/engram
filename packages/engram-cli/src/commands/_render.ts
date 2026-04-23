@@ -8,6 +8,8 @@
  *   json:     { episode_id, source_type, source_ref?, url? } in citations array
  */
 
+import { EPISODE_SOURCE_TYPES, RELATION_TYPES } from "engram-core";
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -21,9 +23,17 @@ export interface CitedEpisode {
   excerpt: string;
 }
 
+export interface RenameEventEntry {
+  old_path: string;
+  new_path: string;
+  episode: CitedEpisode | null;
+}
+
 export interface WhydDigest {
   target: string;
   introducing_episode: CitedEpisode | null;
+  /** For path:line queries, the commit that introduced the specific line. */
+  blame_episode?: CitedEpisode | null;
   co_change_neighbors: Array<{
     canonical_name: string;
     weight: number;
@@ -35,11 +45,14 @@ export interface WhydDigest {
     episode_id?: string;
   }>;
   recent_prs: CitedEpisode[];
+  rename_chain: RenameEventEntry[];
   projections: Array<{
     kind: string;
     title: string;
     valid_from: string;
     episode_id?: string;
+    stale?: boolean;
+    stale_reason?: string;
   }>;
   truncated: boolean;
   token_budget_used: number;
@@ -65,11 +78,15 @@ export function citationText(episodeId: string): string {
  */
 export function citationMarkdown(ep: CitedEpisode, repoUrl?: string): string {
   const epId = ep.episode_id;
-  if (ep.source_type === "github_pr" || ep.source_type === "github_issue") {
+  if (
+    ep.source_type === EPISODE_SOURCE_TYPES.GITHUB_PR ||
+    ep.source_type === EPISODE_SOURCE_TYPES.GITHUB_ISSUE
+  ) {
     const num = ep.source_ref ? ep.source_ref.replace(/^#/, "") : null;
     const isNumeric = num !== null && /^\d+$/.test(num);
     if (isNumeric && repoUrl) {
-      const kind = ep.source_type === "github_pr" ? "pull" : "issues";
+      const kind =
+        ep.source_type === EPISODE_SOURCE_TYPES.GITHUB_PR ? "pull" : "issues";
       return `[#${num}](${repoUrl}/${kind}/${num})`;
     }
     if (ep.source_ref?.startsWith("http")) {
@@ -88,11 +105,15 @@ export interface JsonCitation {
 
 export function citationJson(ep: CitedEpisode, repoUrl?: string): JsonCitation {
   let url: string | null = null;
-  if (ep.source_type === "github_pr" || ep.source_type === "github_issue") {
+  if (
+    ep.source_type === EPISODE_SOURCE_TYPES.GITHUB_PR ||
+    ep.source_type === EPISODE_SOURCE_TYPES.GITHUB_ISSUE
+  ) {
     const num = ep.source_ref ? ep.source_ref.replace(/^#/, "") : null;
     const isNumeric = num !== null && /^\d+$/.test(num);
     if (isNumeric && repoUrl) {
-      const kind = ep.source_type === "github_pr" ? "pull" : "issues";
+      const kind =
+        ep.source_type === EPISODE_SOURCE_TYPES.GITHUB_PR ? "pull" : "issues";
       url = `${repoUrl}/${kind}/${num}`;
     } else if (ep.source_ref?.startsWith("http")) {
       url = ep.source_ref;
@@ -130,7 +151,7 @@ function shortRef(ref: string | null): string {
   return ref.slice(0, 40);
 }
 
-export function renderText(digest: WhydDigest, noAi: boolean): string {
+export function renderText(digest: WhydDigest): string {
   const lines: string[] = [];
 
   const targetBase = digest.target.split("/").pop() ?? digest.target;
@@ -202,6 +223,17 @@ export function renderText(digest: WhydDigest, noAi: boolean): string {
       lines.push(
         `  ${padRight(ref, 6)}  ${padRight(firstLine, 62)}  ${when}  ${cit}`,
       );
+    }
+    lines.push("");
+  }
+
+  // Rename chain
+  if (digest.rename_chain && digest.rename_chain.length > 0) {
+    lines.push("Rename history");
+    for (const r of digest.rename_chain) {
+      const cit = r.episode ? `  ${citationText(r.episode.episode_id)}` : "";
+      const when = r.episode ? `  ${shortDate(r.episode.timestamp)}` : "";
+      lines.push(`  Renamed from ${r.old_path}${when}${cit}`);
     }
     lines.push("");
   }
@@ -357,14 +389,14 @@ export function renderJson(
     ...digest.co_change_neighbors.map((n) => ({
       fact: `co_changes_with ${n.canonical_name}`,
       edge_kind: "inferred",
-      relation_type: "co_changes_with",
+      relation_type: RELATION_TYPES.CO_CHANGES_WITH,
       weight: n.weight,
       valid_from: null,
     })),
     ...digest.ownership.map((o) => ({
       fact: o.fact,
       edge_kind: "observed",
-      relation_type: "likely_owner_of",
+      relation_type: RELATION_TYPES.LIKELY_OWNER_OF,
       valid_from: o.valid_from,
     })),
   ];
@@ -374,7 +406,7 @@ export function renderJson(
       kind: p.kind,
       title: p.title,
       valid_from: p.valid_from,
-      stale: false,
+      stale: p.stale ?? false,
     }));
 
   return {
@@ -406,6 +438,6 @@ export function renderDigest(
     case "markdown":
       return renderMarkdown(digest, opts?.repoUrl);
     default:
-      return renderText(digest, true);
+      return renderText(digest);
   }
 }

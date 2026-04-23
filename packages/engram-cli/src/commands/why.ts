@@ -23,15 +23,23 @@ import type { EngramGraph, Entity, Episode } from "engram-core";
 import {
   closeGraph,
   createGenerator,
+  EPISODE_SOURCE_TYPES,
   findEntities,
   getEntity,
   getEpisode,
+  InvalidAsOfError,
   listActiveProjections,
   NullGenerator,
   openGraph,
+  resolveAsOf,
   resolveDbPath,
 } from "engram-core";
-import type { CitedEpisode, OutputFormat, WhydDigest } from "./_render.js";
+import type {
+  CitedEpisode,
+  OutputFormat,
+  RenameEventEntry,
+  WhydDigest,
+} from "./_render.js";
 import { renderDigest } from "./_render.js";
 import {
   estimateTokens,
@@ -68,11 +76,66 @@ function gitBlameCommit(
   }
 }
 
+interface RenameEvent {
+  hash: string;
+  old_path: string;
+  new_path: string;
+}
+
+/**
+ * Use `git log --follow --diff-filter=R --name-status` to find commits where
+ * the file was renamed, returning {hash, old_path, new_path} for each rename.
+ */
+function gitRenameHistory(filePath: string, cwd: string): RenameEvent[] {
+  try {
+    const result = spawnSync(
+      "git",
+      [
+        "log",
+        "--follow",
+        "--diff-filter=R",
+        "--name-status",
+        "--format=%H",
+        "--",
+        filePath,
+      ],
+      { cwd, encoding: "utf8", timeout: 10000 },
+    );
+    if (result.status !== 0) return [];
+    const events: RenameEvent[] = [];
+    const lines = result.stdout.split("\n");
+    let currentHash = "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      if (/^[0-9a-f]{40}$/.test(trimmed)) {
+        currentHash = trimmed;
+      } else if (trimmed.startsWith("R") && currentHash) {
+        const parts = trimmed.split(/\s+/);
+        if (parts.length >= 3) {
+          events.push({
+            hash: currentHash,
+            old_path: parts[1],
+            new_path: parts[2],
+          });
+        }
+      }
+    }
+    return events;
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Use `git log --follow` to collect the full commit history for a file,
- * including renames. Returns short hashes.
+ * including renames. Returns full hashes.
  */
-function gitLogFollow(filePath: string, cwd: string, since?: string): string[] {
+function _gitLogFollow(
+  filePath: string,
+  cwd: string,
+  since?: string,
+): string[] {
   try {
     const args = [
       "log",
@@ -199,6 +262,8 @@ async function assembleDigest(
         kind: pr.projection.kind,
         title: pr.projection.title,
         valid_from: pr.projection.valid_from,
+        stale: pr.stale,
+        stale_reason: pr.stale_reason,
       });
     }
   }
@@ -208,7 +273,7 @@ async function assembleDigest(
   const recentPrs: CitedEpisode[] = [];
   for (const row of prRows) {
     if (since) {
-      const sinceTs = parseSince(since);
+      const sinceTs = parseSince(since, gitCwd);
       if (sinceTs && row.timestamp < sinceTs) continue;
     }
     const ep = getEpisode(graph, row.id);
@@ -220,35 +285,31 @@ async function assembleDigest(
     if (recentPrs.length >= 10) break;
   }
 
-  // 6. Rename-following: collect commits from git log --follow and try to find
-  //    additional episodes linked to them.
+  // 6. Rename-following: detect rename history and surface it in output.
+  const renameChain: RenameEventEntry[] = [];
   if (entity.entity_type === "file" || entity.entity_type === "source_file") {
     const filePath = entity.canonical_name;
-    const gitHashes = gitLogFollow(filePath, gitCwd, since);
-    const seenIds = new Set(recentPrs.map((e) => e.episode_id));
-    if (introducingEpisode) seenIds.add(introducingEpisode.episode_id);
-
-    for (const hash of gitHashes.slice(0, 30)) {
-      if (recentPrs.length >= 10) break;
-      // Look up episode by source_ref matching commit hash (short or full)
+    const renameEvents = gitRenameHistory(filePath, gitCwd);
+    for (const ev of renameEvents.slice(0, 5)) {
       const epRow = graph.db
         .query<{ id: string }, [string, string]>(
           `SELECT id FROM episodes
-           WHERE source_type = 'git_commit'
+           WHERE source_type = ?
              AND (source_ref = ? OR source_ref LIKE ?)
              AND status = 'active'
            LIMIT 1`,
         )
-        .get(hash, `${hash.slice(0, 7)}%`);
-      if (!epRow || seenIds.has(epRow.id)) continue;
-      const ep = getEpisode(graph, epRow.id);
-      if (!ep) continue;
-      const cited = toCitedEpisode(ep);
-      if (budget(cited.excerpt)) {
-        seenIds.add(epRow.id);
-        // Only add as PR/recent if not already intro; skip plain commits in recentPrs
-        // (they would flood the list). Keep for ownership only.
-      }
+        .get(
+          EPISODE_SOURCE_TYPES.GIT_COMMIT,
+          ev.hash,
+          `${ev.hash.slice(0, 7)}%`,
+        );
+      const ep = epRow ? getEpisode(graph, epRow.id) : null;
+      renameChain.push({
+        old_path: ev.old_path,
+        new_path: ev.new_path,
+        episode: ep ? toCitedEpisode(ep) : null,
+      });
     }
   }
 
@@ -259,8 +320,10 @@ async function assembleDigest(
     ownership,
     recent_prs: recentPrs.filter(
       (ep) =>
-        ep.source_type === "github_pr" || ep.source_type === "github_issue",
+        ep.source_type === EPISODE_SOURCE_TYPES.GITHUB_PR ||
+        ep.source_type === EPISODE_SOURCE_TYPES.GITHUB_ISSUE,
     ),
+    rename_chain: renameChain,
     projections,
     truncated,
     token_budget_used: tokensUsed,
@@ -271,12 +334,27 @@ async function assembleDigest(
 // --since parser
 // ---------------------------------------------------------------------------
 
-function parseSince(since: string): string | null {
-  // ISO date or datetime
-  if (/^\d{4}-\d{2}-\d{2}/.test(since)) {
-    return since.length === 10 ? `${since}T00:00:00.000Z` : since;
+function parseSince(since: string, cwd: string): string | null {
+  // Try resolveAsOf (ISO8601, bare date, named relative like "yesterday")
+  try {
+    return resolveAsOf(since).iso;
+  } catch (e) {
+    if (!(e instanceof InvalidAsOfError)) throw e;
   }
-  // git ref — we can't easily resolve without git; return null (no filter)
+  // Try as a git ref via `git log -1`
+  try {
+    const result = spawnSync("git", ["log", "-1", "--format=%cI", since], {
+      cwd,
+      encoding: "utf8",
+      timeout: 5000,
+    });
+    if (result.status === 0) {
+      const ts = result.stdout.trim();
+      if (ts) return new Date(ts).toISOString();
+    }
+  } catch {
+    // fall through
+  }
   return null;
 }
 
@@ -450,6 +528,7 @@ See also:
       try {
         const parsed = parseTarget(target);
         let entity: Entity | null = null;
+        let blameEpisodeId: string | undefined;
 
         if (parsed.kind === "path" || parsed.kind === "path_line") {
           const filePath = parsed.path!;
@@ -495,14 +574,17 @@ See also:
             entity = symResolved.entity;
           } else if ("ambiguous" in resolved) {
             console.error(
-              `Error: ambiguous target — ${resolved.candidates.length} entities match '${filePath}':\n` +
+              `Ambiguous target — ${resolved.candidates.length} entities match '${filePath}':\n` +
                 resolved.candidates
-                  .map((e) => `  ${e.canonical_name} [${e.entity_type}]`)
+                  .map(
+                    (e, i) =>
+                      `  ${i + 1}. ${e.canonical_name} [${e.entity_type}]`,
+                  )
                   .join("\n") +
                 "\nHint: provide a more specific path.",
             );
             closeGraph(graph);
-            process.exit(1);
+            process.exit(2);
           } else {
             entity = resolved.entity;
 
@@ -520,31 +602,28 @@ See also:
               const symbolEntities = findEntities(graph, {
                 entity_type: "symbol",
               }).filter((e) =>
-                e.canonical_name.startsWith(entity!.canonical_name),
+                e.canonical_name.startsWith(entity?.canonical_name),
               );
               if (symbolEntities.length > 0) {
                 // Use the first symbol as extra context (we'll narrate both)
                 // Just use the file entity as primary for now
               }
 
-              // If we have a blame hash, find that episode and use it as intro
               if (blameHash) {
                 const blameEp = graph.db
                   .query<{ id: string }, [string, string]>(
                     `SELECT id FROM episodes
-                     WHERE source_type = 'git_commit'
+                     WHERE source_type = ?
                        AND (source_ref = ? OR source_ref LIKE ?)
                        AND status = 'active'
                      LIMIT 1`,
                   )
-                  .get(blameHash, `${blameHash.slice(0, 7)}%`);
-                if (blameEp) {
-                  // Store for use in digest (we'll use it as the intro)
-                  // The assembleDigest function will pick the earliest commit;
-                  // we hint this by not overriding here — the blame result is for
-                  // display purposes, handled in the digest post-processing below.
-                  void blameEp;
-                }
+                  .get(
+                    EPISODE_SOURCE_TYPES.GIT_COMMIT,
+                    blameHash,
+                    `${blameHash.slice(0, 7)}%`,
+                  );
+                if (blameEp) blameEpisodeId = blameEp.id;
               }
             }
           }
@@ -567,7 +646,7 @@ See also:
                  ORDER BY bm25(entities_fts)
                  LIMIT 5`,
               )
-              .all(`"${parsed.symbol!.replace(/"/g, '""')}"`);
+              .all(`"${parsed.symbol?.replace(/"/g, '""')}"`);
 
             if (ftsRows.length > 0) {
               console.error(
@@ -606,11 +685,20 @@ See also:
         }
 
         // Assemble digest
-        const digest = await assembleDigest(graph, entity, {
+        const rawDigest = await assembleDigest(graph, entity, {
           tokenBudget,
           since: opts.since,
           gitCwd: process.cwd(),
         });
+
+        // Annotate blame episode for path:line queries
+        let digest = rawDigest;
+        if (blameEpisodeId) {
+          const blameEp = getEpisode(graph, blameEpisodeId);
+          if (blameEp) {
+            digest = { ...rawDigest, blame_episode: toCitedEpisode(blameEp) };
+          }
+        }
 
         // AI narration (unless --no-ai)
         let narrative: string | undefined;
