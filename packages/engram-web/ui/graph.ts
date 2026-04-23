@@ -12,6 +12,7 @@ export const NODE_COLORS: Record<string, string> = {
   person: "#e8845c",
   module: "#6ab187",
   decision: "#c06cb4",
+  projection: "#f0b429",
   default: "#999999",
 };
 
@@ -84,6 +85,27 @@ export function initCytoscape(container: HTMLElement): Core {
         style: {
           "border-width": 2,
           "border-color": "#58a6ff",
+        },
+      },
+      // Projection nodes — diamond shape with amber color
+      {
+        selector: 'node[entity_type = "projection"]',
+        style: {
+          shape: "diamond",
+          "background-color": "#f0b429",
+          "border-width": 1,
+          "border-color": "#6e4a00",
+          color: "#f0b429",
+        },
+      },
+      // Stale projection nodes get a warning indicator
+      {
+        selector: 'node[entity_type = "projection"][?stale]',
+        style: {
+          "background-color": "#e67e22",
+          "border-width": 2,
+          "border-color": "#f0b429",
+          "border-style": "dashed",
         },
       },
       {
@@ -215,6 +237,10 @@ export interface GraphNode {
   entity_type: string;
   status: string;
   updated_at: string;
+  source_type?: string;
+  anchor_id?: string | null;
+  kind?: string;
+  stale?: boolean;
 }
 
 export interface GraphEdge {
@@ -249,6 +275,10 @@ export function buildElements(
       entity_type: n.entity_type,
       status: n.status,
       updated_at: n.updated_at,
+      source_type: n.source_type,
+      anchor_id: n.anchor_id,
+      kind: n.kind,
+      stale: n.stale,
     },
   }));
 

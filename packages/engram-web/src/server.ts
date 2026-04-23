@@ -186,6 +186,11 @@ export function createHandler(graph: EngramGraph) {
       return serveStatic(pathname);
     }
 
+    // Serve font files from dist/ui/fonts/
+    if (pathname.startsWith("/fonts/")) {
+      return serveStatic(pathname);
+    }
+
     // Serve other static files (main.js, main.css)
     if (pathname.match(/\.(js|css|html|map)$/)) {
       return serveStatic(pathname);

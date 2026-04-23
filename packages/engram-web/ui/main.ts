@@ -18,6 +18,7 @@ import {
   closePanel,
   openEdgePanel,
   openEntityPanel,
+  openProjectionPanel,
   setCytoscapeInstance,
 } from "./panels.js";
 import { initSearch } from "./search.js";
@@ -72,6 +73,10 @@ interface GraphResponse {
     entity_type: string;
     status: string;
     updated_at: string;
+    source_type?: string;
+    anchor_id?: string | null;
+    kind?: string;
+    stale?: boolean;
   }>;
   edges: Array<{
     id: string;
@@ -143,10 +148,13 @@ function buildLegend(data?: GraphResponse): void {
   const types = data
     ? [...new Set(data.nodes.map((n) => n.entity_type))].sort()
     : Object.keys(NODE_COLORS).filter((k) => k !== "default");
+
   legendEl.innerHTML = types
     .map((t) => {
       const color = NODE_COLORS[t as keyof typeof NODE_COLORS] ?? "#8b949e";
-      return `<div class="legend-item"><span class="legend-dot" style="background:${color}"></span>${t}</div>`;
+      // Projections use a diamond shape indicator
+      const dotClass = t === "projection" ? "legend-dot diamond" : "legend-dot";
+      return `<div class="legend-item"><span class="${dotClass}" style="background:${color}"></span>${t}</div>`;
     })
     .join("");
 }
@@ -172,8 +180,23 @@ async function init(): Promise<void> {
     setCytoscapeInstance(cy);
     attachHoverHandlers(cy);
 
-    // Tap handlers
-    cy.on("tap", "node", (evt) => openEntityPanel(evt.target.id() as string));
+    // Tap handlers — route projection nodes to their own panel
+    cy.on("tap", "node", (evt) => {
+      const node = evt.target;
+      const entityType = node.data("entity_type") as string;
+      if (entityType === "projection") {
+        openProjectionPanel({
+          id: node.id() as string,
+          canonical_name: node.data("label") as string,
+          anchor_id: node.data("anchor_id") as string | null | undefined,
+          kind: node.data("kind") as string | undefined,
+          stale: node.data("stale") as boolean | undefined,
+          updated_at: node.data("updated_at") as string,
+        });
+      } else {
+        openEntityPanel(node.id() as string);
+      }
+    });
     cy.on("tap", "edge", (evt) => openEdgePanel(evt.target.id() as string));
     cy.on("tap", (evt) => {
       if (evt.target === cy) closePanel();
