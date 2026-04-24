@@ -278,6 +278,22 @@ describe("computeFreshness — git source (commits-behind)", () => {
     expect(report.sources[0].severity).toBe("warn");
   });
 
+  it("stays fresh when a git run has a null cursor and is recent (commits-behind not applicable)", () => {
+    const now = new Date("2026-04-23T12:00:00.000Z");
+    insertRun(graph, {
+      id: "r-null-cursor",
+      sourceType: "git",
+      sourceScope: `${repoPath}::branch=main`,
+      completedAt: "2026-04-22T12:00:00.000Z",
+      cursor: null,
+    });
+
+    const report = computeFreshness(graph, { now });
+    expect(report.sources[0].commitsBehind).toBeNull();
+    expect(report.sources[0].cursorLost).toBe(false);
+    expect(report.sources[0].severity).toBe("fresh");
+  });
+
   it("marks cursorLost when the stored SHA is not in the repo", () => {
     const now = new Date("2026-04-23T12:00:00.000Z");
     insertRun(graph, {

@@ -138,7 +138,7 @@ describe("engram whats-new", () => {
     expect(out).toContain("v0.1.0");
   });
 
-  it("emits structured JSON with -j", async () => {
+  it("emits structured JSON with -j and does not mutate last_seen (no side effects for scripts)", async () => {
     tmp = makeTmpDir();
     const dbDir = makeGraph(tmp);
     setLastSeen(dbDir, "0.1.0");
@@ -157,6 +157,9 @@ describe("engram whats-new", () => {
     expect(parsed.lastSeen).toBe("0.1.0");
     expect(Array.isArray(parsed.versions)).toBe(true);
     expect(parsed.versions[0].version).toBe("0.2.0");
+
+    // JSON consumers should not have metadata side effects.
+    expect(readLastSeen(dbDir)).toBe("0.1.0");
   });
 
   it("bumps last_seen_engine_version after a default text render", async () => {

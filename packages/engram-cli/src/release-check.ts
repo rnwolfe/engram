@@ -79,23 +79,58 @@ function parseVersionFromTag(tag: string): string {
 }
 
 /**
- * Strict numeric-triple semver comparison. Returns negative if a<b, 0 if equal,
- * positive if a>b. Pre-release suffixes (`-alpha.1`) compare as older than
- * their release counterpart, matching npm semver semantics closely enough.
+ * Semver comparison per https://semver.org/#spec-item-11. Returns negative if
+ * a<b, 0 if equal, positive if a>b. Prerelease suffixes are split on `.`; each
+ * identifier is compared numerically when both sides are numeric, otherwise
+ * ASCII-wise. This matters for `alpha.10 > alpha.2` which the previous naive
+ * string compare got wrong.
  */
 export function compareSemver(a: string, b: string): number {
   const stripV = (s: string) => (s.startsWith("v") ? s.slice(1) : s);
   const [coreA = "", preA = ""] = stripV(a).split("-", 2);
   const [coreB = "", preB = ""] = stripV(b).split("-", 2);
+
   const pa = coreA.split(".").map((n) => Number.parseInt(n, 10));
   const pb = coreB.split(".").map((n) => Number.parseInt(n, 10));
   for (let i = 0; i < 3; i++) {
     const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
     if (diff !== 0) return diff;
   }
+
+  // A version without a prerelease has higher precedence than one with.
   if (preA && !preB) return -1;
   if (!preA && preB) return 1;
-  if (preA && preB) return preA < preB ? -1 : preA > preB ? 1 : 0;
+  if (!preA && !preB) return 0;
+
+  return comparePrerelease(preA, preB);
+}
+
+const NUMERIC = /^[0-9]+$/;
+
+function comparePrerelease(a: string, b: string): number {
+  const aIds = a.split(".");
+  const bIds = b.split(".");
+  const max = Math.max(aIds.length, bIds.length);
+  for (let i = 0; i < max; i++) {
+    const ai = aIds[i];
+    const bi = bIds[i];
+    // "A larger set of pre-release fields has a higher precedence than a
+    // smaller set, if all of the preceding identifiers are equal."
+    if (ai === undefined) return -1;
+    if (bi === undefined) return 1;
+
+    const aNum = NUMERIC.test(ai);
+    const bNum = NUMERIC.test(bi);
+    if (aNum && bNum) {
+      const diff = Number.parseInt(ai, 10) - Number.parseInt(bi, 10);
+      if (diff !== 0) return diff;
+    } else if (aNum !== bNum) {
+      // "Numeric identifiers always have lower precedence than alphanumeric."
+      return aNum ? -1 : 1;
+    } else if (ai !== bi) {
+      return ai < bi ? -1 : 1;
+    }
+  }
   return 0;
 }
 

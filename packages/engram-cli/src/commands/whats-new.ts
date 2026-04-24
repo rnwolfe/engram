@@ -242,10 +242,18 @@ acknowledging them, or --since/--all to view an arbitrary slice.`,
         renderHuman(versions, since, all);
       }
 
-      // Mark as seen so doctor/status stop nudging — unless explicitly opted out
-      // or the user asked for an arbitrary slice via --since / --all.
+      // Mark as seen so doctor/status stop nudging. Gates:
+      //   - text format only — scripts consuming JSON output should not have
+      //     metadata side effects. Use `engram whats-new` (no --format json)
+      //     after reading notes, or rely on an interactive invocation.
+      //   - default slice only — --since/--all are ad-hoc reads that should
+      //     not silently advance the acknowledged version.
+      //   - --no-mark opts out explicitly.
       const shouldMark =
-        opts.mark !== false && opts.since === undefined && !all;
+        opts.mark !== false &&
+        opts.format === "text" &&
+        opts.since === undefined &&
+        !all;
       if (shouldMark) {
         markEngineVersionSeen(graph);
       }

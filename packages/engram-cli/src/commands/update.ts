@@ -8,9 +8,15 @@
  * Two modes:
  *   --check     read-only: ask GitHub if a newer release is out and report
  *               (exits 1 when behind so scripts can gate on it).
- *   (default)   download the target release binary, verify it, and atomically
- *               replace the running binary. Refuses when the running binary
- *               is a dev checkout or sits in a directory the user cannot write.
+ *   (default)   download the target release binary and atomically replace the
+ *               running binary. Refuses when the running binary is a dev
+ *               checkout or sits in a directory the user cannot write.
+ *
+ * Trust model (current): authenticity rests on HTTPS/TLS to
+ * `github.com/<repo>/releases/download/...`. We do **not** yet verify against
+ * a published SHA256 or signature. A compromised GitHub release asset would
+ * not be caught. Follow-up: publish checksums in the release workflow and
+ * have this command fail closed on mismatch. See issue #275.
  */
 
 import * as fs from "node:fs";
@@ -200,7 +206,12 @@ Examples:
   engram update --check -j         # machine-readable check
 
 Release info is cached under $XDG_CACHE_HOME/engram/latest-release.json for
-24h so repeat checks do not hit the GitHub API.`,
+24h so repeat checks do not hit the GitHub API.
+
+Authenticity: downloads use HTTPS/TLS against github.com. Checksum or
+signature verification is not yet implemented — a compromised release asset
+would not be caught by this command alone. Review the release page if the
+provenance matters to you.`,
     )
     .action(async (opts: UpdateOpts) => {
       if (opts.j) opts.format = "json";

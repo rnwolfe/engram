@@ -27,6 +27,11 @@ export interface SourceFreshness {
   sourceScope: string | null;
   /** ISO timestamp of the most recent successful run, or null if never. */
   lastCompletedAt: string | null;
+  /**
+   * Stored ingestion cursor for this run (git SHA for git; adapter-specific
+   * otherwise). Null if the run completed without writing a cursor.
+   */
+  cursor: string | null;
   /** Days since `lastCompletedAt`. Null if the source never ran. */
   daysSince: number | null;
   /**
@@ -35,7 +40,7 @@ export interface SourceFreshness {
    * reachable from the current repo (force-push / history rewrite).
    */
   commitsBehind: number | null;
-  /** True if the cursor SHA exists in the repo but commits-behind failed. */
+  /** True if the stored cursor SHA is missing from or unreachable in the repo (force-push / history rewrite). */
   cursorLost: boolean;
   severity: FreshnessSeverity;
   /** One-line human explanation, safe to print directly. */
@@ -159,7 +164,6 @@ function countCommitsBehind(
 
 function buildReason(
   source: Omit<SourceFreshness, "reason" | "severity">,
-  severity: FreshnessSeverity,
 ): string {
   if (source.lastCompletedAt === null) {
     return "never run";
@@ -189,7 +193,7 @@ function buildReason(
     return `last ingest ${daysStr} (commits-behind unavailable)`;
   }
 
-  return `last ingest ${daysStr}${severity === "fresh" ? "" : ""}`;
+  return `last ingest ${daysStr}`;
 }
 
 /**
@@ -253,18 +257,22 @@ export function computeFreshness(
     }
 
     const daySeverity = severityFromDays(daysSince, thresholds);
-    const commitSeverity =
-      row.source_type === INGESTION_SOURCE_TYPES.GIT
-        ? cursorLost
-          ? "stale"
-          : severityFromCommits(commitsBehind, thresholds)
-        : "fresh";
+    // commits-behind only contributes when we have a git source with a
+    // reachable cursor. Missing or unparseable cursor → not applicable, fall
+    // back to day-based severity only; don't poison "fresh" with "unknown".
+    let commitSeverity: FreshnessSeverity = "fresh";
+    if (row.source_type === INGESTION_SOURCE_TYPES.GIT) {
+      if (cursorLost) commitSeverity = "stale";
+      else if (commitsBehind !== null)
+        commitSeverity = severityFromCommits(commitsBehind, thresholds);
+    }
     const severity = worseSeverity(daySeverity, commitSeverity);
 
     const partial: Omit<SourceFreshness, "reason" | "severity"> = {
       sourceType: row.source_type,
       sourceScope: row.source_scope,
       lastCompletedAt,
+      cursor: row.cursor,
       daysSince,
       commitsBehind,
       cursorLost,
@@ -273,7 +281,7 @@ export function computeFreshness(
     sources.push({
       ...partial,
       severity,
-      reason: buildReason(partial, severity),
+      reason: buildReason(partial),
     });
   }
 

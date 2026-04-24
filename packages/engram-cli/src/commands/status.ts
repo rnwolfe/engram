@@ -36,12 +36,6 @@ interface CountRow {
   count: number;
 }
 
-interface IngestionRow {
-  source_type: string;
-  completed_at: string | null;
-  cursor: string | null;
-}
-
 interface ReachabilityResult {
   ok: boolean;
   message: string;
@@ -431,65 +425,52 @@ function collectIngestion(graph: EngramGraph): IngestionSection {
     reason: null,
   };
 
-  const getLastRun = (sourceType: string): IngestionSourceInfo => {
-    try {
-      const row = graph.db
-        .query<IngestionRow, [string]>(
-          `SELECT source_type, completed_at, cursor
-           FROM ingestion_runs
-           WHERE source_type = ? AND status = 'completed'
-           ORDER BY completed_at DESC LIMIT 1`,
-        )
-        .get(sourceType);
-      if (!row) return { ...emptyInfo };
-      return {
-        ...emptyInfo,
-        completedAt: row.completed_at ? formatDateTime(row.completed_at) : null,
-        cursor: row.cursor,
-      };
-    } catch {
-      return { ...emptyInfo };
-    }
-  };
-
-  // Freshness helper: gives us daysSince, commitsBehind, and severity.
+  // `computeFreshness` returns one entry per (source_type, source_scope),
+  // newest-first. Build the status view directly from that so we never lose
+  // scope information — previously this code keyed a Map on source_type alone,
+  // which silently dropped all but one scope per type and surfaced the oldest.
   let freshness: ReturnType<typeof computeFreshness>;
   try {
     freshness = computeFreshness(graph);
   } catch {
     freshness = { overall: "unknown", sources: [] };
   }
-  const freshBySource = new Map(
-    freshness.sources.map((s) => [s.sourceType, s]),
-  );
 
-  const applyFreshness = (
-    sourceType: string,
-    base: IngestionSourceInfo,
-  ): IngestionSourceInfo => {
-    const f = freshBySource.get(sourceType);
-    if (!f) return base;
-    return {
-      ...base,
-      daysSince: f.daysSince,
-      commitsBehind: f.commitsBehind,
-      severity: f.severity,
-      reason: f.reason,
-    };
+  const toInfo = (
+    s: (typeof freshness.sources)[number],
+  ): IngestionSourceInfo => ({
+    completedAt: s.lastCompletedAt ? formatDateTime(s.lastCompletedAt) : null,
+    cursor: s.cursor,
+    daysSince: s.daysSince,
+    commitsBehind: s.commitsBehind,
+    severity: s.severity,
+    reason: s.reason,
+  });
+
+  // Canonical types get one summary line. If multiple scopes exist for the
+  // same type, take the freshest (first, since sources are newest-first).
+  const freshestByType = new Map<string, (typeof freshness.sources)[number]>();
+  for (const s of freshness.sources) {
+    if (!freshestByType.has(s.sourceType)) {
+      freshestByType.set(s.sourceType, s);
+    }
+  }
+  const canonical = (sourceType: string): IngestionSourceInfo => {
+    const f = freshestByType.get(sourceType);
+    return f ? toInfo(f) : { ...emptyInfo };
   };
 
+  // Non-canonical types: one line per (type, scope) so multi-scope plugin
+  // sources (e.g. several gerrit projects) are not collapsed together.
   const knownSources = new Set(["git", "github", "source"]);
   const other = freshness.sources
     .filter((s) => !knownSources.has(s.sourceType))
-    .map((s) => ({
-      sourceType: s.sourceType,
-      ...applyFreshness(s.sourceType, getLastRun(s.sourceType)),
-    }));
+    .map((s) => ({ sourceType: s.sourceType, ...toInfo(s) }));
 
   return {
-    git: applyFreshness("git", getLastRun("git")),
-    github: applyFreshness("github", getLastRun("github")),
-    source: applyFreshness("source", getLastRun("source")),
+    git: canonical("git"),
+    github: canonical("github"),
+    source: canonical("source"),
     other,
   };
 }
