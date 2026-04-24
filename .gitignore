@@ -9,4 +9,5 @@ dist/
 bun.lock
 .forge/
 .claude/worktrees/
+.claude/scheduled_tasks.lock
 .worktrees/
