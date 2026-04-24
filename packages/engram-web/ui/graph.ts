@@ -207,26 +207,38 @@ export function initCytoscape(container: HTMLElement): Core {
 
 // ── Layout ────────────────────────────────────────────────
 
-export const COSE_LAYOUT_OPTIONS = {
+const COSE_BASE = {
   name: "cose",
-  animate: true,
-  animationDuration: 500,
   randomize: true,
-  nodeRepulsion: () => 2048,
-  idealEdgeLength: () => 80,
-  edgeElasticity: () => 32,
+  nodeRepulsion: () => 400000,
+  idealEdgeLength: () => 120,
+  edgeElasticity: () => 100,
   nestingFactor: 1.2,
-  gravity: 1,
-  numIter: 1000,
-  initialTemp: 200,
-  coolingFactor: 0.95,
+  gravity: 80,
+  initialTemp: 1000,
+  coolingFactor: 0.99,
   minTemp: 1,
   fit: true,
-  padding: 40,
-} as const;
+  padding: 60,
+};
 
-export function runCoseLayout(cy: Core): void {
-  cy.elements().not(":hidden").layout(COSE_LAYOUT_OPTIONS).run();
+export function runCoseLayout(cy: Core, opts?: { animate?: boolean }): void {
+  const visible = cy.elements().not(":hidden");
+  const n = visible.nodes().length;
+  // Scale iterations: fewer nodes can afford more; clamp 500–2500
+  const numIter = Math.min(
+    2500,
+    Math.max(500, Math.round(5000 / Math.max(n, 1))),
+  );
+  const animate = opts?.animate ?? true;
+  visible
+    .layout({
+      ...COSE_BASE,
+      animate,
+      animationDuration: animate ? 500 : 0,
+      numIter,
+    })
+    .run();
 }
 
 // ── Elements builder ──────────────────────────────────────

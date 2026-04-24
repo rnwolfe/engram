@@ -139,6 +139,7 @@ function buildCheckboxSection(
   activeSet: Set<string>,
   defaultHidden: Set<string>,
   onChange: () => void,
+  onReveal?: () => void,
 ): void {
   const section = document.createElement("div");
   section.className = "filter-section";
@@ -162,10 +163,12 @@ function buildCheckboxSection(
     checkbox.addEventListener("change", () => {
       if (checkbox.checked) {
         activeSet.add(value);
+        onChange();
+        if (defaultHidden.has(value)) onReveal?.();
       } else {
         activeSet.delete(value);
+        onChange();
       }
-      onChange();
     });
 
     label.appendChild(checkbox);
@@ -222,6 +225,7 @@ export function initFilters(
       activeFilters.entityTypes,
       DEFAULT_HIDDEN_ENTITY_TYPES,
       applyFilters,
+      onReLayout,
     );
   }
 
@@ -255,6 +259,7 @@ export function initFilters(
       activeFilters.sourceTypes,
       new Set(),
       applyFilters,
+      onReLayout,
     );
   }
 
