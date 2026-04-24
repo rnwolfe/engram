@@ -1,0 +1,154 @@
+{
+  "$schema": "./whats-new.schema.json",
+  "_comment": "Source of truth for `engram whats-new`. Each entry corresponds to a released version. Keep items user-facing — describe what users can now do, not internal changes. `added`/`changed`/`breaking`/`deprecated`/`removed` are rendered verbatim; `fixes_summary` is a one-line roll-up so we don't enumerate every bugfix. Updated alongside CHANGELOG.md by the /release skill.",
+  "versions": [
+    {
+      "version": "0.2.0",
+      "date": "2026-04-19",
+      "headline": "Projection layer, multi-provider AI, and the .engram directory format",
+      "added": [
+        {
+          "title": "engram reconcile — projection maintenance loop",
+          "command": "engram reconcile",
+          "summary": "Two-phase loop: `assess` refreshes stale projections; `discover` surveys uncovered substrate and proposes new ones. Supports --phase, --scope, --max-cost (token budget), --dry-run, --reset-cursor, --cross-refs."
+        },
+        {
+          "title": "engram project — explicit projection authoring",
+          "command": "engram project",
+          "summary": "Author a single projection on a specific anchor with declared inputs — useful for targeted decision pages or entity summaries."
+        },
+        {
+          "title": "engram export wiki",
+          "command": "engram export wiki",
+          "summary": "Materialize active projections to a markdown folder (one file per projection) for reading or committing."
+        },
+        {
+          "title": "engram sync — config-driven multi-source ingestion",
+          "command": "engram sync",
+          "summary": "Orchestrate git, GitHub, source-code, and plugin adapters in one pass. Preferred entry point over chaining individual `ingest` commands."
+        },
+        {
+          "title": "engram brief — grounded briefing for a PR, issue, or topic",
+          "command": "engram brief",
+          "summary": "Assembles a briefing pack for a specific PR, issue, or topic — with evidence and co-change context baked in."
+        },
+        {
+          "title": "engram why — narrate history and rationale",
+          "command": "engram why",
+          "summary": "Explains the history and rationale of a file, symbol, or line using commit messages, PRs, and ownership signals."
+        },
+        {
+          "title": "engram onboard — briefing for a new contributor",
+          "command": "engram onboard",
+          "summary": "Guided briefing for a new contributor entering an area of the codebase, with suggested reading and key people."
+        },
+        {
+          "title": "engram diff — temporal diff of substrate and projections",
+          "command": "engram diff",
+          "summary": "Compare the graph (or a projection) across two time points to see what changed and when."
+        },
+        {
+          "title": "Projection authoring via Anthropic, Gemini, or OpenAI",
+          "summary": "Auto-detected from the exported API key. Set `ENGRAM_AI_PROVIDER` for explicit selection when multiple keys are present."
+        },
+        {
+          "title": "Built-in projection kinds",
+          "summary": "`entity_summary`, `decision_page`, `contradiction_report`, `topic_cluster`. User-defined kinds loadable from $XDG_CONFIG_HOME/engram/kinds/."
+        },
+        {
+          "title": "Source-code ingestion",
+          "command": "engram ingest source",
+          "summary": "Walks the working tree and extracts file/module/symbol entities via tree-sitter for TypeScript and JavaScript."
+        },
+        {
+          "title": "Plugin system",
+          "command": "engram plugin",
+          "summary": "First-party plugins (Gerrit, Google Workspace) installable via `engram plugin install`. User-authored plugins supported."
+        },
+        {
+          "title": "engram visualize — web graph UI",
+          "command": "engram visualize",
+          "summary": "Local web UI backed by Cytoscape.js with pan/zoom, typed node/edge styling, search-to-focus, temporal time slider, and decay/ownership overlays."
+        }
+      ],
+      "changed": [
+        {
+          "title": ".engram is now a directory, not a flat file",
+          "summary": "SQLite and related state live in `.engram/`. Old flat-file databases are not automatically migrated.",
+          "migration": "Run `engram doctor --fix` on an existing flat file, or recreate the graph."
+        },
+        {
+          "title": "Enrichment adapters use --scope, not --repo",
+          "summary": "`--repo` still accepted for one cycle with a deprecation warning.",
+          "migration": "Update scripts to pass `--scope <project>` where they used `--repo`."
+        },
+        {
+          "title": "Retrieval ranking improved",
+          "summary": "Config noise filtered; term-matching entities rank higher."
+        }
+      ],
+      "removed": [
+        {
+          "title": "engram-mcp transport",
+          "summary": "MCP server replaced by `engram context` for agent integration — a single pack-based API.",
+          "migration": "Agents that called the MCP server should switch to `engram context <query>`."
+        },
+        {
+          "title": "engramark benchmark suite",
+          "summary": "Stale-knowledge tests relocated under `packages/engram-core/test/stale-knowledge/`."
+        }
+      ],
+      "fixes_summary": "15 fixes across status, embed, reconcile, visualize, search, export, and markdown ingest."
+    },
+    {
+      "version": "0.1.0",
+      "date": "2026-04-08",
+      "headline": "Initial release — .engram format, git ingestion, hybrid retrieval",
+      "added": [
+        {
+          "title": ".engram format",
+          "summary": "Single-file SQLite schema with versioned migrations, metadata, episodes, entities, edges, and evidence chains."
+        },
+        {
+          "title": "Git VCS ingestion",
+          "command": "engram init --from-git",
+          "summary": "Walks git history to extract authors, files, co-change patterns, ownership signals, and bus-factor edges — no API tokens needed."
+        },
+        {
+          "title": "GitHub enrichment adapter",
+          "command": "engram ingest enrich github",
+          "summary": "Pulls PR discussions, linked issues, and review comments into the graph."
+        },
+        {
+          "title": "Markdown and text ingestion",
+          "summary": "Ingest `.md` and plain-text documents as episode sources."
+        },
+        {
+          "title": "Full-text search and hybrid retrieval",
+          "command": "engram search",
+          "summary": "FTS5-backed keyword search blended with vector similarity when an AI provider is configured."
+        },
+        {
+          "title": "Knowledge decay detection",
+          "command": "engram decay",
+          "summary": "Surfaces edges whose evidence is stale relative to recent activity."
+        },
+        {
+          "title": "Ownership risk report",
+          "command": "engram ownership-report",
+          "summary": "Bus-factor analysis — surfaces files and modules with single-owner concentration."
+        },
+        {
+          "title": "Integrity verification",
+          "command": "engram verify",
+          "summary": "Checks graph invariants: evidence coverage, temporal consistency, orphan detection."
+        },
+        {
+          "title": "Pluggable AI provider layer",
+          "summary": "`null` (FTS-only, default), `ollama` (nomic-embed-text), and `gemini` (gemini-embedding-001) providers."
+        }
+      ],
+      "fixes_summary": "3 fixes across hybrid search scoring, EngRAMark dataset, and CI permissions."
+    }
+  ]
+}
