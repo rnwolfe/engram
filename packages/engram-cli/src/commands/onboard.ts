@@ -156,7 +156,7 @@ See also:
         process.exit(1);
       }
 
-      let graph: EngramGraph | undefined;
+      let graph: EngramGraph;
       try {
         graph = openDb(opts.db);
       } catch (err) {
@@ -192,11 +192,11 @@ See also:
         console.error(
           `Error: ${err instanceof Error ? err.message : String(err)}`,
         );
-        closeGraph(graph!);
+        closeGraph(graph);
         process.exit(1);
       }
 
-      closeGraph(graph!);
+      closeGraph(graph);
     });
 
   // --- person subcommand ---
@@ -224,7 +224,7 @@ See also:
         process.exit(1);
       }
 
-      let graph: EngramGraph | undefined;
+      let graph: EngramGraph;
       try {
         graph = openDb(opts.db);
       } catch (err) {
@@ -260,10 +260,10 @@ See also:
         console.error(
           `Error: ${err instanceof Error ? err.message : String(err)}`,
         );
-        closeGraph(graph!);
+        closeGraph(graph);
         process.exit(1);
       }
 
-      closeGraph(graph!);
+      closeGraph(graph);
     });
 }

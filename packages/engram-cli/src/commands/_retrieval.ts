@@ -154,14 +154,10 @@ export function getEdgeProvenance(
 
 export type TargetKind = "path" | "symbol" | "path_line";
 
-export interface ParsedTarget {
-  kind: TargetKind;
-  path?: string;
-  line?: number;
-  symbol?: string;
-  /** Raw input string */
-  raw: string;
-}
+export type ParsedTarget =
+  | { kind: "path"; path: string; raw: string }
+  | { kind: "path_line"; path: string; line: number; raw: string }
+  | { kind: "symbol"; symbol: string; raw: string };
 
 /**
  * Parse a target argument into its kind:

@@ -382,7 +382,7 @@ describe("renderOnboardJson", () => {
     const json = renderOnboardJson(makePersonDigest()) as OnboardDigest;
     expect(json.target_kind).toBe("person");
     expect(Array.isArray(json.ownership_footprint)).toBe(true);
-    expect(json.ownership_footprint!.length).toBe(2);
+    expect(json.ownership_footprint?.length).toBe(2);
   });
 
   it("JSON is serialisable without error", () => {

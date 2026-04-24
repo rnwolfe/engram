@@ -140,7 +140,7 @@ See also:
 
       const dbPath = resolveDbPath(path.resolve(opts.db));
 
-      let graph: EngramGraph | undefined;
+      let graph: EngramGraph;
       try {
         graph = openGraph(dbPath);
       } catch (err) {
@@ -166,7 +166,7 @@ See also:
             break;
           default:
             digest = await assembleTopicDigest(graph, parsed.ref, () => {
-              closeGraph(graph!);
+              closeGraph(graph);
               process.exit(2);
             });
         }
@@ -188,10 +188,10 @@ See also:
         console.error(
           `Error: ${err instanceof Error ? err.message : String(err)}`,
         );
-        closeGraph(graph!);
+        closeGraph(graph);
         process.exit(1);
       }
 
-      closeGraph(graph!);
+      closeGraph(graph);
     });
 }

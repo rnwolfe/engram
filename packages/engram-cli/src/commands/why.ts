@@ -531,7 +531,7 @@ See also:
         let blameEpisodeId: string | undefined;
 
         if (parsed.kind === "path" || parsed.kind === "path_line") {
-          const filePath = parsed.path!;
+          const filePath = parsed.path;
           const resolved = resolvePathTarget(graph, filePath);
 
           if (resolved === null) {
@@ -629,7 +629,7 @@ See also:
           }
         } else {
           // Symbol target
-          const resolved = resolveSymbolTarget(graph, parsed.symbol!);
+          const resolved = resolveSymbolTarget(graph, parsed.symbol);
 
           if (resolved === null) {
             // FTS fallback
