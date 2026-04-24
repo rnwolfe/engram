@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-04-24
+
+### Fixed
+
+- Resolved 10 `noNonNullAssertion` lint warnings in `brief`, `onboard`,
+  and `why` commands. `ParsedTarget` converted from an optional-field
+  interface to a discriminated union so TypeScript narrows `path`/`symbol`
+  access without assertions. `graph` variables in action handlers declared
+  as `EngramGraph` (not `| undefined`) — TypeScript's definite-assignment
+  analysis handles `process.exit` in the catch branch.
+- `docs/whats-new.json` 0.2.0 entry corrected — removed six items
+  (`sync`, `brief`, `why`, `onboard`, `diff`, `visualize`) that were
+  not present in the v0.2.0 tag. The five narrative CLI commands now
+  appear in the 0.3.0 entry where they actually shipped; `engram
+  visualize` moved to its original home in 0.1.0 with a design-refresh
+  note in 0.3.0's `changed` section.
+
 ## [0.3.0] - 2026-04-23
 
 ### Added
@@ -294,7 +311,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI `commitlint` job was missing `pull-requests: read` permission, causing false
   failures on PRs.
 
-[Unreleased]: https://github.com/rnwolfe/engram/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/rnwolfe/engram/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/rnwolfe/engram/releases/tag/v0.3.1
 [0.3.0]: https://github.com/rnwolfe/engram/releases/tag/v0.3.0
 [0.2.0]: https://github.com/rnwolfe/engram/releases/tag/v0.2.0
 [0.1.0]: https://github.com/rnwolfe/engram/releases/tag/v0.1.0

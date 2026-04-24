@@ -5,8 +5,33 @@
     {
       "version": "0.3.0",
       "date": "2026-04-23",
-      "headline": "Temporal time-travel, repo-lifecycle health, and 8 new source languages",
+      "headline": "Narrative CLI surface, temporal time-travel, repo-lifecycle health, and 8 new source languages",
       "added": [
+        {
+          "title": "engram sync — config-driven multi-source ingestion",
+          "command": "engram sync",
+          "summary": "Orchestrate git, GitHub, source-code, and plugin adapters in one pass from a single `.engram.config.json`. Preferred entry point over chaining individual `ingest` commands."
+        },
+        {
+          "title": "engram brief — grounded briefing for a PR, issue, or topic",
+          "command": "engram brief",
+          "summary": "Assembles a briefing pack for a specific PR, issue, or topic — with evidence and co-change context baked in."
+        },
+        {
+          "title": "engram why — narrate history and rationale",
+          "command": "engram why",
+          "summary": "Explains the history and rationale of a file, symbol, or line using commit messages, PRs, and ownership signals."
+        },
+        {
+          "title": "engram onboard — briefing for a new contributor",
+          "command": "engram onboard",
+          "summary": "Guided briefing for a new contributor entering an area of the codebase, with suggested reading and key people."
+        },
+        {
+          "title": "engram diff — temporal diff of substrate and projections",
+          "command": "engram diff",
+          "summary": "Compare the graph (or a projection) across two time points to see what changed and when."
+        },
         {
           "title": "engram context --as-of <when>",
           "command": "engram context --as-of",
@@ -56,6 +81,11 @@
           "title": "Gerrit is now a plugin, not built-in",
           "summary": "The hardcoded `engram ingest enrich gerrit` subcommand is gone. Gerrit now auto-registers via the plugin loader.",
           "migration": "Run `engram plugin install gerrit` once; existing flags (--scope, --endpoint, --token) are unchanged."
+        },
+        {
+          "title": "engram visualize — design refresh",
+          "command": "engram visualize",
+          "summary": "Web UI rebuilt with Geist font and Tailwind. Projections now appear as nodes in the graph, and a new source-type filter lets you hide/show episodes by origin."
         }
       ],
       "fixes_summary": "UX audit sweep across the CLI, mobile viz sidebar/layout fixes, and a restored RBAC extractor."
@@ -81,31 +111,6 @@
           "summary": "Materialize active projections to a markdown folder (one file per projection) for reading or committing."
         },
         {
-          "title": "engram sync — config-driven multi-source ingestion",
-          "command": "engram sync",
-          "summary": "Orchestrate git, GitHub, source-code, and plugin adapters in one pass. Preferred entry point over chaining individual `ingest` commands."
-        },
-        {
-          "title": "engram brief — grounded briefing for a PR, issue, or topic",
-          "command": "engram brief",
-          "summary": "Assembles a briefing pack for a specific PR, issue, or topic — with evidence and co-change context baked in."
-        },
-        {
-          "title": "engram why — narrate history and rationale",
-          "command": "engram why",
-          "summary": "Explains the history and rationale of a file, symbol, or line using commit messages, PRs, and ownership signals."
-        },
-        {
-          "title": "engram onboard — briefing for a new contributor",
-          "command": "engram onboard",
-          "summary": "Guided briefing for a new contributor entering an area of the codebase, with suggested reading and key people."
-        },
-        {
-          "title": "engram diff — temporal diff of substrate and projections",
-          "command": "engram diff",
-          "summary": "Compare the graph (or a projection) across two time points to see what changed and when."
-        },
-        {
           "title": "Projection authoring via Anthropic, Gemini, or OpenAI",
           "summary": "Auto-detected from the exported API key. Set `ENGRAM_AI_PROVIDER` for explicit selection when multiple keys are present."
         },
@@ -121,12 +126,7 @@
         {
           "title": "Plugin system",
           "command": "engram plugin",
-          "summary": "First-party plugins (Gerrit, Google Workspace) installable via `engram plugin install`. User-authored plugins supported."
-        },
-        {
-          "title": "engram visualize — web graph UI",
-          "command": "engram visualize",
-          "summary": "Local web UI backed by Cytoscape.js with pan/zoom, typed node/edge styling, search-to-focus, temporal time slider, and decay/ownership overlays."
+          "summary": "XDG-based plugin loader with js-module and executable transports. `engram plugin list` shows discovered plugins."
         }
       ],
       "changed": [
@@ -200,6 +200,11 @@
           "title": "Integrity verification",
           "command": "engram verify",
           "summary": "Checks graph invariants: evidence coverage, temporal consistency, orphan detection."
+        },
+        {
+          "title": "engram visualize — web graph UI",
+          "command": "engram visualize",
+          "summary": "Local web UI backed by Cytoscape.js with pan/zoom, typed node/edge styling, search-to-focus, temporal time slider, and decay/ownership overlays."
         },
         {
           "title": "Pluggable AI provider layer",
