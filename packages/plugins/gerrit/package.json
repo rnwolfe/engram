@@ -1,6 +1,6 @@
 {
   "name": "@engram/plugin-gerrit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Gerrit enrichment adapter for engram (in-repo plugin)",
   "type": "module",
   "main": "src/index.ts",
