@@ -11,9 +11,11 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "check:versions": "bun scripts/check-versions.ts",
-    "verify": "bun run check:versions && bun run build && bun test && bun run lint"
+    "verify": "bun run check:versions && bun run build && bun test && bun run lint",
+    "prepare": "husky"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.10"
+    "@biomejs/biome": "2.4.12",
+    "husky": "^9.1.7"
   }
 }
