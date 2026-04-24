@@ -249,45 +249,49 @@ function isHelpModalOpen(): boolean {
 // ── Toolbar ───────────────────────────────────────────────
 
 function wireSidebarToggle(): void {
-  const sidebar = document.getElementById("filter-sidebar");
-  const toggleBtn = document.getElementById("btn-sidebar-toggle");
+  const sidebarEl = document.getElementById("filter-sidebar");
+  const toggleBtnEl = document.getElementById("btn-sidebar-toggle");
   const backdrop = document.getElementById("sidebar-backdrop");
-  if (!sidebar || !toggleBtn) return;
+  if (!sidebarEl || !toggleBtnEl) return;
+
+  // Non-null after guard above — avoid repeated assertions
+  const sidebar: HTMLElement = sidebarEl;
+  const toggleBtn: HTMLElement = toggleBtnEl;
 
   const isMobile = () => window.innerWidth <= 768;
 
   function setSidebarAccessibility(open: boolean): void {
-    toggleBtn!.setAttribute("aria-expanded", open ? "true" : "false");
-    sidebar!.setAttribute("aria-hidden", open ? "false" : "true");
+    toggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    sidebar.setAttribute("aria-hidden", open ? "false" : "true");
     if (open) {
-      sidebar!.removeAttribute("inert");
+      sidebar.removeAttribute("inert");
     } else {
-      sidebar!.setAttribute("inert", "");
+      sidebar.setAttribute("inert", "");
     }
   }
 
   function openSidebar(): void {
     if (isMobile()) {
-      sidebar!.classList.add("sidebar-open");
+      sidebar.classList.add("sidebar-open");
       backdrop?.classList.remove("hidden");
     } else {
-      sidebar!.classList.remove("collapsed");
+      sidebar.classList.remove("collapsed");
     }
     setSidebarAccessibility(true);
   }
 
   function closeSidebar(): void {
-    sidebar!.classList.remove("sidebar-open");
+    sidebar.classList.remove("sidebar-open");
     backdrop?.classList.add("hidden");
     if (!isMobile()) {
-      sidebar!.classList.add("collapsed");
+      sidebar.classList.add("collapsed");
     }
     setSidebarAccessibility(false);
   }
 
   function isSidebarVisible(): boolean {
-    if (isMobile()) return sidebar!.classList.contains("sidebar-open");
-    return !sidebar!.classList.contains("collapsed");
+    if (isMobile()) return sidebar.classList.contains("sidebar-open");
+    return !sidebar.classList.contains("collapsed");
   }
 
   toggleBtn.addEventListener("click", () => {
@@ -306,14 +310,11 @@ function wireSidebarToggle(): void {
     const nowMobile = isMobile();
     if (wasMobile === nowMobile) return;
     wasMobile = nowMobile;
-    // Reset both classes so neither bleeds across breakpoints
-    sidebar!.classList.remove("sidebar-open", "collapsed");
+    sidebar.classList.remove("sidebar-open", "collapsed");
     backdrop?.classList.add("hidden");
     if (nowMobile) {
-      // Start closed on mobile
       setSidebarAccessibility(false);
     } else {
-      // Start open on desktop
       setSidebarAccessibility(true);
     }
   });
