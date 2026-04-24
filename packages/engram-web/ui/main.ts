@@ -216,7 +216,7 @@ async function init(): Promise<void> {
     buildLegend(data);
 
     // Init filters first so defaults are applied before layout
-    initFilters(cy, data, () => runCoseLayout(cy));
+    initFilters(cy, data, () => runCoseLayout(cy, { animate: false }));
     runCoseLayout(cy);
     initSearch(cy, openEntityPanel);
     initTimeSlider(cy, (validAt) => applyGraphSnapshot(cy, validAt));
@@ -256,21 +256,33 @@ function wireSidebarToggle(): void {
 
   const isMobile = () => window.innerWidth <= 768;
 
+  function setSidebarAccessibility(open: boolean): void {
+    toggleBtn!.setAttribute("aria-expanded", open ? "true" : "false");
+    sidebar!.setAttribute("aria-hidden", open ? "false" : "true");
+    if (open) {
+      sidebar!.removeAttribute("inert");
+    } else {
+      sidebar!.setAttribute("inert", "");
+    }
+  }
+
   function openSidebar(): void {
-    sidebar!.classList.add("sidebar-open");
-    sidebar!.classList.remove("collapsed");
-    backdrop?.classList.remove("hidden");
-    toggleBtn!.setAttribute("aria-expanded", "true");
+    if (isMobile()) {
+      sidebar!.classList.add("sidebar-open");
+      backdrop?.classList.remove("hidden");
+    } else {
+      sidebar!.classList.remove("collapsed");
+    }
+    setSidebarAccessibility(true);
   }
 
   function closeSidebar(): void {
-    if (isMobile()) {
-      sidebar!.classList.remove("sidebar-open");
-      backdrop?.classList.add("hidden");
-    } else {
+    sidebar!.classList.remove("sidebar-open");
+    backdrop?.classList.add("hidden");
+    if (!isMobile()) {
       sidebar!.classList.add("collapsed");
     }
-    toggleBtn!.setAttribute("aria-expanded", "false");
+    setSidebarAccessibility(false);
   }
 
   function isSidebarVisible(): boolean {
@@ -286,13 +298,31 @@ function wireSidebarToggle(): void {
     }
   });
 
-  // Backdrop tap closes sidebar on mobile
   backdrop?.addEventListener("click", () => closeSidebar());
 
-  // On mobile, start with sidebar closed
+  // Reconcile state when crossing the mobile breakpoint
+  let wasMobile = isMobile();
+  window.addEventListener("resize", () => {
+    const nowMobile = isMobile();
+    if (wasMobile === nowMobile) return;
+    wasMobile = nowMobile;
+    // Reset both classes so neither bleeds across breakpoints
+    sidebar!.classList.remove("sidebar-open", "collapsed");
+    backdrop?.classList.add("hidden");
+    if (nowMobile) {
+      // Start closed on mobile
+      setSidebarAccessibility(false);
+    } else {
+      // Start open on desktop
+      setSidebarAccessibility(true);
+    }
+  });
+
+  // Initial state
   if (isMobile()) {
-    sidebar.classList.remove("sidebar-open");
-    toggleBtn.setAttribute("aria-expanded", "false");
+    setSidebarAccessibility(false);
+  } else {
+    setSidebarAccessibility(true);
   }
 }
 

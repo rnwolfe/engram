@@ -119,6 +119,8 @@ body {
   padding: 0;
   border-right: none;
   overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* Sidebar backdrop (mobile only) */

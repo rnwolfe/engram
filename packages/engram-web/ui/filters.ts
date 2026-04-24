@@ -164,7 +164,7 @@ function buildCheckboxSection(
       if (checkbox.checked) {
         activeSet.add(value);
         onChange();
-        onReveal?.();
+        if (defaultHidden.has(value)) onReveal?.();
       } else {
         activeSet.delete(value);
         onChange();
