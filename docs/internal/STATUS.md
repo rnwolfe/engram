@@ -1,7 +1,7 @@
 # Engram — Status
 
-> Last synced: 2026-04-23
-> Latest release: **v0.2.0** (2026-04-19) — `main` carries additional v0.2.x work not yet tagged
+> Last synced: 2026-04-24
+> Latest release: **v0.3.1** (2026-04-24) — see [CHANGELOG.md](../../CHANGELOG.md) for the full v0.3 surface (narrative CLI, `sync`, repo-lifecycle health).
 
 ## Phase 1 — Foundation (v0.1) — shipped 2026-04-08
 
@@ -129,7 +129,7 @@
 - [x] README v0.2 overhaul — plugins, Gerrit, reconcile, companion, token-budget semantics (#221)
 - [x] Various CLI fixes in #168-#179 (embed default, port validation, sparse-results gating, piped-intro suppression, etc.)
 
-## Phase 2 — Shipped on `main` since v0.2.0 tag
+## Phase 2 — Shipped in v0.3 (2026-04-23 → 2026-04-24)
 
 ### Done
 

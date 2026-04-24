@@ -17,11 +17,13 @@ relationships that never makes it into a commit message.
 - [Install](#install)
 - [Quick start](#quick-start)
 - [Use it with an AI coding agent](#use-it-with-an-ai-coding-agent)
+- [Narrative queries](#narrative-queries)
 - [Commands](#commands)
 - [Ingestion](#ingestion)
 - [Projections and reconcile](#projections-and-reconcile)
 - [Plugins](#plugins)
 - [AI providers](#ai-providers)
+- [Staying current](#staying-current)
 - [Programmatic API](#programmatic-api)
 - [Architecture](#architecture)
 - [Status](#status)
@@ -33,8 +35,9 @@ Engram runs a three-layer pipeline:
 
 1. **Ingest** — pull knowledge from where it already lives: git history
    (free, no tokens), source code (tree-sitter AST parsing), GitHub PRs,
-   Gerrit changes, markdown documents, or a custom plugin. Every piece of
-   source becomes an immutable **episode** with full provenance.
+   Gerrit changes, Google Docs, markdown documents, or a custom plugin.
+   Every piece of source becomes an immutable **episode** with full
+   provenance.
 2. **Graph** — encode that evidence as a temporal knowledge graph:
    entities, relationships, and facts with **validity windows**. Every edge
    traces back to source material. Every claim knows when it was true.
@@ -112,6 +115,10 @@ engram context "why was the auth middleware refactored"   # pack for an agent
 engram visualize   # http://127.0.0.1:7878
 ```
 
+Running more than one source on a schedule? Define them once in
+`.engram.config.json` and run `engram sync` — see
+[Config-driven sync](#config-driven-sync).
+
 ## Use it with an AI coding agent
 
 This is where engram earns its keep. The `context` command assembles a
@@ -136,42 +143,113 @@ engram context "why was X refactored" --format json
 Packs include co-change edges, supersession chains, and ownership signals
 that current code alone does not reveal.
 
+## Narrative queries
+
+On top of the raw pack, engram ships a handful of narrative commands that
+assemble a focused answer to a specific developer question — grounded in
+the graph, renderable as text, markdown, or JSON:
+
+```bash
+# Why does this file / symbol / line look the way it does?
+engram why packages/engram-core/src/graph/edges.ts
+engram why packages/engram-core/src/graph/edges.ts:supersedeEdge
+
+# A grounded briefing for a PR, issue, or topic
+engram brief "#214"
+engram brief "auth middleware"
+
+# Onboarding packet for a newcomer entering an area of the codebase
+engram onboard packages/engram-core/src/temporal
+
+# What changed between two points in time — substrate and projections
+engram diff v0.2.0 v0.3.0
+engram diff HEAD~50 HEAD --projections entity_summary
+
+# Time-travel a context pack to a past graph state
+engram context "reconcile design" --as-of 2026-01-15
+```
+
+These commands are designed to be readable on their own *and* to drop into
+an agent prompt. Use `--format markdown` for a human-reviewable artifact,
+`-j` (or `--format json`) for programmatic use, and `--no-ai` to get a
+structured, LLM-free rendering.
+
 ## Commands
 
 | Command | Purpose |
 |---|---|
 | `engram init` | Create a `.engram/` graph (interactive or `--yes`). |
 | `engram add [content]` | Add a manual note or file as evidence. |
+| `engram sync` | Run every source declared in `.engram.config.json` in one pass. |
 | `engram ingest git [path]` | Ingest a git repository's commit history. |
 | `engram ingest source [path]` | Ingest source files (tree-sitter). |
 | `engram ingest md <glob>` | Ingest markdown documents. |
 | `engram ingest enrich github --scope owner/repo` | Enrich with GitHub PRs and issues. |
-| `engram ingest enrich gerrit --scope <project>` | Enrich with Gerrit changes. |
-| `engram ingest enrich <plugin-name>` | Enrich via a discovered plugin. |
+| `engram ingest enrich gerrit --scope <project>` | Enrich with Gerrit changes (plugin). |
+| `engram ingest enrich google-workspace --scope folder:<id>` | Enrich with Google Docs (plugin). |
+| `engram ingest enrich <plugin-name>` | Enrich via any other discovered plugin. |
 | `engram reconcile --max-cost <tokens>` | Two-phase projection maintenance. |
 | `engram project --kind <k> --anchor entity:<ULID>` | Author a single projection. |
 | `engram export wiki --out ./wiki` | Export active projections as markdown. |
 | `engram search <query>` | Hybrid FTS + vector search. |
 | `engram show <entity>` | Entity details, edges, evidence. |
 | `engram history <entity>` | Temporal evolution of facts. |
-| `engram context <query>` | Token-budgeted pack for an agent prompt. |
+| `engram context <query> [--as-of <when>]` | Token-budgeted pack for an agent prompt; optional time travel. |
+| `engram why <file\|symbol\|line>` | Narrate the history and rationale of a location. |
+| `engram brief <PR\|issue\|topic>` | Grounded briefing with evidence and co-change context. |
+| `engram onboard <area>` | Guided briefing for a newcomer entering an area. |
+| `engram diff <from> <to>` | Temporal diff of substrate and projections between two refs. |
 | `engram companion --harness <name>` | Emit agent-harness instructions. |
 | `engram visualize` | Local HTTP server, defaults to `http://127.0.0.1:7878`. |
 | `engram ownership` | Ownership risk report (decay + owners). |
 | `engram decay` | Knowledge decay report. |
-| `engram status` | Health dashboard (providers, counts, config). |
+| `engram status` | Health dashboard (providers, counts, source freshness). |
 | `engram stats` | Raw graph counts. |
-| `engram doctor` | Diagnostics and optional repair. |
+| `engram doctor` | Diagnostics, freshness checks, version drift, optional repair. |
+| `engram whats-new` | User-facing highlights for engine versions newer than last seen. |
+| `engram update` | Self-updater — `--check` probes releases; default installs the latest. |
 | `engram verify` | Validate `.engram/` integrity. |
 | `engram embed` | Manage vector embeddings. |
 | `engram rebuild-index` | Rebuild the FTS index. |
 | `engram plugin list` | List discovered plugins (add `--available` for installable bundled plugins). |
+| `engram plugin info <name>` | Print a plugin's manifest description and linked docs. |
 | `engram plugin install <name>` | Wire a bundled first-party plugin into XDG (or project with `--project`). |
 | `engram plugin uninstall <name>` | Remove an installed plugin (`--force` for user-authored). |
 
 Every command has `--help` with examples.
 
 ## Ingestion
+
+### Config-driven sync
+
+For anything beyond a quick demo, declare your sources in
+`.engram.config.json` at the project root and run them in one pass:
+
+```bash
+engram sync                      # runs every configured source + cross-refs
+engram sync --only repo-git      # subset by source name
+engram sync --dry-run            # validate and print the plan
+engram sync --continue-on-error  # keep going when a source fails
+```
+
+```json
+{
+  "version": 1,
+  "sources": [
+    { "name": "repo-git",  "type": "git",    "path": "." },
+    { "name": "repo-src",  "type": "source", "root": "packages/" },
+    { "name": "engram-gh", "type": "github", "scope": "org/repo",
+      "auth": { "kind": "bearer", "tokenEnv": "GITHUB_TOKEN" } }
+  ]
+}
+```
+
+Supports `git`, `source`, `markdown`, `github`, and any discovered plugin
+adapter. See
+[`docs/internal/specs/sync-orchestration.md`](docs/internal/specs/sync-orchestration.md)
+for the full schema (discovery order, failure semantics, exit codes) and
+[`docs/examples/.engram.config.json`](docs/examples/.engram.config.json) for
+a multi-source example.
 
 ### Git — free, no tokens
 
@@ -189,8 +267,9 @@ Every command has `--help` with examples.
 
 `engram ingest source` walks the working tree, parses source files with
 tree-sitter, and creates file, module, and symbol entities. Respects
-`.gitignore` by default; always skips `node_modules`, build artifacts, and
-lockfiles.
+`.gitignore` and an optional `.engramignore` by default; monorepo-aware
+vendor heuristics skip `node_modules`, build artifacts, lockfiles, and
+vendored third-party trees automatically.
 
 Supported languages: **TypeScript/JavaScript (including TSX/JSX), Go, Python,
 Rust, Java, Ruby, C, C++, C#**, and **Starlark** (`BUILD`/`BUILD.bazel`/`BUCK`
@@ -222,7 +301,8 @@ discussions, review comments, linked issues, rationale behind decisions.
 | Source | Status | Scope flag | Notes |
 |---|---|---|---|
 | GitHub | Built-in | `--scope owner/repo` | Public works without a token. |
-| Gerrit | Plugin | `--scope <project>` | Basic or bearer auth; `--endpoint <url>`. Install via `engram plugin install gerrit`. |
+| Gerrit | Plugin (bundled) | `--scope <project>` | Basic or bearer auth; `--endpoint <url>`. Install via `engram plugin install gerrit`. |
+| Google Workspace | Plugin (bundled) | `--scope folder:<id>` or `--scope query:<q>` | Docs with revision-aware episodes. Install via `engram plugin install google-workspace`. |
 | GitLab | Planned | — | — |
 | Jira | Planned | — | — |
 | Linear | Planned | — | — |
@@ -244,6 +324,11 @@ engram plugin install gerrit
 engram ingest enrich gerrit --scope chromium/src \
   --endpoint https://gerrit-review.googlesource.com \
   --username alice --password $GERRIT_PASSWORD
+
+# Google Workspace (install the plugin first)
+engram plugin install google-workspace
+GOOGLE_SERVICE_ACCOUNT_JSON=$(cat service-account.json) \
+  engram ingest enrich google-workspace --scope folder:<drive-folder-id>
 ```
 
 All enrichment adapters speak the same v2 contract: `--scope`, a shared set
@@ -314,13 +399,16 @@ engram export wiki --out ./wiki
 
 ## Plugins
 
-Engram ships with a GitHub built-in adapter and a Gerrit first-party plugin.
-Anything else — GitLab, Jira, Linear, a proprietary review system, a custom
+Engram ships with a GitHub built-in adapter and two first-party plugins
+under `packages/plugins/` — **Gerrit** and **Google Workspace**. Anything
+else — GitLab, Jira, Linear, a proprietary review system, a custom
 knowledge source — can live as a plugin without forking engram.
 
 The Gerrit adapter (`packages/plugins/gerrit/`) is the reference implementation
 for the plugin contract (ADR-008) — proof that the contract is adequate for a
-full-featured first-party adapter.
+full-featured first-party adapter. Google Workspace
+(`packages/plugins/google-workspace/`) is the reference for mutable sources
+with revision-aware episode supersession (ADR-007).
 
 ### Discovery
 
@@ -355,6 +443,8 @@ NAME        VERSION  TRANSPORT   SCOPE    SOURCE    STATUS
 ----------  -------  ----------  -------  --------  ------
 my-jira     0.1.0    executable  user     user      OK
 my-linear   0.2.0    js-module   project  symlinked OK
+
+engram plugin info gerrit   # manifest description + linked docs
 ```
 
 ### Install and uninstall
@@ -444,6 +534,32 @@ ANTHROPIC_API_KEY=<key> engram reconcile --max-cost 50000
 ENGRAM_AI_PROVIDER=gemini GEMINI_API_KEY=<key> engram reconcile --max-cost 50000
 ```
 
+## Staying current
+
+Engram tracks three flavours of drift — data freshness, engine-version
+drift, and available releases — so a long-lived graph doesn't rot
+silently:
+
+```bash
+# Per-source freshness (days + commits behind HEAD) inline in the dashboard
+engram status
+
+# Diagnostics + repair, including freshness / engine_version_drift /
+# update_available checks
+engram doctor
+
+# Render user-facing highlights for engine versions newer than this graph
+# last acknowledged; bumps last_seen_engine_version after rendering
+engram whats-new
+
+# Self-update from GitHub releases
+engram update --check          # probe for a newer release, no changes
+engram update                  # download + atomic-replace the binary
+```
+
+`engram update` refuses to clobber a dev install (repository clone). The
+release check is cached for 24 hours so routine `doctor` runs stay cheap.
+
 ## Programmatic API
 
 ```typescript
@@ -483,11 +599,13 @@ import { discoverPlugins, loadManifest } from "engram-core/plugins";
 ## Architecture
 
 ```
-engram-core       The library (the product). Graph, temporal, retrieval,
-                  ingestion, projection, plugin-loader engines. Zero CLI
-                  or transport dependencies.
-engram-cli        CLI wrapper. commander + @clack/prompts.
-engram-web        Visualizer backend (served by `engram visualize`).
+engram-core              The library (the product). Graph, temporal, retrieval,
+                         ingestion, projection, plugin-loader engines. Zero
+                         CLI or transport dependencies.
+engram-cli               CLI wrapper. commander + @clack/prompts.
+engram-web               Visualizer backend (served by `engram visualize`).
+packages/plugins/*       First-party enrichment adapters shipped as plugins
+                         (gerrit, google-workspace).
 ```
 
 The `.engram/` directory layout is the durable contract. The CLI is the
@@ -503,18 +621,24 @@ Deeper reading:
 
 ## Status
 
-**v0.2 (schema) — in development.** Breaking changes expected before 1.0.
+**Latest release: v0.3.1** (schema v0.2, adapter contract v2). Breaking
+changes still possible before 1.0 — see [`CHANGELOG.md`](CHANGELOG.md).
 
 | Area | State |
 |---|---|
 | Git ingest (structural graph) | Stable |
 | Source ingest (TS/JS/TSX/JSX, Go, Python, Rust, Java, Ruby, C/C++, C#, Starlark) | Stable |
 | GitHub enrichment | Stable |
-| Gerrit enrichment | Experimental |
+| Hybrid search (FTS + vector) | Stable |
+| Config-driven `engram sync` | Stable |
+| Narrative queries (`why`, `brief`, `onboard`, `diff`) | Experimental |
+| `engram context --as-of` (temporal pack time travel) | Experimental |
+| Gerrit enrichment (plugin) | Experimental |
+| Google Workspace enrichment (plugin, mutable sources) | Experimental |
 | Plugin loader (js-module + executable) | Experimental |
 | Projections + reconcile | Experimental |
 | Cross-source reference resolution | Experimental |
-| Hybrid search (FTS + vector) | Stable |
+| Self-update + release lifecycle (`doctor`, `whats-new`, `update`) | Experimental |
 | `engram visualize` | Experimental |
 
 ## License
