@@ -1,18 +1,29 @@
 /**
  * server.ts — Bun.serve() HTTP server for engram-web.
  *
+ * Static assets (HTML, JS, CSS, fonts) are imported with
+ * `with { type: "file" }` so `bun build --compile` embeds them into the
+ * release binary. A static manifest maps each served URL to the resolved
+ * file path — there is no runtime filesystem scan of `dist/ui/`.
+ *
  * Routes:
  *   GET /              → dist/ui/index.html
- *   GET /assets/*      → dist/ui/assets/*
- *   GET /api/stats     → StatsResponse
- *   GET /api/graph     → GraphResponse (optional ?valid_at=ISO8601)
- *   GET /api/temporal-bounds → TemporalBoundsResponse
- *   GET /api/search    → SearchResponse (required ?q=<text>)
+ *   GET /main.js       → dist/ui/main.js
+ *   GET /main.css      → dist/ui/main.css
+ *   GET /fonts/*.woff2 → dist/ui/fonts/*.woff2
+ *   GET /api/*         → JSON handlers
  */
 
-import * as fs from "node:fs";
-import * as path from "node:path";
 import type { EngramGraph } from "engram-core";
+import fontRegular from "../dist/ui/fonts/GeistMono-Regular.woff2" with {
+  type: "file",
+};
+import fontVariable from "../dist/ui/fonts/GeistMono-Variable.woff2" with {
+  type: "file",
+};
+import indexHtml from "../dist/ui/index.html" with { type: "file" };
+import mainCss from "../dist/ui/main.css" with { type: "file" };
+import mainJs from "../dist/ui/main.js" with { type: "file" };
 import { handleDecay } from "./api/decay.js";
 import {
   handleEdgeDetail,
@@ -25,7 +36,14 @@ import { handleSearch } from "./api/search.js";
 import { handleStats } from "./api/stats.js";
 import { handleTemporalBounds } from "./api/temporal.js";
 
-const DIST_UI_DIR = path.resolve(import.meta.dir, "..", "dist", "ui");
+const STATIC_ASSETS: Record<string, string> = {
+  "/": indexHtml,
+  "/index.html": indexHtml,
+  "/main.js": mainJs,
+  "/main.css": mainCss,
+  "/fonts/GeistMono-Regular.woff2": fontRegular,
+  "/fonts/GeistMono-Variable.woff2": fontVariable,
+};
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -35,21 +53,32 @@ function json(data: unknown, status = 200): Response {
 }
 
 function serveStatic(requestPath: string): Response {
-  // Resolve path and ensure it stays within dist/ui/
-  const resolved = path.resolve(DIST_UI_DIR, requestPath.replace(/^\//, ""));
-  if (
-    !resolved.startsWith(DIST_UI_DIR + path.sep) &&
-    resolved !== DIST_UI_DIR
-  ) {
+  const assetPath = STATIC_ASSETS[requestPath];
+  if (!assetPath) {
     return new Response("Not Found", { status: 404 });
   }
+  return new Response(Bun.file(assetPath));
+}
 
-  if (!fs.existsSync(resolved)) {
-    return new Response("Not Found", { status: 404 });
+/**
+ * Verify every static asset is reachable. Run once at server startup so
+ * missing build output fails fast with a clear message instead of silently
+ * 404ing on the browser side. In a `bun build --compile` binary all paths
+ * are embedded; in dev mode they resolve to files on disk.
+ */
+export async function verifyStaticAssets(): Promise<void> {
+  const missing: string[] = [];
+  for (const [route, assetPath] of Object.entries(STATIC_ASSETS)) {
+    const exists = await Bun.file(assetPath).exists();
+    if (!exists) {
+      missing.push(`${route} (${assetPath})`);
+    }
   }
-
-  const file = Bun.file(resolved);
-  return new Response(file);
+  if (missing.length > 0) {
+    throw new Error(
+      `engram-web: web UI assets are missing. Run \`bun run build\` in the workspace root first.\nMissing: ${missing.join(", ")}`,
+    );
+  }
 }
 
 export function createHandler(graph: EngramGraph) {
@@ -170,32 +199,6 @@ export function createHandler(graph: EngramGraph) {
       }
     }
 
-    // Static asset serving
-    if (pathname === "/") {
-      const indexPath = path.join(DIST_UI_DIR, "index.html");
-      if (!fs.existsSync(indexPath)) {
-        return new Response(
-          "UI not built. Run `bun run build` in packages/engram-web.",
-          { status: 503, headers: { "Content-Type": "text/plain" } },
-        );
-      }
-      return new Response(Bun.file(indexPath));
-    }
-
-    if (pathname.startsWith("/assets/")) {
-      return serveStatic(pathname);
-    }
-
-    // Serve font files from dist/ui/fonts/
-    if (pathname.startsWith("/fonts/")) {
-      return serveStatic(pathname);
-    }
-
-    // Serve other static files (main.js, main.css)
-    if (pathname.match(/\.(js|css|html|map)$/)) {
-      return serveStatic(pathname);
-    }
-
-    return new Response("Not Found", { status: 404 });
+    return serveStatic(pathname);
   };
 }

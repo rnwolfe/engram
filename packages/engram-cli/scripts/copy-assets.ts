@@ -6,12 +6,15 @@
  * sibling files at runtime; after bundling, import.meta.url resolves
  * to dist/cli.js, so those files must live in dist/.
  *
+ * engram-web's UI assets are NOT copied here — server.ts imports them
+ * with `with { type: "file" }` so they are embedded at bundle time by
+ * both `bun build` and `bun build --compile`.
+ *
  * This script copies:
  *   - tree-sitter.wasm          → dist/tree-sitter.wasm
  *   - grammars/*.wasm           → dist/grammars/*.wasm
  *   - queries/*.scm             → dist/queries/*.scm
  *   - kinds/*.yaml              → dist/kinds/*.yaml  (projection kind catalog)
- *   - engram-web/dist/ui/       → dist/ui/           (visualize command static assets)
  */
 
 import { cpSync, mkdirSync } from "node:fs";
@@ -19,7 +22,6 @@ import path from "node:path";
 
 const cliRoot = path.join(import.meta.dir, "..");
 const coreRoot = path.join(cliRoot, "../engram-core");
-const webRoot = path.join(cliRoot, "../engram-web");
 const distDir = path.join(cliRoot, "dist");
 const sourceDir = path.join(coreRoot, "src/ingest/source");
 const kindsDir = path.join(coreRoot, "src/ai/kinds");
@@ -33,7 +35,6 @@ const treeSitterWasm = path.join(
 mkdirSync(path.join(distDir, "grammars"), { recursive: true });
 mkdirSync(path.join(distDir, "queries"), { recursive: true });
 mkdirSync(path.join(distDir, "kinds"), { recursive: true });
-mkdirSync(path.join(distDir, "ui"), { recursive: true });
 
 cpSync(treeSitterWasm, path.join(distDir, "tree-sitter.wasm"));
 cpSync(path.join(sourceDir, "grammars"), path.join(distDir, "grammars"), {
@@ -43,8 +44,5 @@ cpSync(path.join(sourceDir, "queries"), path.join(distDir, "queries"), {
   recursive: true,
 });
 cpSync(kindsDir, path.join(distDir, "kinds"), { recursive: true });
-cpSync(path.join(webRoot, "dist", "ui"), path.join(distDir, "ui"), {
-  recursive: true,
-});
 
 console.log("Assets copied to dist/");
