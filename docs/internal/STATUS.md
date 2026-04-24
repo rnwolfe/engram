@@ -1,7 +1,7 @@
 # Engram — Status
 
-> Last synced: 2026-04-21
-> Latest release: **v0.2.0** (2026-04-19)
+> Last synced: 2026-04-23
+> Latest release: **v0.2.0** (2026-04-19) — `main` carries additional v0.2.x work not yet tagged
 
 ## Phase 1 — Foundation (v0.1) — shipped 2026-04-08
 
@@ -129,17 +129,68 @@
 - [x] README v0.2 overhaul — plugins, Gerrit, reconcile, companion, token-budget semantics (#221)
 - [x] Various CLI fixes in #168-#179 (embed default, port validation, sparse-results gating, piped-intro suppression, etc.)
 
+## Phase 2 — Shipped on `main` since v0.2.0 tag
+
+### Done
+
+#### Narrative & temporal CLI surface
+
+- [x] `engram context --as-of <when>` — pack-level temporal time travel, learn-time filter (#264)
+- [x] `engram diff <from> <to>` — temporal diff of substrate and projections between two refs (#268)
+- [x] `engram why <file|symbol|line>` — narrate history and rationale (#269)
+- [x] `engram brief <PR|issue|topic>` — grounded briefing (#270)
+- [x] `engram onboard <area>` — guided briefing for a new contributor (#271)
+
+#### Multi-source orchestration
+
+- [x] `engram sync` — config-driven multi-source orchestration (#266, closes #203)
+
+#### Adapters & ingest
+
+- [x] Google Workspace adapter — Docs ingest with revision-aware episodes (#254, closes #196)
+- [x] Google Workspace scope grammar — `folder:` and `query:` discovery modes (#255, closes #198)
+- [x] Google Workspace adapter migrated to `packages/plugins/google-workspace/` (#256)
+- [x] Monorepo-aware source exclusions — vendor heuristics + `.engramignore` (#265)
+
+#### Plugin system
+
+- [x] Plugin docs contract — manifest `description`/`docs` fields + `engram plugin info` command (#257)
+
+#### Repo-lifecycle health
+
+- [x] `engram doctor` checks — `freshness`, `engine_version_drift`, `update_available` (#274)
+- [x] `engram whats-new` — render user-facing highlights from `docs/whats-new.json` (#274)
+- [x] `engram update` — self-updater with `--check` / atomic binary replace (#274)
+- [x] `engram status` — per-source "N commits behind, X days ago" inline (#274)
+- [x] `ENGINE_VERSION` synced across workspace + `check-versions` guard (#274)
+
+#### Graph visualization
+
+- [x] Design refresh — Geist font, Tailwind, projections in graph, source-type filter (#272)
+- [x] Mobile sidebar toggle + layout fix for revealed nodes (#273)
+
+#### CLI / UX
+
+- [x] Systematic UX audit fixes for human and agent ergonomics (#251)
+- [x] `/cleanup` skill for stale branch and worktree triage (#252)
+
+#### Documentation
+
+- [x] README update for expanded source-ingest language coverage (#250)
+- [x] STATUS and VISION sync with v0.2 shipped work (#253)
+
 ## Phase 2 — In flight / Next up
+
+### Open, unlabeled
+
+- [ ] #275 — `engram update`: verify downloaded binary against published checksum (follow-up to #274; supply-chain hardening for the self-updater)
 
 ### Open, needs refinement (`backlog/needs-refinement`)
 
-- [ ] #196 — Google Docs adapter (priority/high) — first LLM-consumable mutable source after ADR-007
-- [ ] #198 — Google Drive folder enumeration (depends on #196)
 - [ ] #193 — GitLab adapter (reclassified as in-repo plugin per ADR-008)
 - [ ] #194 — Jira adapter (reclassified as in-repo plugin per ADR-008)
 - [ ] #195 — Linear adapter (reclassified as in-repo plugin per ADR-008)
 - [ ] #192 — Buganizer spike (verify public API alignment)
-- [ ] #203 — `engram sync` — config-driven multi-source orchestration
 - [ ] #123 — Harness plugin core + Gemini CLI adapter (D3 Deliverable 2)
 - [ ] #116 — **Workflow benchmark** (priority/high, research) — Gate G1 for narrative projections per ADR-004. Flagged in most recent `/product` check: `decision_page`, `contradiction_report`, and `topic_cluster` shipped in v0.2.0 without G1 exit criteria met.
 
@@ -156,8 +207,8 @@ Phase 3 is gated on Phase 2 adapter coverage (Gerrit migration + Jira/Linear/Git
 
 ## Architecture Stats
 
-- **Packages**: 3 (`engram-core`, `engram-cli`, `engram-web`)
-- **Specs**: 17 under `docs/internal/specs/`
+- **Packages**: 3 core (`engram-core`, `engram-cli`, `engram-web`) + 2 in-repo plugins (`gerrit`, `google-workspace`) under `packages/plugins/`
+- **Specs**: 22 under `docs/internal/specs/`
 - **ADRs**: 8 recorded in `docs/internal/DECISIONS.md`
 - **Schema version**: v0.2 (projection layer + mutable-source supersession)
 - **Adapter contract**: v2 (typed auth, scope schema, cursor helpers)
