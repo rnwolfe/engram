@@ -77,9 +77,14 @@ Linux and macOS on x64 and arm64. Windows users can build from source.
 git clone https://github.com/rnwolfe/engram.git
 cd engram
 bun install
-bun run build
-bun link --cwd packages/engram-cli   # exposes `engram` on $PATH
+bun run build                         # required before `engram visualize` will serve UI
+bun link --cwd packages/engram-cli    # exposes `engram` on $PATH
 ```
+
+`bun run build` is mandatory in a source clone — the web UI assets are
+embedded at build time via Bun's `with { type: "file" }` imports, not
+tracked in git. Release binaries from `install.sh` are self-contained and
+require no build step.
 
 ## Quick start
 
