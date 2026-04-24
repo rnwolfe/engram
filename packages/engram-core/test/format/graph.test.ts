@@ -17,6 +17,7 @@ import {
   closeGraph,
   createGraph,
   EngramFormatError,
+  markEngineVersionSeen,
   openGraph,
   resolveDbPath,
 } from "../../src/format/index.js";
@@ -129,6 +130,129 @@ describe("createGraph", () => {
       .query<{ foreign_keys: number }, []>("PRAGMA foreign_keys")
       .get();
     expect(row?.foreign_keys).toBe(1);
+    closeGraph(graph);
+  });
+
+  it("initialises last_seen_engine_version to ENGINE_VERSION", () => {
+    const path = tmpPath("create-last-seen");
+    created.push(path);
+
+    const graph = createGraph(path);
+    expect(graph.lastSeenEngineVersion).toBe(ENGINE_VERSION);
+
+    const stored = (
+      graph.db
+        .prepare("SELECT value FROM metadata WHERE key = ?")
+        .get("last_seen_engine_version") as { value: string } | undefined
+    )?.value;
+    expect(stored).toBe(ENGINE_VERSION);
+    closeGraph(graph);
+  });
+});
+
+describe("last_seen_engine_version: open never mutates, markEngineVersionSeen does", () => {
+  const created: string[] = [];
+
+  afterEach(() => {
+    cleanupFiles(created);
+    created.length = 0;
+  });
+
+  it("reports no drift when reopening a freshly created graph", () => {
+    const path = tmpPath("reopen-no-drift");
+    created.push(path);
+    closeGraph(createGraph(path));
+
+    const reopened = openGraph(path);
+    expect(reopened.lastSeenEngineVersion).toBe(ENGINE_VERSION);
+    closeGraph(reopened);
+  });
+
+  it("openGraph returns the stored value without mutating it", () => {
+    const path = tmpPath("drift");
+    created.push(path);
+    const graph = createGraph(path);
+    graph.db
+      .prepare(
+        "INSERT INTO metadata (key, value) VALUES ('last_seen_engine_version', ?) " +
+          "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      )
+      .run("0.0.1");
+    closeGraph(graph);
+
+    const reopened = openGraph(path);
+    expect(reopened.lastSeenEngineVersion).toBe("0.0.1");
+
+    const stored = (
+      reopened.db
+        .prepare("SELECT value FROM metadata WHERE key = ?")
+        .get("last_seen_engine_version") as { value: string } | undefined
+    )?.value;
+    expect(stored).toBe("0.0.1");
+    closeGraph(reopened);
+  });
+
+  it("openGraph returns null on legacy graphs missing the key", () => {
+    const path = tmpPath("legacy");
+    created.push(path);
+    const graph = createGraph(path);
+    graph.db
+      .prepare("DELETE FROM metadata WHERE key = ?")
+      .run("last_seen_engine_version");
+    closeGraph(graph);
+
+    const reopened = openGraph(path);
+    expect(reopened.lastSeenEngineVersion).toBeNull();
+
+    const stored = (
+      reopened.db
+        .prepare("SELECT value FROM metadata WHERE key = ?")
+        .get("last_seen_engine_version") as { value: string } | undefined
+    )?.value;
+    expect(stored).toBeUndefined();
+    closeGraph(reopened);
+  });
+
+  it("markEngineVersionSeen writes ENGINE_VERSION and reports the previous value", () => {
+    const path = tmpPath("mark-seen");
+    created.push(path);
+    const graph = createGraph(path);
+    graph.db
+      .prepare(
+        "INSERT INTO metadata (key, value) VALUES ('last_seen_engine_version', ?) " +
+          "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      )
+      .run("0.0.1");
+
+    const result = markEngineVersionSeen(graph);
+    expect(result.previous).toBe("0.0.1");
+
+    const stored = (
+      graph.db
+        .prepare("SELECT value FROM metadata WHERE key = ?")
+        .get("last_seen_engine_version") as { value: string } | undefined
+    )?.value;
+    expect(stored).toBe(ENGINE_VERSION);
+    closeGraph(graph);
+  });
+
+  it("markEngineVersionSeen backfills legacy graphs", () => {
+    const path = tmpPath("mark-seen-legacy");
+    created.push(path);
+    const graph = createGraph(path);
+    graph.db
+      .prepare("DELETE FROM metadata WHERE key = ?")
+      .run("last_seen_engine_version");
+
+    const result = markEngineVersionSeen(graph);
+    expect(result.previous).toBeNull();
+
+    const stored = (
+      graph.db
+        .prepare("SELECT value FROM metadata WHERE key = ?")
+        .get("last_seen_engine_version") as { value: string } | undefined
+    )?.value;
+    expect(stored).toBe(ENGINE_VERSION);
     closeGraph(graph);
   });
 });

@@ -60,6 +60,22 @@ export interface EngramGraph {
   engineVersion: string;
   createdAt: string;
   ownerId: string;
+  /**
+   * The last engine version the user has explicitly acknowledged (by running
+   * `engram whats-new`). Compare against `ENGINE_VERSION` (the running binary)
+   * to detect that the user upgraded but hasn't yet reviewed what changed:
+   *
+   *   - null → no prior observation (graph predates the field). Callers may
+   *     show whats-new from `engineVersion` onward.
+   *   - value < ENGINE_VERSION → user upgraded but hasn't reviewed yet; surface a nudge.
+   *   - value === ENGINE_VERSION → reviewed up to current.
+   *   - value > ENGINE_VERSION → user downgraded; rare, usually a no-op.
+   *
+   * This value is **never** mutated on open. `createGraph` initialises it to
+   * `ENGINE_VERSION` (new graph = nothing new to review). It is bumped only by
+   * `markEngineVersionSeen()` — i.e., after the user runs `engram whats-new`.
+   */
+  lastSeenEngineVersion: string | null;
 }
 
 export interface CreateOpts {
@@ -133,6 +149,7 @@ export function createGraph(path: string, opts: CreateOpts = {}): EngramGraph {
     db.transaction(() => {
       insertMeta.run("format_version", FORMAT_VERSION);
       insertMeta.run("engine_version", ENGINE_VERSION);
+      insertMeta.run("last_seen_engine_version", ENGINE_VERSION);
       insertMeta.run("created_at", createdAt);
       insertMeta.run("owner_id", ownerId);
       insertMeta.run("default_timezone", defaultTimezone);
@@ -145,6 +162,7 @@ export function createGraph(path: string, opts: CreateOpts = {}): EngramGraph {
       engineVersion: ENGINE_VERSION,
       createdAt,
       ownerId,
+      lastSeenEngineVersion: ENGINE_VERSION,
     };
   } catch (err) {
     db.close();
@@ -226,6 +244,12 @@ export function openGraph(path: string): EngramGraph {
     }
   }
 
+  // Read but do not mutate. `last_seen_engine_version` is only bumped via
+  // markEngineVersionSeen() once the user runs `engram whats-new` — otherwise
+  // drift would be reported at most once per upgrade, which defeats the point
+  // of surfacing it in `doctor` and `status` until acknowledged.
+  const lastSeenEngineVersion = getMeta("last_seen_engine_version") ?? null;
+
   return {
     db,
     path,
@@ -233,7 +257,32 @@ export function openGraph(path: string): EngramGraph {
     engineVersion,
     createdAt,
     ownerId,
+    lastSeenEngineVersion,
   };
+}
+
+/**
+ * Records that the user has acknowledged the current engine version — called
+ * after `engram whats-new` renders its summary. Returns the value that was
+ * stored before the write (null if the field was absent).
+ */
+export function markEngineVersionSeen(graph: EngramGraph): {
+  previous: string | null;
+} {
+  const row = graph.db
+    .query<{ value: string }, [string]>(
+      "SELECT value FROM metadata WHERE key = ?",
+    )
+    .get("last_seen_engine_version");
+  const previous = row?.value ?? null;
+  if (previous !== ENGINE_VERSION) {
+    graph.db.run(
+      "INSERT INTO metadata (key, value) VALUES ('last_seen_engine_version', ?) " +
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      [ENGINE_VERSION],
+    );
+  }
+  return { previous };
 }
 
 /**
