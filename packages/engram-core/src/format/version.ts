@@ -5,7 +5,7 @@
  */
 
 export const FORMAT_VERSION = "0.2.0";
-export const ENGINE_VERSION = "0.3.1";
+export const ENGINE_VERSION = "0.3.2";
 
 /**
  * The oldest schema version this engine can read.

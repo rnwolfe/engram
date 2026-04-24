@@ -3,6 +3,20 @@
   "_comment": "Source of truth for `engram whats-new`. Each entry corresponds to a released version. Keep items user-facing — describe what users can now do, not internal changes. `added`/`changed`/`breaking`/`deprecated`/`removed` are rendered verbatim; `fixes_summary` is a one-line roll-up so we don't enumerate every bugfix. Updated alongside CHANGELOG.md by the /release skill.",
   "versions": [
     {
+      "version": "0.3.2",
+      "date": "2026-04-24",
+      "headline": "engram visualize now works from release binaries.",
+      "changed": [
+        {
+          "title": "engram visualize — UI embedded in the binary",
+          "command": "engram visualize",
+          "summary": "Release binaries now ship with all UI assets embedded. Source-clone contributors using `bun link` must run `bun run build` before `engram visualize` will serve; a friendly error points to this when assets are missing.",
+          "migration": "From a source clone, run `bun run build` before `engram visualize`. Release binaries from install.sh need no action."
+        }
+      ],
+      "fixes_summary": "engram visualize now works from release binaries — previously the compiled binary had no embedded UI assets."
+    },
+    {
       "version": "0.3.0",
       "date": "2026-04-23",
       "headline": "Narrative CLI surface, temporal time-travel, repo-lifecycle health, and 8 new source languages",
