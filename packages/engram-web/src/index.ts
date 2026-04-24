@@ -6,7 +6,7 @@
 
 import type { EngramGraph } from "engram-core";
 import { closeGraph, openGraph } from "engram-core";
-import { createHandler } from "./server.js";
+import { createHandler, verifyStaticAssets } from "./server.js";
 
 export interface ServerOpts {
   dbPath: string;
@@ -26,9 +26,11 @@ export interface ServerHandle {
  * Opens the .engram database at dbPath, binds on host:port (defaults: 127.0.0.1:7878),
  * and returns a handle with a stop() function to close cleanly.
  */
-export function startServer(opts: ServerOpts): ServerHandle {
+export async function startServer(opts: ServerOpts): Promise<ServerHandle> {
   const port = opts.port ?? 7878;
   const host = opts.host ?? "127.0.0.1";
+
+  await verifyStaticAssets();
 
   const graph = openGraph(opts.dbPath);
   const handler = createHandler(graph);

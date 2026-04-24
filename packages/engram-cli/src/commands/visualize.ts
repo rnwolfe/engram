@@ -2,10 +2,15 @@
  * visualize.ts — `engram visualize` command.
  *
  * Starts the engram-web HTTP server, prints the URL, and waits for SIGINT.
+ *
+ * engram-web is loaded via dynamic import so a missing dev build (no
+ * `dist/ui/` output) can surface a helpful "run bun run build" message
+ * instead of Bun's bare "Cannot find module" error. In a compiled binary
+ * the asset imports resolve against the embedded FS so this path is never
+ * taken.
  */
 
 import * as path from "node:path";
-import { startServer } from "@engram/engram-web";
 import type { Command } from "commander";
 import { resolveDbPath } from "engram-core";
 
@@ -16,6 +21,23 @@ interface VisualizeOpts {
   port: string;
   host: string;
   readOnly: boolean;
+}
+
+async function loadEngramWeb() {
+  try {
+    return await import("@engram/engram-web");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("dist/ui")) {
+      console.error("engram visualize: web UI assets have not been built.");
+      console.error(
+        "If you are running from a source clone, build the workspace first:",
+      );
+      console.error("  bun run build");
+      process.exit(1);
+    }
+    throw err;
+  }
 }
 
 export function registerVisualize(program: Command): void {
@@ -44,7 +66,7 @@ See also:
   engram show      display entity details in the terminal
   engram search    find entities by keyword`,
     )
-    .action((opts: VisualizeOpts) => {
+    .action(async (opts: VisualizeOpts) => {
       const dbPath = resolveDbPath(path.resolve(opts.db));
       const port = Number.parseInt(opts.port, 10);
       if (Number.isNaN(port) || port < 1 || port > 65535) {
@@ -59,9 +81,11 @@ See also:
         );
       }
 
-      let handle: ReturnType<typeof startServer> | undefined;
+      const { startServer } = await loadEngramWeb();
+
+      let handle: Awaited<ReturnType<typeof startServer>> | undefined;
       try {
-        handle = startServer({ dbPath, port, host });
+        handle = await startServer({ dbPath, port, host });
       } catch (err) {
         console.error(
           `Error starting server: ${err instanceof Error ? err.message : String(err)}`,
