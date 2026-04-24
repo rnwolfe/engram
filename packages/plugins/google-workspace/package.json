@@ -1,6 +1,6 @@
 {
   "name": "@engram/plugin-google-workspace",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Google Workspace enrichment adapter for engram (in-repo plugin)",
   "type": "module",
   "main": "src/index.ts",

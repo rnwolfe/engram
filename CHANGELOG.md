@@ -7,6 +7,98 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-04-23
+
+### Added
+
+#### Narrative & temporal CLI surface
+
+- **`engram context --as-of <when>`** — Pack-level temporal time travel with
+  learn-time filter: retrieve a context pack reflecting what the graph knew
+  at a past point in time (#264).
+- **`engram diff <from> <to>`** — Temporal diff of substrate and projections
+  between two refs (#268).
+- **`engram why <file|symbol|line>`** — Narrate the history and rationale of
+  a file, symbol, or line using commits, PRs, and ownership signals (#269).
+- **`engram brief <PR|issue|topic>`** — Grounded briefing for a PR, issue,
+  or topic, with evidence and co-change context (#270).
+- **`engram onboard <area>`** — Guided briefing for a new contributor
+  entering an area of the codebase (#271).
+- **`engram sync`** — Config-driven multi-source orchestration. Reads
+  `.engram.config.json` and runs git, GitHub, source, and plugin adapters
+  in one pass (#266).
+
+#### Repo-lifecycle health
+
+- **`engram doctor`** new checks — `freshness` (days + commits behind HEAD
+  per source), `engine_version_drift` (nudge when the user upgraded but
+  hasn't reviewed what changed), and `update_available` (GitHub releases,
+  cached 24h) (#274).
+- **`engram whats-new`** — Render user-facing highlights from
+  `docs/whats-new.json` filtered to versions the user hasn't acknowledged (#274).
+- **`engram update`** — Self-updater: `--check` probes the release API; the
+  default mode downloads the matching OS/arch binary and atomic-renames it
+  into `process.execPath`. Refuses dev installs (#274).
+- **`engram status`** — Surfaces per-source "N commits behind, X days ago"
+  inline (#274).
+
+#### Source-code ingestion — language expansion
+
+- Tree-sitter parsers for **Go** and **Python** (#235), **Rust** (#243),
+  **Java** (#244), **Ruby, C, C++, C#** (#245), and **Starlark/BUILD**
+  for Bazel dependency graphs (#248).
+
+#### Kubernetes operator graph
+
+- **kubebuilder RBAC markers** — `+kubebuilder:rbac` annotations in Go
+  source extracted as RBAC permission edges (#247).
+- **controller-runtime watches** — `SetupWithManager` watches extracted
+  as graph edges (#246).
+
+#### Adapters & ingest
+
+- **Google Workspace adapter** — Docs ingest with revision-aware episodes
+  (first LLM-consumable mutable source per ADR-007). Supports `folder:`
+  and `query:` scope grammar for folder and query-based discovery
+  (#254, #255).
+- **Monorepo-aware source exclusions** — Vendor/build-artifact heuristics
+  and `.engramignore` support in `engram ingest source` (#265).
+
+#### Plugin system
+
+- **`engram plugin install`** and **`engram plugin uninstall`** — Wire
+  first-party plugins into `$XDG_DATA_HOME/engram/plugins/` from the
+  monorepo's `packages/plugins/` directory (#228).
+- **Plugin docs contract** — Manifests carry `description` and `docs` fields;
+  `engram plugin info <name>` surfaces them (#257).
+
+#### Graph visualization
+
+- **Web UI design refresh** — Geist font, Tailwind-based styling, projection
+  nodes rendered directly in the graph, source-type filter (#272).
+
+### Changed
+
+- **Gerrit adapter is now a plugin, not built-in** — `engram ingest enrich
+  gerrit` no longer works out of the box on a fresh install (#229).
+  - Migration: Run `engram plugin install gerrit` once to restore the
+    subcommand. Existing flags (`--scope`, `--endpoint`, `--token`, etc.)
+    are unchanged.
+- **Google Workspace adapter ships as an in-repo plugin** from day one per
+  ADR-008 (#256). Install with `engram plugin install google-workspace`.
+- Orchestrator generalized to accept extractor-declared entities and
+  edges — internal refactor making language extractors simpler to author
+  (#242).
+
+### Fixed
+
+- Viz sidebar toggle on mobile; layout fix for nodes revealed by
+  filters (#273).
+- Systematic UX audit fixes across the CLI surface for both human and
+  agent ergonomics (#251).
+- Restored RBAC marker extraction to `main` after #247 merged to the
+  wrong base (#249).
+
 ## [0.2.0] - 2026-04-19
 
 ### Added
@@ -202,6 +294,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI `commitlint` job was missing `pull-requests: read` permission, causing false
   failures on PRs.
 
-[Unreleased]: https://github.com/rnwolfe/engram/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/rnwolfe/engram/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/rnwolfe/engram/releases/tag/v0.3.0
 [0.2.0]: https://github.com/rnwolfe/engram/releases/tag/v0.2.0
 [0.1.0]: https://github.com/rnwolfe/engram/releases/tag/v0.1.0

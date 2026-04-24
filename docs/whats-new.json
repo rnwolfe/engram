@@ -3,6 +3,64 @@
   "_comment": "Source of truth for `engram whats-new`. Each entry corresponds to a released version. Keep items user-facing — describe what users can now do, not internal changes. `added`/`changed`/`breaking`/`deprecated`/`removed` are rendered verbatim; `fixes_summary` is a one-line roll-up so we don't enumerate every bugfix. Updated alongside CHANGELOG.md by the /release skill.",
   "versions": [
     {
+      "version": "0.3.0",
+      "date": "2026-04-23",
+      "headline": "Temporal time-travel, repo-lifecycle health, and 8 new source languages",
+      "added": [
+        {
+          "title": "engram context --as-of <when>",
+          "command": "engram context --as-of",
+          "summary": "Retrieve a context pack reflecting what the graph knew at a past point in time — time-travel for your knowledge graph."
+        },
+        {
+          "title": "engram update — self-updater",
+          "command": "engram update",
+          "summary": "Probe for new releases with --check, or download and atomic-replace the binary. Refuses to touch dev installs."
+        },
+        {
+          "title": "engram whats-new",
+          "command": "engram whats-new",
+          "summary": "See what changed in the versions you upgraded across. Bumps your last-seen marker so the doctor drift nudge clears."
+        },
+        {
+          "title": "engram doctor — freshness and update checks",
+          "command": "engram doctor",
+          "summary": "New checks: how stale each ingestion source is (days + commits behind HEAD), engine version drift, and update availability."
+        },
+        {
+          "title": "Source ingestion — 8 more languages",
+          "command": "engram ingest source",
+          "summary": "Tree-sitter parsers for Go, Python, Rust, Java, Ruby, C, C++, C#, and Starlark/BUILD join TS/JS."
+        },
+        {
+          "title": "Kubernetes operator graph",
+          "summary": "Go source now extracts kubebuilder RBAC markers and controller-runtime SetupWithManager watches as first-class edges."
+        },
+        {
+          "title": "Google Workspace adapter",
+          "command": "engram plugin install google-workspace",
+          "summary": "Ingest Google Docs with revision-aware episodes — the first mutable-source adapter landing ADR-007 in production."
+        },
+        {
+          "title": "Monorepo-aware source exclusions",
+          "summary": "engram ingest source now honors .engramignore and skips vendor/build directories via heuristics — no more bloated graphs on monorepos."
+        },
+        {
+          "title": "engram plugin install / uninstall",
+          "command": "engram plugin install",
+          "summary": "Install first-party plugins (gerrit, google-workspace) from the monorepo into your user-wide plugins directory."
+        }
+      ],
+      "changed": [
+        {
+          "title": "Gerrit is now a plugin, not built-in",
+          "summary": "The hardcoded `engram ingest enrich gerrit` subcommand is gone. Gerrit now auto-registers via the plugin loader.",
+          "migration": "Run `engram plugin install gerrit` once; existing flags (--scope, --endpoint, --token) are unchanged."
+        }
+      ],
+      "fixes_summary": "UX audit sweep across the CLI, mobile viz sidebar/layout fixes, and a restored RBAC extractor."
+    },
+    {
       "version": "0.2.0",
       "date": "2026-04-19",
       "headline": "Projection layer, multi-provider AI, and the .engram directory format",
