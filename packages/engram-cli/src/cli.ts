@@ -25,8 +25,10 @@ import { registerShow } from "./commands/show.js";
 import { registerStats } from "./commands/stats.js";
 import { registerStatus } from "./commands/status.js";
 import { registerSync } from "./commands/sync.js";
+import { registerUpdate } from "./commands/update.js";
 import { registerVerify } from "./commands/verify.js";
 import { registerVisualize } from "./commands/visualize.js";
+import { registerWhatsNew } from "./commands/whats-new.js";
 import { registerWhy } from "./commands/why.js";
 
 const program = new Command()
@@ -75,5 +77,7 @@ registerSync(program);
 registerWhy(program);
 registerBrief(program);
 registerOnboard(program);
+registerWhatsNew(program);
+registerUpdate(program);
 
 program.parse();

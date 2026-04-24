@@ -58,6 +58,7 @@ export {
   closeGraph,
   createGraph,
   EngramFormatError,
+  markEngineVersionSeen,
   migrate_0_1_0_to_0_2_0,
   openGraph,
   resolveDbPath,
@@ -139,6 +140,17 @@ export {
   supersedeEpisode,
   supersedeProjection,
 } from "./graph/index.js";
+export type {
+  FreshnessOptions,
+  FreshnessReport,
+  FreshnessSeverity,
+  FreshnessThresholds,
+  SourceFreshness,
+} from "./health/index.js";
+export {
+  computeFreshness,
+  DEFAULT_FRESHNESS_THRESHOLDS,
+} from "./health/index.js";
 export type {
   AuthCredential,
   EnrichmentAdapter,

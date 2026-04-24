@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "engram whats-new",
+  "description": "Typed source of truth for `engram whats-new`. Authored alongside CHANGELOG.md during a release — the /release skill writes both from the same draft so they cannot drift.",
+  "type": "object",
+  "required": ["versions"],
+  "additionalProperties": true,
+  "properties": {
+    "$schema": { "type": "string" },
+    "_comment": { "type": "string" },
+    "versions": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/versionEntry" }
+    }
+  },
+  "definitions": {
+    "versionEntry": {
+      "type": "object",
+      "required": ["version", "date"],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "Semver version without the 'v' prefix.",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.]+)?$"
+        },
+        "date": {
+          "type": "string",
+          "format": "date",
+          "description": "Release date (YYYY-MM-DD, UTC)."
+        },
+        "headline": {
+          "type": "string",
+          "description": "One-line TL;DR of what this release means to a user."
+        },
+        "added": { "type": "array", "items": { "$ref": "#/definitions/item" } },
+        "changed": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/item" }
+        },
+        "deprecated": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/item" }
+        },
+        "breaking": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/item" }
+        },
+        "removed": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/item" }
+        },
+        "fixes_summary": {
+          "type": "string",
+          "description": "One-line roll-up of bug fixes. Avoid enumerating — users rarely need each fix described separately."
+        }
+      }
+    },
+    "item": {
+      "type": "object",
+      "required": ["title", "summary"],
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Short name for the feature/change. Bold in the rendered output."
+        },
+        "summary": {
+          "type": "string",
+          "description": "User-facing description. What can the user now do? Not 'we refactored X'."
+        },
+        "command": {
+          "type": "string",
+          "description": "CLI command this introduces or touches, e.g. 'engram reconcile'."
+        },
+        "migration": {
+          "type": "string",
+          "description": "Required for entries under `breaking`, `changed` (when action is needed), and `removed`. One sentence describing what the user must do."
+        },
+        "docs": {
+          "type": "string",
+          "description": "Optional doc link (repo-relative path or full URL)."
+        }
+      }
+    }
+  }
+}

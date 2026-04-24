@@ -15,13 +15,15 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { Command } from "commander";
-import type { EngramGraph } from "engram-core";
+import type { EngramGraph, FreshnessSeverity } from "engram-core";
 import {
   closeGraph,
+  computeFreshness,
   getEmbeddingModel,
   openGraph,
   resolveDbPath,
 } from "engram-core";
+import { c } from "../colors.js";
 
 interface StatusOpts {
   db: string;
@@ -32,12 +34,6 @@ interface StatusOpts {
 
 interface CountRow {
   count: number;
-}
-
-interface IngestionRow {
-  source_type: string;
-  completed_at: string | null;
-  cursor: string | null;
 }
 
 interface ReachabilityResult {
@@ -81,10 +77,21 @@ interface GraphSection {
   projectionsStale: number;
 }
 
+interface IngestionSourceInfo {
+  completedAt: string | null;
+  cursor: string | null;
+  daysSince: number | null;
+  commitsBehind: number | null;
+  severity: FreshnessSeverity;
+  reason: string | null;
+}
+
 interface IngestionSection {
-  git: { completedAt: string | null; cursor: string | null };
-  github: { completedAt: string | null; cursor: string | null };
-  source: { completedAt: string | null; cursor: string | null };
+  git: IngestionSourceInfo;
+  github: IngestionSourceInfo;
+  source: IngestionSourceInfo;
+  /** Freshness info for any additional source_types that have ingested. */
+  other: Array<{ sourceType: string } & IngestionSourceInfo>;
 }
 
 interface StatusOutput {
@@ -409,34 +416,62 @@ function collectGraph(graph: EngramGraph): GraphSection {
 }
 
 function collectIngestion(graph: EngramGraph): IngestionSection {
-  const defaultRun = { completedAt: null, cursor: null };
-
-  const getLastRun = (
-    sourceType: string,
-  ): { completedAt: string | null; cursor: string | null } => {
-    try {
-      const row = graph.db
-        .query<IngestionRow, [string]>(
-          `SELECT source_type, completed_at, cursor
-           FROM ingestion_runs
-           WHERE source_type = ? AND status = 'completed'
-           ORDER BY completed_at DESC LIMIT 1`,
-        )
-        .get(sourceType);
-      if (!row) return defaultRun;
-      return {
-        completedAt: row.completed_at ? formatDateTime(row.completed_at) : null,
-        cursor: row.cursor,
-      };
-    } catch {
-      return defaultRun;
-    }
+  const emptyInfo: IngestionSourceInfo = {
+    completedAt: null,
+    cursor: null,
+    daysSince: null,
+    commitsBehind: null,
+    severity: "unknown",
+    reason: null,
   };
 
+  // `computeFreshness` returns one entry per (source_type, source_scope),
+  // newest-first. Build the status view directly from that so we never lose
+  // scope information — previously this code keyed a Map on source_type alone,
+  // which silently dropped all but one scope per type and surfaced the oldest.
+  let freshness: ReturnType<typeof computeFreshness>;
+  try {
+    freshness = computeFreshness(graph);
+  } catch {
+    freshness = { overall: "unknown", sources: [] };
+  }
+
+  const toInfo = (
+    s: (typeof freshness.sources)[number],
+  ): IngestionSourceInfo => ({
+    completedAt: s.lastCompletedAt ? formatDateTime(s.lastCompletedAt) : null,
+    cursor: s.cursor,
+    daysSince: s.daysSince,
+    commitsBehind: s.commitsBehind,
+    severity: s.severity,
+    reason: s.reason,
+  });
+
+  // Canonical types get one summary line. If multiple scopes exist for the
+  // same type, take the freshest (first, since sources are newest-first).
+  const freshestByType = new Map<string, (typeof freshness.sources)[number]>();
+  for (const s of freshness.sources) {
+    if (!freshestByType.has(s.sourceType)) {
+      freshestByType.set(s.sourceType, s);
+    }
+  }
+  const canonical = (sourceType: string): IngestionSourceInfo => {
+    const f = freshestByType.get(sourceType);
+    return f ? toInfo(f) : { ...emptyInfo };
+  };
+
+  // Non-canonical types: one line per (type, scope) so multi-scope plugin
+  // sources (e.g. several gerrit projects) are not collapsed together.
+  const knownSources = new Set(["git", "github", "source"]);
+  const other = freshness.sources
+    .filter((s) => !knownSources.has(s.sourceType))
+    .map((s) => ({ sourceType: s.sourceType, ...toInfo(s) }));
+
   return {
-    git: getLastRun("git"),
-    github: getLastRun("github"),
-    source: getLastRun("source"),
+    git: canonical("git"),
+    github: canonical("github"),
+    source: canonical("source"),
+    other,
   };
 }
 
@@ -568,15 +603,35 @@ function printHuman(status: StatusOutput, noVerify: boolean): void {
 
   // Ingestion
   console.log("Ingestion");
-  const gitInfo = ingestion.git.completedAt
-    ? `${ingestion.git.completedAt}${ingestion.git.cursor ? ` (HEAD: ${ingestion.git.cursor.slice(0, 7)})` : ""}`
-    : "never";
-  const githubInfo = ingestion.github.completedAt ?? "never";
-  const sourceInfo = ingestion.source.completedAt ?? "never";
+  const formatInfo = (
+    info: IngestionSourceInfo,
+    showCursor: boolean,
+  ): string => {
+    if (!info.completedAt) return "never";
+    const parts = [info.completedAt];
+    if (showCursor && info.cursor) {
+      parts.push(`(HEAD: ${info.cursor.slice(0, 7)})`);
+    }
+    if (info.reason) {
+      parts.push(`— ${info.reason}`);
+    } else if (info.daysSince !== null) {
+      parts.push(
+        `— ${info.daysSince === 0 ? "today" : info.daysSince === 1 ? "1 day ago" : `${info.daysSince} days ago`}`,
+      );
+    }
+    let line = parts.join(" ");
+    if (info.severity === "warn") line = `${line}  ${c.yellow("⚠")}`;
+    else if (info.severity === "stale") line = `${line}  ${c.red("✗")}`;
+    return line;
+  };
 
-  console.log(`  Last git ingest:    ${gitInfo}`);
-  console.log(`  Last github sync:   ${githubInfo}`);
-  console.log(`  Last source ingest: ${sourceInfo}`);
+  console.log(`  Last git ingest:    ${formatInfo(ingestion.git, true)}`);
+  console.log(`  Last github sync:   ${formatInfo(ingestion.github, false)}`);
+  console.log(`  Last source ingest: ${formatInfo(ingestion.source, false)}`);
+  for (const o of ingestion.other) {
+    const label = `Last ${o.sourceType} ingest`.padEnd(20);
+    console.log(`  ${label}${formatInfo(o, false)}`);
+  }
 
   if (noVerify) {
     console.log();

@@ -7,6 +7,7 @@ export {
   closeGraph,
   createGraph,
   EngramFormatError,
+  markEngineVersionSeen,
   openGraph,
   resolveDbPath,
 } from "./graph.js";

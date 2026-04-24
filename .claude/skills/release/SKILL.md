@@ -102,10 +102,18 @@ Go through each merged PR since the last tag. Classify by conventional commit ty
 | `docs:` | **Documentation** (omit if trivial) |
 | `chore:`, `ci:`, `test:` | Omit unless user-visible |
 | `perf:` | **Changed** |
+| Removal of a feature/command/flag | **Removed** |
+| Announcement that a feature/flag will be removed | **Deprecated** |
 | Breaking change (`!` suffix or `BREAKING CHANGE:` in body) | **Breaking** |
 
 For each PR, extract the user-facing impact — not the implementation detail. Write
 entries that describe what users can now do, not what code changed internally.
+
+**Breaking entries MUST carry a `Migration:` sub-bullet** describing the exact
+action a user needs to take (e.g., "rename `--repo` to `--scope`", "re-init the
+graph from scratch"). `Changed` and `Removed` entries that require user action
+should include one too. Without a migration line, a breaking change is not
+releasable — stop and ask the user what the migration is.
 
 ---
 
@@ -143,12 +151,36 @@ Work through this checklist and report the result of each item:
 [ ] [Unreleased] section in CHANGELOG.md is accurate (matches what's actually merged)
 [ ] STATUS.md is not severely stale (last sync within ~5 PRs) — if STATUS.md exists
 [ ] Tests pass on current HEAD (recommend running, but don't block if CI is green)
+[ ] Every Breaking entry has a Migration: sub-bullet; every Removed entry that
+    requires user action has one too
+[ ] No open PRs affect the public CLI surface (new commands, new flags, renamed
+    flags) that are unaccounted for in the CHANGELOG draft
 ```
 
 For each failing item, note it but do not abort. The human decides what's a blocker.
 
 **Advisory checks** (warn but never block):
 - Suggest `/product sync` if STATUS.md exists and wasn't updated recently
+
+## Step 4a — Version-Source-of-Truth Check (blocking)
+
+The engine exposes `ENGINE_VERSION` from
+`packages/engram-core/src/format/version.ts`. `--version`, the `last_seen_engine_version`
+metadata, the GitHub update check, and the `engram update` asset URL all read
+from there. If it doesn't match the tag we're about to push, users will see
+stale version strings and the update-available nudge will be wrong.
+
+Run `bun run check:versions`. It verifies every workspace `package.json` agrees
+with `ENGINE_VERSION`. It must exit 0.
+
+Before moving on:
+
+1. Bump `ENGINE_VERSION` in `packages/engram-core/src/format/version.ts` to the
+   proposed tag version (drop the leading `v`).
+2. Bump the `version` field in every workspace `package.json` to the same value.
+3. Run `bun run check:versions` again — must pass.
+
+**Do not tag** until this step is green.
 
 ---
 
@@ -222,7 +254,7 @@ needs changes, make them and re-present before continuing.
 
 ---
 
-## Step 7 — Update CHANGELOG.md
+## Step 7 — Update CHANGELOG.md and docs/whats-new.json
 
 Move the drafted section into CHANGELOG.md:
 
@@ -241,19 +273,63 @@ The resulting top of CHANGELOG.md should look like:
 ...
 ```
 
----
+**Also update `docs/whats-new.json`.** This file is the typed source of truth
+for `engram whats-new` and must be written from the same draft as the
+CHANGELOG entry — otherwise users who upgrade will see stale or missing notes.
+Schema is documented in `docs/whats-new.schema.json`. Prepend a new entry to
+the top of the `versions` array:
 
-## Step 8 — Commit the CHANGELOG
+```json
+{
+  "version": "X.Y.Z",
+  "date": "YYYY-MM-DD",
+  "headline": "One-line TL;DR of the release.",
+  "added": [
+    {
+      "title": "engram <new-command>",
+      "command": "engram <new-command>",
+      "summary": "User-facing description. What can a user now do?"
+    }
+  ],
+  "changed": [],
+  "deprecated": [],
+  "breaking": [
+    {
+      "title": "...",
+      "summary": "...",
+      "migration": "Required for every breaking entry. One sentence of action."
+    }
+  ],
+  "removed": [],
+  "fixes_summary": "N fixes across <areas>."
+}
+```
+
+Only include **user-facing** items. Internal refactors, CI changes, and test
+improvements belong in CHANGELOG.md (if at all) but not in whats-new. The
+mental test: "would this entry help a user who just upgraded decide whether to
+try something new or update a script?"
+
+## Step 8 — Commit the CHANGELOG, whats-new, and version bumps
 
 ```bash
-git add CHANGELOG.md
+git add \
+  CHANGELOG.md \
+  docs/whats-new.json \
+  packages/engram-core/src/format/version.ts \
+  packages/engram-core/package.json \
+  packages/engram-cli/package.json \
+  packages/engram-web/package.json \
+  packages/plugins/*/package.json
+
 git commit -m "chore: release v${VERSION}
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
-Do not include other files in this commit. The release commit should only be the
-CHANGELOG update — this keeps the git history clean and makes release archaeology easy.
+The release commit should include (a) the CHANGELOG update, (b) the whats-new
+entry, and (c) the synchronized version bumps from Step 4a. Do not include
+unrelated changes — it keeps release archaeology easy.
 
 ---
 

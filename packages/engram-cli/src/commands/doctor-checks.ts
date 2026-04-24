@@ -8,11 +8,15 @@ import * as fs from "node:fs";
 import * as nodePath from "node:path";
 import {
   closeGraph,
+  computeFreshness,
+  ENGINE_VERSION,
   FORMAT_VERSION,
+  type FreshnessReport,
   getEmbeddingModel,
   migrate_0_1_0_to_0_2_0,
   openGraph,
 } from "engram-core";
+import { checkForUpdate } from "../release-check.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -225,6 +229,122 @@ export function checkWal(cwd: string, rawDbPath: string): CheckResult {
     `stale WAL/SHM files found: ${staleFiles.join(", ")}`,
     "engram doctor --fix (deletes stale files)",
   );
+}
+
+/**
+ * update_available: ask GitHub Releases whether a newer engram tag has been
+ * published and suggest `engram update` if so. Result is cached for 24h under
+ * $XDG_CACHE_HOME/engram so repeat `doctor` runs don't hit the API.
+ *
+ * Skipped if `offline` is true. Network errors render as `skip`, not `fail` —
+ * a slow network is not a broken install.
+ */
+export async function checkUpdateAvailable(opts: {
+  offline: boolean;
+}): Promise<CheckResult> {
+  const result = await checkForUpdate({
+    currentVersion: ENGINE_VERSION,
+    offline: opts.offline,
+  });
+  if (result.error) {
+    return skip("update_available", result.error);
+  }
+  if (!result.latest) {
+    return skip("update_available", "no release info available");
+  }
+  if (result.updateAvailable) {
+    return warn(
+      "update_available",
+      `newer release v${result.latest.version} available (running v${ENGINE_VERSION})`,
+      "engram update",
+    );
+  }
+  return pass(
+    "update_available",
+    `v${ENGINE_VERSION} is latest${result.fromCache ? " (cached)" : ""}`,
+  );
+}
+
+/**
+ * engine_version_drift: compare the last engine version the user reviewed
+ * (via `engram whats-new`) against the running binary. Different values mean
+ * the user upgraded but hasn't yet looked at what changed.
+ *
+ * Renders as `warn` (not `fail`) — drift is informational, not a health problem.
+ * The check keeps firing on every `doctor` run until the user runs `whats-new`,
+ * which is the intended nudge loop.
+ */
+export function checkEngineVersionDrift(dbPath: string): CheckResult {
+  try {
+    const graph = openGraph(dbPath);
+    const lastSeen = graph.lastSeenEngineVersion;
+    const createdWith = graph.engineVersion;
+    closeGraph(graph);
+
+    if (lastSeen === ENGINE_VERSION) {
+      return pass("engine_version_drift", `v${ENGINE_VERSION} (up to date)`);
+    }
+    if (lastSeen === null) {
+      return warn(
+        "engine_version_drift",
+        `graph created with v${createdWith}, running v${ENGINE_VERSION} — never reviewed`,
+        `engram whats-new`,
+      );
+    }
+    return warn(
+      "engine_version_drift",
+      `last reviewed v${lastSeen}, running v${ENGINE_VERSION}`,
+      `engram whats-new`,
+    );
+  } catch (err) {
+    return fail(
+      "engine_version_drift",
+      `cannot open database: ${err instanceof Error ? err.message : String(err)}`,
+      null,
+    );
+  }
+}
+
+/**
+ * freshness: every ingested source should have recent data. For git sources we
+ * also compare the stored cursor SHA against HEAD — commits-behind is the
+ * primary signal for fast-moving repos, since 14 days with 200 commits is a
+ * different situation than 14 days with 2 commits.
+ */
+export function checkFreshness(dbPath: string): CheckResult {
+  try {
+    const graph = openGraph(dbPath);
+    let report: FreshnessReport;
+    try {
+      report = computeFreshness(graph);
+    } finally {
+      closeGraph(graph);
+    }
+
+    if (report.sources.length === 0) {
+      return pass("freshness", "no ingested sources yet");
+    }
+
+    const summary = report.sources
+      .map((s) => `${s.sourceType}: ${s.reason}`)
+      .join("; ");
+
+    if (report.overall === "fresh") {
+      return pass("freshness", summary);
+    }
+
+    const fixHint = "engram sync (or re-run the relevant ingest command)";
+    if (report.overall === "stale") {
+      return fail("freshness", summary, fixHint);
+    }
+    return warn("freshness", summary, fixHint);
+  } catch (err) {
+    return fail(
+      "freshness",
+      `cannot open database: ${err instanceof Error ? err.message : String(err)}`,
+      null,
+    );
+  }
 }
 
 /** evidence_integrity: every active entity and non-invalidated edge must have ≥1 evidence link. */
