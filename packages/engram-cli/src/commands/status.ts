@@ -15,13 +15,15 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { Command } from "commander";
-import type { EngramGraph } from "engram-core";
+import type { EngramGraph, FreshnessSeverity } from "engram-core";
 import {
   closeGraph,
+  computeFreshness,
   getEmbeddingModel,
   openGraph,
   resolveDbPath,
 } from "engram-core";
+import { c } from "../colors.js";
 
 interface StatusOpts {
   db: string;
@@ -81,10 +83,21 @@ interface GraphSection {
   projectionsStale: number;
 }
 
+interface IngestionSourceInfo {
+  completedAt: string | null;
+  cursor: string | null;
+  daysSince: number | null;
+  commitsBehind: number | null;
+  severity: FreshnessSeverity;
+  reason: string | null;
+}
+
 interface IngestionSection {
-  git: { completedAt: string | null; cursor: string | null };
-  github: { completedAt: string | null; cursor: string | null };
-  source: { completedAt: string | null; cursor: string | null };
+  git: IngestionSourceInfo;
+  github: IngestionSourceInfo;
+  source: IngestionSourceInfo;
+  /** Freshness info for any additional source_types that have ingested. */
+  other: Array<{ sourceType: string } & IngestionSourceInfo>;
 }
 
 interface StatusOutput {
@@ -409,11 +422,16 @@ function collectGraph(graph: EngramGraph): GraphSection {
 }
 
 function collectIngestion(graph: EngramGraph): IngestionSection {
-  const defaultRun = { completedAt: null, cursor: null };
+  const emptyInfo: IngestionSourceInfo = {
+    completedAt: null,
+    cursor: null,
+    daysSince: null,
+    commitsBehind: null,
+    severity: "unknown",
+    reason: null,
+  };
 
-  const getLastRun = (
-    sourceType: string,
-  ): { completedAt: string | null; cursor: string | null } => {
+  const getLastRun = (sourceType: string): IngestionSourceInfo => {
     try {
       const row = graph.db
         .query<IngestionRow, [string]>(
@@ -423,20 +441,56 @@ function collectIngestion(graph: EngramGraph): IngestionSection {
            ORDER BY completed_at DESC LIMIT 1`,
         )
         .get(sourceType);
-      if (!row) return defaultRun;
+      if (!row) return { ...emptyInfo };
       return {
+        ...emptyInfo,
         completedAt: row.completed_at ? formatDateTime(row.completed_at) : null,
         cursor: row.cursor,
       };
     } catch {
-      return defaultRun;
+      return { ...emptyInfo };
     }
   };
 
+  // Freshness helper: gives us daysSince, commitsBehind, and severity.
+  let freshness: ReturnType<typeof computeFreshness>;
+  try {
+    freshness = computeFreshness(graph);
+  } catch {
+    freshness = { overall: "unknown", sources: [] };
+  }
+  const freshBySource = new Map(
+    freshness.sources.map((s) => [s.sourceType, s]),
+  );
+
+  const applyFreshness = (
+    sourceType: string,
+    base: IngestionSourceInfo,
+  ): IngestionSourceInfo => {
+    const f = freshBySource.get(sourceType);
+    if (!f) return base;
+    return {
+      ...base,
+      daysSince: f.daysSince,
+      commitsBehind: f.commitsBehind,
+      severity: f.severity,
+      reason: f.reason,
+    };
+  };
+
+  const knownSources = new Set(["git", "github", "source"]);
+  const other = freshness.sources
+    .filter((s) => !knownSources.has(s.sourceType))
+    .map((s) => ({
+      sourceType: s.sourceType,
+      ...applyFreshness(s.sourceType, getLastRun(s.sourceType)),
+    }));
+
   return {
-    git: getLastRun("git"),
-    github: getLastRun("github"),
-    source: getLastRun("source"),
+    git: applyFreshness("git", getLastRun("git")),
+    github: applyFreshness("github", getLastRun("github")),
+    source: applyFreshness("source", getLastRun("source")),
+    other,
   };
 }
 
@@ -568,15 +622,35 @@ function printHuman(status: StatusOutput, noVerify: boolean): void {
 
   // Ingestion
   console.log("Ingestion");
-  const gitInfo = ingestion.git.completedAt
-    ? `${ingestion.git.completedAt}${ingestion.git.cursor ? ` (HEAD: ${ingestion.git.cursor.slice(0, 7)})` : ""}`
-    : "never";
-  const githubInfo = ingestion.github.completedAt ?? "never";
-  const sourceInfo = ingestion.source.completedAt ?? "never";
+  const formatInfo = (
+    info: IngestionSourceInfo,
+    showCursor: boolean,
+  ): string => {
+    if (!info.completedAt) return "never";
+    const parts = [info.completedAt];
+    if (showCursor && info.cursor) {
+      parts.push(`(HEAD: ${info.cursor.slice(0, 7)})`);
+    }
+    if (info.reason) {
+      parts.push(`— ${info.reason}`);
+    } else if (info.daysSince !== null) {
+      parts.push(
+        `— ${info.daysSince === 0 ? "today" : info.daysSince === 1 ? "1 day ago" : `${info.daysSince} days ago`}`,
+      );
+    }
+    let line = parts.join(" ");
+    if (info.severity === "warn") line = `${line}  ${c.yellow("⚠")}`;
+    else if (info.severity === "stale") line = `${line}  ${c.red("✗")}`;
+    return line;
+  };
 
-  console.log(`  Last git ingest:    ${gitInfo}`);
-  console.log(`  Last github sync:   ${githubInfo}`);
-  console.log(`  Last source ingest: ${sourceInfo}`);
+  console.log(`  Last git ingest:    ${formatInfo(ingestion.git, true)}`);
+  console.log(`  Last github sync:   ${formatInfo(ingestion.github, false)}`);
+  console.log(`  Last source ingest: ${formatInfo(ingestion.source, false)}`);
+  for (const o of ingestion.other) {
+    const label = `Last ${o.sourceType} ingest`.padEnd(20);
+    console.log(`  ${label}${formatInfo(o, false)}`);
+  }
 
   if (noVerify) {
     console.log();

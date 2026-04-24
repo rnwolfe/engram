@@ -15,6 +15,9 @@
  *   embedding_index   Stored embedding model dimensions match what is recorded
  *   wal               No stale WAL/SHM files at repo root from old flat-file layout
  *   evidence_integrity Every active entity and non-invalidated edge has ≥1 evidence link
+ *   freshness         Each ingested source is recent (days + commits-behind for git)
+ *   engine_version_drift  User has reviewed what's new since their last engine version
+ *   update_available  A newer engram release is published on GitHub (cached 24h)
  *
  * Exit codes:
  *   0 — all checks pass or only warnings
@@ -30,11 +33,14 @@ import { c } from "../colors.js";
 import type { CheckResult, CheckStatus } from "./doctor-checks.js";
 import {
   checkEmbeddingIndex,
+  checkEngineVersionDrift,
   checkEvidenceIntegrity,
+  checkFreshness,
   checkFtsIndex,
   checkGitignore,
   checkLayout,
   checkSchema,
+  checkUpdateAvailable,
   checkWal,
   fixFtsIndex,
   fixGitignore,
@@ -56,6 +62,7 @@ interface DoctorOpts {
   db: string;
   fix: boolean;
   yes: boolean;
+  offline: boolean;
   format?: string;
   j?: boolean;
 }
@@ -128,6 +135,7 @@ export function registerDoctor(program: Command): void {
     .option("--db <path>", "path to .engram file or directory", ".engram")
     .option("--fix", "apply safe auto-fixes with confirmation prompts")
     .option("--yes", "apply all safe fixes non-interactively (implies --fix)")
+    .option("--offline", "skip network-dependent checks (update_available)")
     .option("--format <format>", "output format: human or json", "human")
     .option("-j", "shorthand for --format json")
     .addHelpText(
@@ -141,6 +149,9 @@ Checks performed:
   embedding_index   Embedding model dimensions are consistent
   wal               No stale WAL/SHM files from old flat-file layout
   evidence_integrity  All entities and edges have at least one evidence link
+  freshness         Each ingested source is recent (days + commits-behind for git)
+  engine_version_drift  Prompts you to review 'engram whats-new' after an upgrade
+  update_available  Checks GitHub for a newer engram release (cached 24h; skip with --offline)
 
 Exit codes:
   0   all checks pass or only warnings
@@ -221,6 +232,27 @@ Examples:
           skip("evidence_integrity", "skipped — database not accessible"),
         );
       }
+
+      // 8. freshness — days and commits-behind per ingested source
+      if (canOpenDb) {
+        checks.push(checkFreshness(resolvedDbPath));
+      } else {
+        checks.push(skip("freshness", "skipped — database not accessible"));
+      }
+
+      // 9. engine_version_drift — user upgraded but hasn't run whats-new?
+      if (canOpenDb) {
+        checks.push(checkEngineVersionDrift(resolvedDbPath));
+      } else {
+        checks.push(
+          skip("engine_version_drift", "skipped — database not accessible"),
+        );
+      }
+
+      // 10. update_available — is a newer engram release out on GitHub?
+      checks.push(
+        await checkUpdateAvailable({ offline: opts.offline === true }),
+      );
 
       // ── Apply fixes ───────────────────────────────────────────────────────
       if (applyFixes) {
