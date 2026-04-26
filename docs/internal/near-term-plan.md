@@ -5,7 +5,11 @@
 **Scope:** the next concrete cycle of work, sized to deliver one falsifiable
 demonstration that engram earns its keep on a complex repository. Sequenced
 behind, and consistent with, [`harness-pivot-plan.md`](harness-pivot-plan.md);
-this plan picks up where ADR-004 deferred D3 behind a workflow benchmark.
+this plan picks up where that document deferred D3 behind a workflow
+benchmark. (ADR-004 and ADR-005 are referenced historically here and in
+`harness-pivot-plan.md`, but their bodies have not yet been backfilled into
+[`DECISIONS.md`](DECISIONS.md); treat `harness-pivot-plan.md` as the current
+source of truth until the ADRs land.)
 
 ## Why this exists
 
@@ -207,12 +211,26 @@ remembering, no prompt-engineering instructions.
 
 **Scope.**
 
-- New package `packages/engram-plugin-core/`: harness-neutral hook surface
+- New package `packages/harnesses/core/`: harness-neutral hook surface
   (`on_session_start`, `on_user_prompt`) plus a context-assembly helper
   that wraps `engram context --format=json`.
-- New package `packages/engram-plugin-gemini-cli/`: thin adapter (target
+- New package `packages/harnesses/gemini-cli/`: thin adapter (target
   <200 lines) translating Gemini CLI's native hook API to the neutral
   surface.
+- **Why a new `packages/harnesses/` subtree rather than `packages/plugins/`.**
+  ADR-008 reserved `packages/plugins/<name>/` for first-party *ingest*
+  adapters loaded through the plugin loader (Gerrit, Google Workspace).
+  Harness adapters are a different mechanism: they are loaded by the host
+  agent harness (Gemini CLI, Claude Code) at session lifecycle boundaries,
+  not by the engram plugin loader, and they extend runtime *delivery*
+  rather than data input. Co-locating them under `packages/plugins/` would
+  collide with doc tooling and plugin discovery globs and conflate two
+  unrelated extension points. `packages/harnesses/` matches the term of
+  art already used in `harness-pivot-plan.md` and keeps the boundary
+  explicit. (Earlier drafts of the pivot plan used
+  `packages/engram-plugin-*` naming; this plan supersedes that
+  choice — when those packages are created they should be created under
+  `packages/harnesses/`.)
 - Two events implemented (others from harness-pivot-plan D3 deferred):
   - `on_session_start` — emit a compact staleness brief (what's stale,
     what's new since last session). Skipped silently if no `.engram` is
