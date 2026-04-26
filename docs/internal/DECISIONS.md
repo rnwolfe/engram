@@ -76,6 +76,47 @@ But Karpathy's wiki and graphify both lack two things Engram already has: a temp
 *Carried over*
 - All existing principles, schema, operations, and the AI provider layer (#31) remain unchanged. Projection work is gated on #31 shipping.
 
+## ADR-004 -- Engine-decides-model-executes / context-provider reframing
+
+**Date**: 2026-04-17
+**Status**: Accepted
+
+**Context**: The harness-pivot-plan (`docs/internal/harness-pivot-plan.md`) ran two pack experiments (G1 narrative projection, G2 pack+companion). G1 showed the pack clearly helps on 4/9 questions; G2 showed the pack helps 1/9 on Maestro and regresses 1/9. Key finding: the structural pack's primary value is context assembly and grounding, not narrative generation per se.
+
+**Decision**: Reframe engram as a context provider, not an answer engine. Adopt the "engine decides, model executes" thesis from the LCM paper: the engine deterministically assembles and bounds context; the model only runs inference. MCP-style tool exposure (ADR-deleted) inverts this by handing retrieval decisions to the model. CLI invocation from a harness plugin keeps the engine in control.
+
+Three consequences:
+1. D3 (harness plugin layer) is deferred behind the workflow benchmark — the G2 results don't yet prove the pack earns its keep on multi-file tasks. The wow-moment gate (a single frozen prompt that fails bare and one-shots with engram) serves as the new gating criterion.
+2. Narrative projections (D5) are gated on the wow-moment gate succeeding — narrative compounds the pack value but cannot substitute for it.
+3. `engram context` becomes the single stable primitive everything routes through. Its output contract (token-budgeted, format=json/md, ranked with evidence chains and stale flags) is the stable interface harness plugins depend on.
+
+**Alternatives considered**:
+- *MCP tool exposure.* Rejected: inverts control; retrieval decisions land with the model, not the engine.
+- *Answer engine framing.* Rejected: engram has no answer quality advantage over bare Gemini; its advantage is grounded, time-bounded context assembly.
+
+**Consequences**: The workflow benchmark (now expressed as the wow-moment gate) gates all harness and narrative projection work. Until the gate passes, additional surface area (more adapters, more kinds) is not prioritized.
+
+## ADR-005 -- Decommission engram-mcp and engramark
+
+**Date**: 2026-04-17
+**Status**: Accepted (deletions complete)
+
+**Context**: harness-pivot-plan decisions D1 and D2 formalized the deletion of two packages:
+- `packages/engram-mcp/` — exposed retrieval as model-callable tools (MCP), which ADR-004 identifies as architecturally wrong.
+- `packages/engramark/` — benchmark suite for proving claims to external buyers; premature for a one-user dogfood stage, and the Fastify retrieval benchmark tests an axis nobody cares about.
+
+**Decision**: Delete both packages. The stale-knowledge scenarios from engramark are preserved — they are regression scaffolding for one of engram's strongest differentiators — relocated to `packages/engram-core/test/stale-knowledge/`.
+
+Specifically:
+- D1: `packages/engram-mcp/` deleted entirely. MCP tool references removed from docs. Three-layer architecture is now `engram-core` + `engram-cli` + `packages/harnesses/` (per W3 of the near-term cycle plan).
+- D2: `packages/engramark/` deleted. Stale-knowledge dataset, runners, and scoring moved to `packages/engram-core/test/stale-knowledge/`. Fastify dataset and report formatting dropped entirely.
+
+**Alternatives considered**:
+- *Keep engram-mcp for users who prefer MCP.* Rejected: architectural divergence from ADR-004; MCP inverts control.
+- *Keep engramark as a separate benchmark harness.* Rejected: no external audience; scenarios are better served as integration tests.
+
+**Consequences**: Both deletions are complete. No `packages/engram-mcp/` or `packages/engramark/` directories exist in the tree. The stale-knowledge integration tests run as part of `bun test`.
+
 ## ADR-006 -- Hybrid local-plugin loader with XDG discovery and manifest declaration
 
 **Date**: 2026-04-19
@@ -346,6 +387,10 @@ Three delivery models were considered:
   core team could accept a third-party plugin into `packages/plugins/` with
   no technical gate. This is the same governance question every monorepo
   faces; no new risk introduced.
+
+*Clarification (2026-04-26)*
+
+**Harness adapters are distinct from ingest plugins.** ADR-006 and ADR-008 describe `packages/plugins/` — the ingest plugin subtree for enrichment adapters (Jira, Linear, GitLab, etc.) loaded by the plugin loader at `engram sync` time. A separate subtree `packages/harnesses/` now exists for harness adapters (Claude Code, Gemini CLI, etc.) that integrate with coding agent lifecycles. Harness adapters are not ingest plugins: they are loaded by the host agent process, not by the engram sync orchestrator, and they do not implement `EnrichmentAdapter`. They implement the harness-neutral hook surface in `packages/harnesses/core/` (`on_session_start`, `on_user_prompt`). The two subtrees are independent; neither loads the other; the plugin-loading contract in ADR-006 does not apply to `packages/harnesses/`.
 
 *Carried over*
 - ADR-006's trust model is unchanged: users authorize plugins at install

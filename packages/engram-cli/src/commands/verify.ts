@@ -64,7 +64,7 @@ See also:
         console.error(
           `${c.red("Error:")} opening graph: ${err instanceof Error ? err.message : String(err)}`,
         );
-        process.exit(1);
+        process.exit(2);
       }
 
       const violations: string[] = [];
@@ -144,7 +144,7 @@ See also:
           `${c.red("Error:")} verify failed: ${err instanceof Error ? err.message : String(err)}`,
         );
         closeGraph(graph);
-        process.exit(1);
+        process.exit(2);
       }
 
       closeGraph(graph);

@@ -125,7 +125,7 @@ See also:
         process.stderr.write(
           `Cannot open graph: ${err instanceof Error ? err.message : String(err)}\n`,
         );
-        process.exit(1);
+        process.exit(2);
       }
 
       const isTTY = process.stdout.isTTY;
@@ -155,7 +155,7 @@ See also:
           `Git ingestion failed: ${err instanceof Error ? err.message : String(err)}\n`,
         );
         closeGraph(graph);
-        process.exit(1);
+        process.exit(2);
       }
 
       closeGraph(graph);
@@ -193,7 +193,7 @@ See also:
         process.stderr.write(
           `Cannot open graph: ${err instanceof Error ? err.message : String(err)}\n`,
         );
-        process.exit(1);
+        process.exit(2);
       }
 
       const isTTY = process.stdout.isTTY;
@@ -214,7 +214,7 @@ See also:
           `Markdown ingestion failed: ${err instanceof Error ? err.message : String(err)}\n`,
         );
         closeGraph(graph);
-        process.exit(1);
+        process.exit(2);
       }
 
       closeGraph(graph);
@@ -306,7 +306,7 @@ See also:
         log.error(
           `Cannot open graph: ${err instanceof Error ? err.message : String(err)}`,
         );
-        process.exit(1);
+        process.exit(2);
       }
 
       let fileIdx = 0;
@@ -378,7 +378,7 @@ See also:
           `Source ingestion failed: ${err instanceof Error ? err.message : String(err)}`,
         );
         closeGraph(graph);
-        process.exit(1);
+        process.exit(2);
       }
 
       closeGraph(graph);
@@ -562,7 +562,7 @@ See also:
       log.error(
         `Cannot open graph: ${err instanceof Error ? err.message : String(err)}`,
       );
-      process.exit(1);
+      process.exit(2);
     }
 
     const s = spinner();
@@ -587,7 +587,19 @@ See also:
       s.stop("GitHub enrichment failed");
       handleEnrichError(err, adapter.name, adapter.supportedAuth);
       closeGraph(graph);
-      process.exit(1);
+      if (
+        err instanceof EnrichmentAdapterError &&
+        err.code === "rate_limited"
+      ) {
+        process.exit(3);
+      }
+      if (
+        err instanceof EnrichmentAdapterError &&
+        err.code === "auth_failure"
+      ) {
+        process.exit(1);
+      }
+      process.exit(2);
     }
 
     closeGraph(graph);
@@ -760,7 +772,7 @@ See also:
         log.error(
           `Cannot open graph: ${err instanceof Error ? err.message : String(err)}`,
         );
-        process.exit(1);
+        process.exit(2);
         return; // unreachable, satisfies definite assignment
       }
 
@@ -791,10 +803,14 @@ See also:
                   "For ADC: run gcloud auth application-default login\n" +
                   "For bearer: verify your token is valid",
               );
+              closeGraph(graph);
+              process.exit(1);
               break;
             case "rate_limited":
               log.error(err.message);
               log.warn("Wait a moment and retry.");
+              closeGraph(graph);
+              process.exit(3);
               break;
             default:
               log.error(err.message);
@@ -803,7 +819,7 @@ See also:
           log.error(err instanceof Error ? err.message : String(err));
         }
         closeGraph(graph);
-        process.exit(1);
+        process.exit(2);
       }
 
       closeGraph(graph);
@@ -874,7 +890,7 @@ function registerPluginEnrichSubcommands(
           log.error(
             `Cannot open graph: ${err instanceof Error ? err.message : String(err)}`,
           );
-          process.exit(1);
+          process.exit(2);
         }
 
         let adapter: EnrichmentAdapter;
@@ -889,7 +905,7 @@ function registerPluginEnrichSubcommands(
             `Failed to load plugin '${pluginManifest.name}': ${err instanceof Error ? err.message : String(err)}`,
           );
           closeGraph(graph);
-          process.exit(1);
+          process.exit(2);
         }
 
         const s = spinner();
@@ -914,7 +930,7 @@ function registerPluginEnrichSubcommands(
           s.stop(`Plugin '${pluginManifest.name}' failed`);
           log.error(err instanceof Error ? err.message : String(err));
           closeGraph(graph);
-          process.exit(1);
+          process.exit(2);
         }
 
         closeGraph(graph);

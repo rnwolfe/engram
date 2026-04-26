@@ -1,0 +1,77 @@
+fixture:
+  name: k8s-sidecar-containers-753
+  description: >
+    KEP-753 SidecarContainers — restartPolicy=Always-as-marker design.
+    The design explicitly rejected a separate sidecars[] collection. The
+    wow-moment target: an engram-equipped agent surfaces the rejected-alternative
+    reasoning from KEP-753 that bare grep/file-search buries.
+  source:
+    type: git
+    repo: https://github.com/kubernetes/kubernetes.git
+    pin: TODO-pin-to-sha-before-kep-753-alpha-merge
+    clone_strategy: cached
+
+slice:
+  paths:
+    - pkg/kubelet/container/**
+    - pkg/kubelet/kuberuntime/**
+    - pkg/apis/core/validation/**
+    - pkg/api/v1/resource/**
+    - staging/src/k8s.io/api/core/v1/types.go
+    - pkg/features/kube_features.go
+
+ingest:
+  - name: k8s-git
+    type: git
+    path: RUNNER_POPULATED
+  - name: k8s-source
+    type: source
+    root: RUNNER_POPULATED
+  - name: k8s-prs
+    type: github
+    scope: kubernetes/kubernetes
+    auth:
+      kind: bearer
+      tokenEnv: GITHUB_TOKEN
+  - name: k8s-keps
+    type: git
+    path: RUNNER_POPULATED
+    # kubernetes/enhancements repo — git adapter captures KEP markdown via source walker
+
+evaluation:
+  model:
+    provider: gemini
+    model_id: gemini-2.5-pro
+    cli_command: gemini
+    cli_flags: ["-p"]
+  conditions:
+    - id: bare
+      description: Agent answers from raw file search alone (no engram pack).
+    - id: with_pack
+      description: >
+        Agent receives `engram context --format=md` pack prepended to the prompt.
+        Pack is assembled against the materialized fixture .engram.
+  prompts:
+    - id: prompt-001
+      text: |
+        I'm proposing a refactor to PodSpec: add an explicit `sidecars[]` collection
+        alongside `initContainers[]` and `containers[]` so sidecar configuration is
+        structurally distinct from init containers. The current approach of marking
+        init containers with `restartPolicy: Always` feels implicit and overloaded.
+        What are the concrete tradeoffs against the existing design — should I write
+        a KEP for this?
+      ground_truth:
+        files:
+          - staging/src/k8s.io/api/core/v1/types.go
+          - pkg/kubelet/kuberuntime/kuberuntime_manager.go
+          - pkg/apis/core/validation/validation.go
+        rationale_sources:
+          - https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/753-sidecar-containers/README.md
+        expected_answer_summary: |
+          The KEP-753 design explicitly rejected a separate sidecars[] collection
+          because it (a) prevents sequencing flexibility (sidecars must order with
+          init containers), (b) increases OpenAPI schema complexity, and (c) was
+          harder to inject by admission webhooks. restartPolicy=Always-as-marker
+          reuses existing initContainers ordering, lifecycle and admission paths.
+          A KEP proposing the alternative would need to address these concrete
+          rejections rather than restating "explicit > implicit."
