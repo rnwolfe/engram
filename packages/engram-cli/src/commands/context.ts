@@ -19,6 +19,7 @@ import {
   getEntity,
   getEpisode,
   InvalidAsOfError,
+  listActiveProjections,
   openGraph,
   resolveAsOf,
   resolveDbPath,
@@ -220,6 +221,16 @@ interface DirectEpisodeHit {
   score: number;
 }
 
+interface ProjectionInPack {
+  kind: string;
+  anchor_id: string;
+  anchor_name: string;
+  body: string;
+  stale: boolean;
+  stale_reason?: string;
+  generated_at?: string;
+}
+
 interface ContextPack {
   query: string;
   tokenBudgetUsed: number;
@@ -229,6 +240,7 @@ interface ContextPack {
   edges: EnrichedEdge[];
   evidence: EvidenceExcerpt[];
   discussions: DirectEpisodeHit[];
+  projections: ProjectionInPack[];
   /** Resolved ISO8601 UTC timestamp for as-of queries. Absent for current-time queries. */
   as_of?: string;
   /** Raw user input for the as-of value. Absent for current-time queries. */
@@ -317,6 +329,23 @@ function renderMarkdown(pack: ContextPack): string {
       lines.push("```");
       lines.push(ev.excerpt);
       lines.push("```");
+      lines.push("");
+    }
+  }
+
+  if (pack.projections.length > 0) {
+    lines.push("### Module overviews");
+    lines.push(
+      "_AI-authored summaries of matched file/module entities. Re-run `engram reconcile` to refresh stale entries._",
+    );
+    lines.push("");
+    for (const p of pack.projections) {
+      const staleWarning = p.stale
+        ? ` ⚠ stale${p.stale_reason ? ` (${p.stale_reason})` : ""}`
+        : "";
+      lines.push(`#### \`${p.anchor_name}\`${staleWarning}`);
+      lines.push("");
+      lines.push(p.body);
       lines.push("");
     }
   }
@@ -1272,6 +1301,36 @@ async function assembleContextPack(
     );
   }
 
+  // Look up module_overview projections for matched file/module entities (up to 3).
+  const projections: ProjectionInPack[] = [];
+  try {
+    const moduleEntities = entities
+      .filter((e) => e.entity_type === "file" || e.entity_type === "module")
+      .slice(0, 3);
+
+    for (const ent of moduleEntities) {
+      const results = listActiveProjections(graph, {
+        kind: "module_overview",
+        anchor_type: "entity",
+        anchor_id: ent.result_id,
+      });
+      if (results.length > 0) {
+        const r = results[0];
+        projections.push({
+          kind: r.projection.kind,
+          anchor_id: ent.result_id,
+          anchor_name: ent.canonical_name,
+          body: r.projection.body,
+          stale: r.stale,
+          stale_reason: r.stale_reason,
+          generated_at: r.projection.created_at,
+        });
+      }
+    }
+  } catch {
+    // Projection lookup failed (e.g. schema mismatch) — skip silently.
+  }
+
   return {
     query,
     tokenBudgetUsed: tokensUsed,
@@ -1281,6 +1340,7 @@ async function assembleContextPack(
     edges,
     evidence: Array.from(evidenceMap.values()),
     discussions,
+    projections,
     ...(opts.asOf !== undefined && {
       as_of: opts.asOf,
       as_of_input: opts.asOfInput,
@@ -1455,7 +1515,7 @@ See also:
         console.error(
           `Error opening graph: ${err instanceof Error ? err.message : String(err)}`,
         );
-        process.exit(1);
+        process.exit(2);
       }
 
       try {
@@ -1480,7 +1540,7 @@ See also:
           `Context assembly failed: ${err instanceof Error ? err.message : String(err)}`,
         );
         closeGraph(graph);
-        process.exit(1);
+        process.exit(2);
       }
 
       closeGraph(graph);
