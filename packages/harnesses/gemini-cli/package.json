@@ -3,9 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "./src/index.ts",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "bun": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
   "scripts": {
-    "build": "echo 'harness: no build step required'"
+    "build": "bun build ./src/index.ts --outdir ./dist --target node --format esm"
   },
   "dependencies": {
     "@engram/harness-core": "workspace:*"

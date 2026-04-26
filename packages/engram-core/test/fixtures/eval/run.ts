@@ -22,8 +22,9 @@
  * cloned repo referenced in fixture.source.repo) before running eval.
  */
 
-import { execSync } from "node:child_process";
+import { execFile, execSync } from "node:child_process";
 import * as fs from "node:fs";
+import { tmpdir } from "node:os";
 import * as path from "node:path";
 import { parse as parseYaml } from "yaml";
 
@@ -165,30 +166,36 @@ function parsePackMetrics(pack: string): PackMetrics {
   };
 }
 
-function askModel(model: ModelSpec, promptText: string, cwd: string): string {
-  const tmpFile = `/tmp/engram-eval-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`;
+async function askModel(
+  model: ModelSpec,
+  promptText: string,
+  cwd: string,
+): Promise<string> {
   const MAX_RETRIES = 3;
-  const flags = model.cli_flags.join(" ");
+
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      fs.writeFileSync(tmpFile, promptText, "utf8");
-      const result = execSync(
-        `${model.cli_command} ${flags} "$(cat ${JSON.stringify(tmpFile)})"`,
-        {
-          encoding: "utf8",
-          cwd,
-          shell: "/bin/bash",
-          timeout: 300_000,
-        },
-      );
-      try {
-        fs.unlinkSync(tmpFile);
-      } catch {}
+      const result = await new Promise<string>((resolve, reject) => {
+        const tmpFile = path.join(
+          tmpdir(),
+          `engram-eval-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`,
+        );
+        fs.writeFileSync(tmpFile, promptText, "utf8");
+        execFile(
+          model.cli_command,
+          ["-p", promptText],
+          { encoding: "utf8", cwd, timeout: 300_000 },
+          (err, stdout) => {
+            try {
+              fs.unlinkSync(tmpFile);
+            } catch {}
+            if (err) reject(err);
+            else resolve(stdout);
+          },
+        );
+      });
       return result.trim();
     } catch (err) {
-      try {
-        fs.unlinkSync(tmpFile);
-      } catch {}
       const msg = err instanceof Error ? err.message : String(err);
       const isQuota =
         msg.includes("QUOTA_EXHAUSTED") ||
@@ -200,7 +207,7 @@ function askModel(model: ModelSpec, promptText: string, cwd: string): string {
       if (isQuota && attempt < MAX_RETRIES - 1) {
         const waitMin = Math.ceil(waitMs / 60_000);
         console.log(`\n  Quota exhausted — waiting ${waitMin}m then retrying…`);
-        execSync(`sleep ${Math.ceil(waitMs / 1000)}`, { shell: "/bin/bash" });
+        await new Promise((r) => setTimeout(r, waitMs));
         continue;
       }
       return `[model failed: ${msg}]`;
@@ -416,7 +423,7 @@ async function main() {
       }
 
       process.stdout.write("asking model… ");
-      const answer = askModel(model, fullPrompt, process.cwd());
+      const answer = await askModel(model, fullPrompt, process.cwd());
       const cost: TokenCost = {
         prompt_tokens: estimateTokens(fullPrompt),
         answer_tokens: estimateTokens(answer),

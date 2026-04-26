@@ -11,9 +11,9 @@ _engram_gemini() {
   local db=".engram"
   if [ -f "$db" ] && command -v engram &>/dev/null; then
     local pack
-    pack=$(engram context "$prompt" --format md --token-budget 8000 --db "$db" 2>/dev/null)
+    pack=$(command engram context "$prompt" --format md --token-budget 8000 --db "$db" 2>/dev/null)
     if [ -n "$pack" ]; then
-      gemini -p "$pack
+      command gemini -p "$pack
 
 ---
 
@@ -21,7 +21,7 @@ $prompt"
       return
     fi
   fi
-  gemini "$@"
+  command gemini "$@"
 }
 alias gemini='_engram_gemini'
 `.trim();

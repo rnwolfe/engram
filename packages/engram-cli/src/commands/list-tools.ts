@@ -357,7 +357,7 @@ const TOOL_CATALOGUE: ToolDescriptor[] = [
       {
         name: "--harness",
         description: "Agent harness to target",
-        values: ["generic", "claude-code", "cursor", "gemini"],
+        values: ["generic", "claude-code", "cursor", "gemini", "gemini-cli"],
         default: "generic",
       },
       {

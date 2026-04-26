@@ -59,6 +59,7 @@ const USER_ERROR_CATCH_PATTERNS = [
   /Invalid scope/,
   /scope.*required/i,
   /Application Default Credentials|gcloud auth/,
+  /statSync|existsSync|isDirectory|source path/i,
 ];
 
 interface Violation {
@@ -103,24 +104,24 @@ for (const file of HIGH_TRAFFIC_COMMANDS) {
   // Check 2: process.exit(1) inside catch blocks for likely system errors
   // Parse catch blocks and flag exit(1) calls that don't look like user-error handlers
   const lines = src.split("\n");
-  let inCatch = 0;
+  let inCatch = -1;
   let catchDepth = 0;
   let catchContext = "";
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (/catch\s*\(/.test(line)) {
+    if (/catch\s*(\(|\{)/.test(line)) {
       inCatch = i;
       catchDepth = 1;
       // Include up to 10 lines before the catch block (the try body) for context
       catchContext = lines.slice(Math.max(0, i - 10), i + 1).join("\n") + "\n";
     }
-    if (inCatch > 0 && i > inCatch) {
+    if (inCatch >= 0 && i > inCatch) {
       catchContext += line + "\n";
       const open = (line.match(/\{/g) ?? []).length;
       const close = (line.match(/\}/g) ?? []).length;
       catchDepth += open - close;
       if (catchDepth <= 0) {
-        inCatch = 0;
+        inCatch = -1;
         catchDepth = 0;
         catchContext = "";
       } else if (/process\.exit\(1\)/.test(line)) {

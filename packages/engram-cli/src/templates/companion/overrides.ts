@@ -88,25 +88,25 @@ engram companion --harness gemini >> GEMINI.md
 `,
 
   "gemini-cli": `\
-### How to invoke engram context with Gemini CLI (native harness)
+### How to invoke engram context with Gemini CLI (shell-wrapper)
 
-The \`@engram/harness-gemini-cli\` package automatically prepends an engram context pack
-to every prompt. Install it and the pack injection happens without any manual invocation.
-
-If the native extension API is unavailable, use the shell-wrapper fallback:
-
-\`\`\`sh
-# Add to ~/.bashrc or ~/.zshrc
-$(engram companion --harness gemini-cli)
-\`\`\`
-
-This wraps the \`gemini\` command so every invocation automatically prepends the engram
-context pack when a \`.engram\` database is present in the current directory.
-
-To emit the wrapper snippet:
+Add the shell-wrapper snippet to your shell profile so every \`gemini\` invocation
+automatically prepends the engram context pack when a \`.engram\` database is present:
 
 \`\`\`sh
 engram companion --harness gemini-cli >> ~/.bashrc
+# or for zsh:
+engram companion --harness gemini-cli >> ~/.zshrc
 \`\`\`
+
+Reload your shell (\`source ~/.bashrc\`) or start a new session after appending.
+
+The wrapper calls \`engram context\` before each prompt and prepends the pack if a
+\`.engram\` database exists in the current directory. If no \`.engram\` is found, the
+wrapper passes through to \`gemini\` unchanged.
+
+> **Note:** The native \`@engram/harness-gemini-cli\` extension package is currently
+> workspace-only (not published). External users should use the shell-wrapper above.
+> Native extension support will be documented once the Gemini CLI plugin API stabilises.
 `,
 };

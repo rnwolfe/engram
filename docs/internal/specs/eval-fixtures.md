@@ -259,14 +259,22 @@ packages/engram-core/test/fixtures/eval/run.ts
 
 ```bash
 bun run eval --fixture <name>
+```
+
+`<name>` must match the `fixture.name` field of a YAML file in
+`packages/engram-core/test/fixtures/eval/`.
+
+**Note:** The flags below (`--no-cache`, `--condition`, `--prompt`, `--dry-run`)
+are planned but not yet implemented in the current runner. The runner currently
+only accepts `--fixture <name>`.
+
+```bash
+# Planned (not yet implemented):
 bun run eval --fixture <name> --no-cache          # Force re-materialization
 bun run eval --fixture <name> --condition bare    # Run only one condition
 bun run eval --fixture <name> --prompt prompt-001 # Run only one prompt
 bun run eval --fixture <name> --dry-run           # Print plan, no model calls
 ```
-
-`<name>` must match the `fixture.name` field of a YAML file in
-`packages/engram-core/test/fixtures/eval/`.
 
 ### 6.3 Runner steps
 
@@ -291,41 +299,44 @@ bun run eval --fixture <name> --dry-run           # Print plan, no model calls
 
 ### 6.4 Results schema (`results.json`)
 
+The schema below reflects the actual runner output. Fields such as `verdict` and
+`reviewerId` are not written by the runner — those are reserved for a future
+human-review or LLM-as-judge layer.
+
 ```jsonc
 {
   "fixture": "<name>",
-  "pin": "<sha>",
-  "ingestHash": "<hex>",
-  "model": { "provider": "...", "model_id": "...", "cli_command": "..." },
-  "timestamp": "<ISO8601>",
-  "runs": [
+  "runAt": "<ISO8601 timestamp>",
+  "model": {
+    "provider": "gemini",
+    "model_id": "gemini-2.5-pro",
+    "cli_command": "gemini",
+    "cli_flags": ["-p"]
+  },
+  "conditions": [
     {
-      "conditionId": "bare",
-      "promptId": "prompt-001",
-      "packIncluded": false,
+      "condition": "bare",           // condition id: "bare" | "with_pack"
+      "prompt_id": "prompt-001",
       "prompt": "<full prompt sent to model>",
-      "response": "<raw model output>",
-      "elapsedMs": 4200,
-      "verdict": null,          // filled by reviewer: "pass" | "fail" | "marginal"
-      "reviewerNote": null,     // filled by reviewer
-      "reviewerId": null        // filled by reviewer
-    },
-    {
-      "conditionId": "with_pack",
-      "promptId": "prompt-001",
-      "packIncluded": true,
+      // pack and pack_metrics are present only for "with_pack" condition:
       "pack": "<engram context output>",
-      "prompt": "<pack + prompt sent to model>",
-      "response": "<raw model output>",
-      "elapsedMs": 6800,
-      "verdict": null,
-      "reviewerNote": null,
-      "reviewerId": null
+      "pack_metrics": {
+        "lines": 120,
+        "hasDiscussions": true,
+        "hasStructuralSignals": false,
+        "discussionCount": 3,
+        "confidenceScores": [0.85, 0.72, 0.61]
+      },
+      "answer": "<raw model output>",
+      "cost": {
+        "prompt_tokens": 512,
+        "answer_tokens": 128,
+        "total_tokens": 640
+      }
     }
   ]
 }
 ```
 
-Verdict fields are left `null` by the runner and filled in by a human reviewer
-(or an LLM-as-judge step added later). The runner never auto-fails a run based
-on model output.
+Token counts in `cost` are estimates derived from character count (1 token ≈ 4
+characters). The runner never auto-fails a run based on model output.

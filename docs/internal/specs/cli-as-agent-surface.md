@@ -30,6 +30,12 @@ must cause the command to emit a single JSON object on stdout, suitable for pipi
 
 ### General JSON schema conventions
 
+> **Implementation status:** The `ok`/`error` wrapper is the target schema. Current
+> implementations vary: `context` outputs the pack object directly, `search` outputs
+> an array, `stats` outputs an unwrapped object. The wrapper will be adopted
+> incrementally. Agents should handle both the current format and the wrapper format
+> until migration is complete.
+
 - Top-level `ok: boolean` — `true` when the command succeeded, `false` on any error.
 - Top-level `error?: string` — present when `ok` is `false`. Human-readable error message.
 - Command-specific payload under a named key (see per-command schemas below).
