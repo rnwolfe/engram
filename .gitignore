@@ -11,3 +11,5 @@ bun.lock
 .claude/worktrees/
 .claude/scheduled_tasks.lock
 .worktrees/
+k8s-sidecar-containers-753.engram/
+k8s-sidecar-containers-753-runs/

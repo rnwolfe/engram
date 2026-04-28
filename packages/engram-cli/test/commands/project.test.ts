@@ -270,7 +270,6 @@ describe("engram project — NullGenerator error", () => {
 
   beforeEach(() => {
     ({ tmpDir, dbPath } = tmpDb());
-    closeGraph(createGraph(dbPath));
   });
 
   afterEach(() => {
@@ -278,8 +277,24 @@ describe("engram project — NullGenerator error", () => {
   });
 
   it("exits 1 with a friendly error when no AI provider is configured", async () => {
-    const savedEnv = process.env.ENGRAM_AI_PROVIDER;
-    delete process.env.ENGRAM_AI_PROVIDER;
+    const graph = createGraph(dbPath);
+    const episode = addEpisode(graph, {
+      source_type: "manual",
+      content: "test episode for null generator error",
+      timestamp: new Date().toISOString(),
+    });
+    closeGraph(graph);
+
+    // Blank all keys that createGenerator() auto-detects so it falls through to NullGenerator.
+    // CI sets ANTHROPIC_API_KEY for Claude Code — this test must override all of them.
+    const savedEnvs = {
+      ENGRAM_AI_PROVIDER: process.env.ENGRAM_AI_PROVIDER,
+      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+      GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+      GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    };
+    for (const key of Object.keys(savedEnvs)) delete process.env[key];
 
     const program = new Command().exitOverride();
     registerProject(program);
@@ -301,15 +316,15 @@ describe("engram project — NullGenerator error", () => {
         "--anchor",
         "none",
         "--input",
-        "episode:fakeid",
+        `episode:${episode.id}`,
         "--db",
         dbPath,
       ]),
     );
     // biome-ignore lint/suspicious/noExplicitAny: test override
     (process as any).exit = origExit;
-    if (savedEnv !== undefined) {
-      process.env.ENGRAM_AI_PROVIDER = savedEnv;
+    for (const [key, val] of Object.entries(savedEnvs)) {
+      if (val !== undefined) process.env[key] = val;
     }
 
     expect(exitCode).toBe(1);
