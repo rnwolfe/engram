@@ -22,7 +22,7 @@
  * cloned repo referenced in fixture.source.repo) before running eval.
  */
 
-import { execFile, execSync } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
@@ -128,10 +128,6 @@ interface RunResults {
 
 const CHARS_PER_TOKEN = 4;
 const FIXTURE_DIR = path.join(import.meta.dir);
-const ENGRAM_CLI = path.join(
-  import.meta.dir,
-  "../../../../../packages/engram-cli/dist/cli.js",
-);
 
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / CHARS_PER_TOKEN);
@@ -143,10 +139,19 @@ function getContextPack(
   tokenBudget = 8000,
 ): string {
   try {
-    return execSync(
-      `node ${ENGRAM_CLI} context ${JSON.stringify(prompt)} --token-budget ${tokenBudget} --db ${JSON.stringify(db)}`,
-      { encoding: "utf8" },
+    // Use spawnSync with array args — no shell, so backticks/brackets in prompt are safe.
+    // Prefer the installed `engram` binary over `bun dist/cli.js` to avoid JIT overhead
+    // and Bun-native dep issues when running as a child of another bun process.
+    const engramBin = Bun.which("engram") ?? "engram";
+    const result = spawnSync(
+      engramBin,
+      ["context", prompt, "--token-budget", String(tokenBudget), "--db", db],
+      { encoding: "utf8", timeout: 300_000 },
     );
+    if (result.error) throw result.error;
+    if (result.status !== 0)
+      throw new Error(result.stderr || `exit ${result.status}`);
+    return result.stdout;
   } catch (err) {
     return `[engram context failed: ${err instanceof Error ? err.message : String(err)}]`;
   }
@@ -366,15 +371,20 @@ async function main() {
   }
 
   // Verify model CLI is available
-  try {
-    execSync(`${fixture.evaluation.model.cli_command} --version`, {
-      encoding: "utf8",
-    });
-  } catch {
-    console.error(
-      `Error: model CLI '${fixture.evaluation.model.cli_command}' not found or not authenticated.`,
+  {
+    const check = spawnSync(
+      fixture.evaluation.model.cli_command,
+      ["--version"],
+      {
+        encoding: "utf8",
+      },
     );
-    process.exit(1);
+    if (check.error || check.status !== 0) {
+      console.error(
+        `Error: model CLI '${fixture.evaluation.model.cli_command}' not found or not authenticated.`,
+      );
+      process.exit(1);
+    }
   }
 
   const runAt = new Date().toISOString();

@@ -8,7 +8,7 @@ fixture:
   source:
     type: git
     repo: https://github.com/kubernetes/kubernetes.git
-    pin: TODO-pin-to-sha-before-kep-753-alpha-merge
+    pin: 2d42274ac75f6c97c3e9c243615a395b81edf9bd
     clone_strategy: cached
 
 slice:
