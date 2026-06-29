@@ -151,13 +151,72 @@ function excerptEpisode(ep: Episode): string {
 const DISCUSSION_EXCERPT_CHARS: Record<string, number> = {
   github_pr: 1200,
   github_issue: 1000,
+  // Design docs / ADRs are large multi-section files; give the matched section
+  // generous space (a single ADR is ~1-2k chars).
+  document: 1400,
   git_commit: 600,
 };
 
-function excerptDiscussion(content: string, sourceType: string): string {
+/**
+ * Find the best `limit`-wide window in `text` — the one containing the densest
+ * cluster of query-term matches. Long episodes (a multi-section design doc, an
+ * ADR file) carry the answer deep in the file; excerpting the file head would
+ * surface the wrong section. Returns null when no term matches (caller falls
+ * back to a head slice). Terms shorter than 3 chars are ignored as noise.
+ */
+function bestQueryWindow(
+  text: string,
+  queryTerms: string[] | undefined,
+  limit: number,
+): { start: number; end: number } | null {
+  if (!queryTerms || queryTerms.length === 0) return null;
+  const hay = text.toLowerCase();
+  const positions: number[] = [];
+  for (const term of queryTerms) {
+    const t = term.toLowerCase();
+    if (t.length < 3) continue;
+    let idx = hay.indexOf(t);
+    while (idx !== -1) {
+      positions.push(idx);
+      idx = hay.indexOf(t, idx + t.length);
+    }
+  }
+  if (positions.length === 0) return null;
+  positions.sort((a, b) => a - b);
+  let bestStart = positions[0];
+  let bestCount = 0;
+  for (const p of positions) {
+    const windowEnd = p + limit;
+    let count = 0;
+    for (const q of positions) {
+      if (q < p) continue;
+      if (q >= windowEnd) break;
+      count++;
+    }
+    if (count > bestCount) {
+      bestCount = count;
+      bestStart = p;
+    }
+  }
+  const start = Math.max(0, bestStart - 80);
+  const end = Math.min(text.length, start + limit);
+  return { start, end };
+}
+
+function excerptDiscussion(
+  content: string,
+  sourceType: string,
+  queryTerms?: string[],
+): string {
   const limit = DISCUSSION_EXCERPT_CHARS[sourceType] ?? 800;
   const trimmed = content.trim();
   if (trimmed.length <= limit) return trimmed;
+  const window = bestQueryWindow(trimmed, queryTerms, limit);
+  if (window) {
+    const prefix = window.start > 0 ? "…" : "";
+    const suffix = window.end < trimmed.length ? "…" : "";
+    return `${prefix}${trimmed.slice(window.start, window.end)}${suffix}`;
+  }
   return `${trimmed.slice(0, limit)}…`;
 }
 
@@ -729,13 +788,14 @@ function searchEpisodesDirectly(
          FROM episodes_fts
          JOIN episodes ON episodes._rowid = episodes_fts.rowid
          WHERE episodes_fts MATCH ?
-           AND episodes.source_type IN ('github_pr', 'github_issue', 'git_commit')
+           AND episodes.source_type IN ('github_pr', 'github_issue', 'document', 'git_commit')
            AND episodes.status = 'active'
          ORDER BY
            CASE episodes.source_type
              WHEN 'github_pr'    THEN 0
              WHEN 'github_issue' THEN 1
-             ELSE                     2
+             WHEN 'document'     THEN 2
+             ELSE                     3
            END ASC,
            rank ASC
          LIMIT ${limit}`,
@@ -784,6 +844,9 @@ function searchEdgesFts(
 const SOURCE_TYPE_PRIOR: Record<string, number> = {
   github_pr: 1.0,
   github_issue: 0.9,
+  // Design docs / ADRs / KEPs ingested as markdown carry deliberate, durable
+  // rationale — the highest-signal "why" source alongside PR/issue discussion.
+  document: 0.9,
   git_commit: 0.7,
 };
 
@@ -920,6 +983,10 @@ async function assembleContextPack(
 
   // Stop-word filtered query for FTS; original query preserved in output.
   const ftsQuery = toFtsQuery(query);
+
+  // Raw terms for query-aware excerpt windowing (surface the matched section of
+  // a long design-doc episode rather than its head).
+  const queryTerms = ftsQuery.split(/\s+/).filter((t) => t.length > 2);
 
   // Build FTS5 MATCH expression.
   // Single term: exact phrase match ("supersedeEdge").
@@ -1178,7 +1245,7 @@ async function assembleContextPack(
     // than a misleading one.
     if (confidence < opts.minConfidence) continue;
 
-    const excerpt = excerptDiscussion(row.content, row.source_type);
+    const excerpt = excerptDiscussion(row.content, row.source_type, queryTerms);
     const epTokens = estimateTokens(excerpt) + 30;
     if (discussionsUsed + epTokens > discussionsBudget) break;
 
@@ -1207,7 +1274,9 @@ async function assembleContextPack(
       if (
         !ep ||
         ep.status !== "active" ||
-        !["github_pr", "github_issue", "git_commit"].includes(ep.source_type)
+        !["github_pr", "github_issue", "document", "git_commit"].includes(
+          ep.source_type,
+        )
       ) {
         continue;
       }
@@ -1220,7 +1289,7 @@ async function assembleContextPack(
       );
       if (confidence < opts.minConfidence) continue;
 
-      const excerpt = excerptDiscussion(ep.content, ep.source_type);
+      const excerpt = excerptDiscussion(ep.content, ep.source_type, queryTerms);
       const epTokens = estimateTokens(excerpt) + 30;
       if (discussionsUsed + epTokens > discussionsBudget) break;
 

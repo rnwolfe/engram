@@ -13,3 +13,8 @@ bun.lock
 .worktrees/
 k8s-sidecar-containers-753.engram/
 k8s-sidecar-containers-753-runs/
+
+# Eval fixtures materialized from this repo (regenerate via materialize.sh)
+packages/engram-core/test/fixtures/eval/engram-mcp-decision.engram/
+packages/engram-core/test/fixtures/eval/*.bare-cwd/
+engram-mcp-decision.engram/

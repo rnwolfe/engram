@@ -163,3 +163,95 @@ describe("ingestMarkdown — glob patterns", () => {
     expect(result.episodesSkipped).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Section-aware ingestion (one episode per `##` section)
+// ---------------------------------------------------------------------------
+
+describe("ingestMarkdown — sectioning", () => {
+  const multiSection = [
+    "# Decisions",
+    "",
+    "Intro preamble before the first section.",
+    "",
+    "## ADR-001 first decision",
+    "",
+    "Body of the first decision.",
+    "",
+    "## ADR-002 second decision",
+    "",
+    "Body of the second decision.",
+    "",
+  ].join("\n");
+
+  test("splits a multi-section doc into one episode per ## section plus preamble", async () => {
+    const filePath = path.join(tmpDir, "decisions.md");
+    fs.writeFileSync(filePath, multiSection);
+
+    const result = await ingestMarkdown(graph, filePath);
+
+    // preamble + 2 sections = 3 episodes
+    expect(result.episodesCreated).toBe(3);
+
+    const refs = graph.db
+      .query<{ source_ref: string }, []>(
+        "SELECT source_ref FROM episodes ORDER BY source_ref",
+      )
+      .all()
+      .map((r) => r.source_ref);
+    expect(refs).toContain(`${filePath}#0-preamble`);
+    expect(refs.some((r) => r.includes("adr-001-first-decision"))).toBe(true);
+    expect(refs.some((r) => r.includes("adr-002-second-decision"))).toBe(true);
+
+    // Each section episode contains only its own body — so FTS ranks and
+    // excerpts each section independently.
+    const adr2 = graph.db
+      .query<{ content: string }, [string]>(
+        "SELECT content FROM episodes WHERE source_ref LIKE ?",
+      )
+      .get(`%adr-002-second-decision`);
+    expect(adr2?.content).toContain("## ADR-002 second decision");
+    expect(adr2?.content).not.toContain("ADR-001");
+  });
+
+  test("records the section heading in metadata", async () => {
+    const filePath = path.join(tmpDir, "decisions.md");
+    fs.writeFileSync(filePath, multiSection);
+    await ingestMarkdown(graph, filePath);
+
+    const row = graph.db
+      .query<{ metadata: string }, [string]>(
+        "SELECT metadata FROM episodes WHERE source_ref LIKE ?",
+      )
+      .get(`%adr-001-first-decision`);
+    expect(JSON.parse(row?.metadata ?? "{}").section_heading).toBe(
+      "ADR-001 first decision",
+    );
+  });
+
+  test("falls back to a single whole-file episode when there are no ## sections", async () => {
+    const filePath = path.join(tmpDir, "flat.md");
+    fs.writeFileSync(filePath, "# Title\n\nNo level-2 sections here.");
+
+    const result = await ingestMarkdown(graph, filePath);
+
+    expect(result.episodesCreated).toBe(1);
+    const ref = graph.db
+      .query<{ source_ref: string }, []>("SELECT source_ref FROM episodes")
+      .get()?.source_ref;
+    expect(ref).toBe(filePath); // file-level source_ref preserved
+  });
+
+  test("sectionize:false forces a single whole-file episode", async () => {
+    const filePath = path.join(tmpDir, "decisions.md");
+    fs.writeFileSync(filePath, multiSection);
+
+    const result = await ingestMarkdown(graph, filePath, { sectionize: false });
+
+    expect(result.episodesCreated).toBe(1);
+    const ref = graph.db
+      .query<{ source_ref: string }, []>("SELECT source_ref FROM episodes")
+      .get()?.source_ref;
+    expect(ref).toBe(filePath);
+  });
+});
