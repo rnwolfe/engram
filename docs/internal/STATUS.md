@@ -195,7 +195,7 @@
 - [ ] #194 — Jira adapter (reclassified as in-repo plugin per ADR-008)
 - [ ] #195 — Linear adapter (reclassified as in-repo plugin per ADR-008)
 - [ ] #192 — Buganizer spike (verify public API alignment)
-- [ ] #123 — Harness plugin core + Gemini CLI adapter (D3 Deliverable 2)
+- [ ] #123 — Harness plugin core + Antigravity (agy) adapter (D3 Deliverable 2; harness pivoted from Gemini CLI 2026-06-29 — `packages/harnesses/antigravity/`)
 - [ ] #116 — **Workflow benchmark** (priority/high, research) — Gate G1 for narrative projections per ADR-004. Flagged in most recent `/product` check: `decision_page`, `contradiction_report`, and `topic_cluster` shipped in v0.2.0 without G1 exit criteria met.
 
 ## Phase 3 — Maturity — not started

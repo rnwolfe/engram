@@ -14,7 +14,7 @@
  *   bun packages/engram-core/test/fixtures/eval/run.ts --fixture <name>
  *
  * Prerequisites:
- *   - Model CLI (e.g. gemini) installed and authenticated.
+ *   - Model CLI (e.g. agy / Antigravity) installed and authenticated.
  *   - engram-cli built: bun run build
  *
  * TODO(materialization): clone-or-resolve cache and run engram sync — not yet
@@ -24,7 +24,6 @@
 
 import { execFile, spawnSync } from "node:child_process";
 import * as fs from "node:fs";
-import { tmpdir } from "node:os";
 import * as path from "node:path";
 import { parse as parseYaml } from "yaml";
 
@@ -181,19 +180,13 @@ async function askModel(
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
       const result = await new Promise<string>((resolve, reject) => {
-        const tmpFile = path.join(
-          tmpdir(),
-          `engram-eval-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`,
-        );
-        fs.writeFileSync(tmpFile, promptText, "utf8");
+        // Flags come from the fixture (e.g. agy: --dangerously-skip-permissions
+        // -p), prompt is appended last so it binds to the trailing -p.
         execFile(
           model.cli_command,
-          ["-p", promptText],
+          [...model.cli_flags, promptText],
           { encoding: "utf8", cwd, timeout: 300_000 },
           (err, stdout) => {
-            try {
-              fs.unlinkSync(tmpFile);
-            } catch {}
             if (err) reject(err);
             else resolve(stdout);
           },

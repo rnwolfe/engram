@@ -179,7 +179,17 @@ rich seam of other supersessions for the regression set (see §5.4).
   deterministic `.engram` and runs the frozen prompt bare vs. with-pack,
   capturing both answers to disk.
 
-### P2 — Invisible hook delivery (Gemini CLI) + the verdict
+### P2 — Invisible delivery (Antigravity / agy) + the verdict
+
+> **Harness pivot (2026-06-29).** Primary harness is now **Antigravity (`agy`)**,
+> not Gemini CLI (whose individual free tier was decommissioned). `agy` is
+> agentic + multi-model + plugin-import capable. Caveat that shapes P2/P3:
+> Antigravity exposes **no documented force-injection hook**, so the "invisible
+> `on_user_prompt`" mechanism below is delivered via the shell-wrapper or the
+> MCP distribution surface (ADR-009) rather than a native hook — the no-hook
+> case is exactly what ADR-009 targets. Eval runner + fixtures use `agy -p`;
+> harness package is `packages/harnesses/antigravity/`. Read "Gemini CLI" below
+> as "Antigravity (agy)" except where the hook mechanism differs.
 
 - `packages/harnesses/core/` neutral surface (`on_session_start`,
   `on_user_prompt`) + `packages/harnesses/gemini-cli/` adapter (<200 lines),

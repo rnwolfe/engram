@@ -1,0 +1,98 @@
+fixture:
+  name: engram-pr-rationale
+  description: >
+    Rationale that lives ONLY in a GitHub issue thread, not in the working tree.
+    Issue #277 ("discussion: agent-facing freshness UX — patterns to borrow from
+    beads") is a brainstorm proposing five unbuilt, undocumented commands
+    (`engram ready`, `engram resume`, reconcile claim/lease, `engram observe`,
+    `engram daemon`). The wow-moment target: an engram-equipped agent surfaces
+    the proposal where a bare agent — with full file + code access but no
+    issue-tracker access — does not know it exists and fabricates a different
+    answer. This is the off-tree-rationale case the MCP fixture could not test
+    (there the answer was co-located in a tree file). VALIDATED 2026-06-29:
+    experiments/pr-issue-substrate/decision.md.
+
+  # Self-referential: substrate is this repository + its GitHub issues/PRs.
+  source:
+    type: git
+    repo: .
+    pin: HEAD
+
+# Deterministic materialization — see materialize.sh <name>. The bare condition
+# MUST run against a `.git`-less `git archive` of HEAD (not a worktree — `agy`
+# follows a worktree's .git back to the real repo), with eval meta-docs removed.
+ingest:
+  - name: engram-git
+    type: git
+    path: RUNNER_POPULATED
+  - name: engram-github
+    type: github
+    scope: rnwolfe/engram         # PRs + issues — the off-tree rationale (incl. #277)
+    auth:
+      kind: bearer
+      tokenEnv: GITHUB_TOKEN      # gh auth token
+  - name: engram-decisions
+    type: md
+    glob: docs/internal/DECISIONS.md
+
+evaluation:
+  model:
+    provider: antigravity
+    model_id: gemini-3.1-pro-high
+    cli_command: agy
+    cli_flags: ["--dangerously-skip-permissions", "-p"]
+
+  conditions:
+    - id: bare
+      description: >
+        Agent answers from a `.git`-less, sanitized archive of the tree (full
+        code + docs, minus eval meta-docs) — file + code access only, no
+        issue-tracker. It does not know which issues exist.
+    - id: with_pack
+      description: >
+        Agent receives the `engram context` pack (which surfaces issue #277)
+        prepended to the prompt.
+
+  prompts:
+    - id: prompt-001
+      text: |
+        What's the plan for a single command that tells an agent what work is
+        actionable or stale right now in this repo, instead of calling several
+        separate commands? Has this been considered?
+      ground_truth:
+        rationale_sources:
+          - "GitHub issue #277 — Idea #1 `engram ready` (beads-inspired unified freshness queue)"
+        expected_answer_summary: |
+          Yes — tracked in issue #277, a beads-inspired brainstorm. The proposal
+          is `engram ready [--scope] [--json]`: one command returning a
+          prioritized queue of stale projections, ingest cursors with new
+          substrate behind them, fresh contradictions, entity collisions, and
+          decay hot spots — collapsing the doctor+status+decay+reconcile+whats-new
+          dance into a single JSON query. Not yet implemented.
+        # VALIDATED: bare fabricated `engram brief repo` / `status --json`, never
+        # found #277. with_pack cited #277 and the beads/10-minute-amnesia framing.
+    - id: prompt-002
+      text: |
+        Is there a lightweight planned command for an agent to quickly file a
+        fact it just learned mid-task, without the full addEntity ceremony? Has
+        this been considered?
+      ground_truth:
+        rationale_sources:
+          - "GitHub issue #277 — Idea #4 `engram observe` (beads bd-create analog)"
+        expected_answer_summary: |
+          Yes — Idea #4 in issue #277: `engram observe "<fact>" --link
+          <type>:<id>` (e.g. `engram observe "Bob now owns auth/middleware"
+          --link entity:auth-middleware --link person:bob`). Auto-resolves entity
+          refs, creates an asserted episode, links evidence — the terse analog of
+          beads' `bd create`. Proposed, not scheduled; focus was `engram ready`
+          and `engram resume`.
+        # VALIDATED: bare found `engram add` + a planned `engram relate` from the
+        # format spec, missing the proposal. with_pack named `engram observe`
+        # exactly, with the example and status.
+
+# NOTE (retrieval caveat, validated): the pack surfaces #277 for natural
+# phrasings sharing the issue's vocabulary ("ready / actionable / stale",
+# "file a fact / observe") but NOT for a "reconcile lease/claim concurrency"
+# phrasing of the same issue's Idea #3 — a reconcile PR out-ranked it. The
+# differentiator is gated on discussion-retrieval precision; improving it is the
+# highest-leverage next investment (see experiments/pr-issue-substrate).

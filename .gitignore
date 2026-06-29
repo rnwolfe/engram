@@ -18,3 +18,4 @@ k8s-sidecar-containers-753-runs/
 packages/engram-core/test/fixtures/eval/engram-mcp-decision.engram/
 packages/engram-core/test/fixtures/eval/*.bare-cwd/
 engram-mcp-decision.engram/
+packages/engram-core/test/fixtures/eval/engram-pr-rationale.engram/
