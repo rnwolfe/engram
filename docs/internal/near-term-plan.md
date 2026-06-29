@@ -1,7 +1,38 @@
 # Near-Term Plan — Wow Moment
 
-**Status:** proposed.
+**Status:** proposed; re-aimed 2026-06-29 (see "Landscape re-aim" below).
 **Date:** 2026-04-26.
+
+## Landscape re-aim (2026-06-29)
+
+A mid-2026 multi-agent landscape scan (full brief in the conversation that
+produced this update) confirmed the strategic frame and forced two concrete
+corrections to this plan. Both are folded into the workstreams below; this
+block is the rationale.
+
+1. **The differentiator cannot be shown on a public, famous codebase.** The
+   K8s/KEP-753 fixture (W1) is *training-contaminated*: frontier models already
+   know KEP-753's rejected-alternative reasoning from pre-training, so the
+   `bare` condition answers it too. A public fixture structurally cannot
+   exercise "rationale the model has never seen." **The wow moment moves to
+   private substrate** (engram-on-engram with its own reverted-design PR
+   history, or a private repo via the YAML source-swap W1 already supports),
+   with a question of the form *"why is X this way and what did it replace?"* —
+   the class where provenance + supersession beats bare agentic grep. The K8s
+   fixture is retained as a *reproducibility demo*, not the gate.
+
+2. **The moat is one narrow axis; defend it and ride MCP for distribution.**
+   The empty market cell is *temporal history + evidence over developer
+   substrate*. The closest competitor (Repowise: local SQLite graph, git+PR
+   ingest, decay/staleness, 9 MCP tools) holds 5 of engram's 6 axes and lacks
+   only true bi-temporal as-of/supersession and the enforced evidence-first
+   invariant — a gap it can close fast. Two consequences: (a) lead the product
+   story with *why + when, with evidence* ("everyone graphs your current code;
+   nobody graphs how it got that way — with evidence and time"), explicitly
+   **not** RAG-on-current-code; (b) [ADR-009](DECISIONS.md#adr-009----mcp-as-a-distribution-surface-refines-adr-004)
+   reverses the blanket MCP ban for a *distribution-only* single-endpoint
+   server — gated behind the wow moment, sequenced as a follow-on to W3, never
+   ahead of the hook path.
 **Scope:** the next concrete cycle of work, sized to deliver one falsifiable
 demonstration that engram earns its keep on a complex repository. Sequenced
 behind, and consistent with, [`harness-pivot-plan.md`](harness-pivot-plan.md);
@@ -49,11 +80,18 @@ the project's center of gravity is correct.
 > correctly when issued to Gemini CLI with the engram plugin installed.
 
 The prompt must be:
-- **Real.** Drawn from the operator's actual experience, or a publicly
-  documented Kubernetes issue with a known correct outcome (a closed PR,
-  resolved bug, or accepted KEP).
+- **Real.** Drawn from the operator's actual experience, or a documented issue
+  with a known correct outcome (a closed PR, resolved bug, or accepted KEP).
 - **Multi-file or rationale-dependent.** A prompt that succeeds purely from
   the file the agent is editing does not exercise the differentiator.
+- **Answerable only from substrate the model has not memorized** (re-aim,
+  2026-06-29). The correct answer must depend on rationale the model *cannot*
+  produce from pre-training — i.e. private/internal history, or a public
+  repo's *reverted-and-superseded* design path that is not the well-known
+  outcome. A famous public issue whose resolution the model already knows
+  fails this bar even if it is "real" and "multi-file": the `bare` condition
+  will answer it, and the eval proves nothing. Prefer `why X / what superseded
+  X` questions over `what is X` questions.
 - **Frozen.** Written into the fixture YAML at cycle start. Not edited after
   workstream evaluations begin. If the prompt turns out to be too easy or
   too hard, that is itself a result; we don't move the goal posts mid-cycle.
@@ -69,9 +107,15 @@ This must remain a real possibility; otherwise the goal is not falsifiable.
 W1 fixture ─┐
             ├─→ W2 projection ──→ W3 harness ──→ EVALUATE wow moment
 W5 CLI shape┘                                          │
-                                                       ↓
-                                            W4 federation (spec only — gated)
+                                          ┌────────────┼────────────┐
+                                          ↓            ↓            ↓
+                              W4 federation    W6 MCP server   (Loss → diagnose)
+                              (spec only —     (gated on a
+                               gated)           Win; ADR-009)
 ```
+
+W6 (MCP distribution server) and W4 (federation spec) are both **downstream of
+the wow-moment verdict**. W6 only proceeds on a Win.
 
 Federation (W4) is **spec-only** in this cycle. Implementation depends on
 whether single-`.engram` retrieval signal degrades against the fixture.
@@ -89,7 +133,18 @@ substituting the source declaration.
 - New directory `packages/engram-core/test/fixtures/eval/` containing one
   YAML file per fixture and a runner that materialises the fixture into a
   scratch `.engram` file.
-- Ship one public fixture against a historical Kubernetes issue. Selection
+- **The gating fixture targets unseen substrate (re-aim, 2026-06-29).** The
+  verdict-bearing fixture must be one the evaluation model cannot answer from
+  pre-training: either engram-on-engram anchored on a *reverted/superseded*
+  design decision in this repo's own PR/ADR history, or a private repo via the
+  YAML source-swap. Its frozen prompt is a `why X / what superseded X`
+  question. This fixture — not the public Kubernetes one — is the wow-moment
+  gate.
+- Ship one public fixture against a historical Kubernetes issue **as a
+  reproducibility demo, not the gate.** It exists so others can re-run the
+  harness without private data; its `bare`/`with_pack` gap is expected to be
+  small precisely because the model already knows the public outcome (this is
+  the contamination the re-aim documents, not a bug). Selection
   criteria: closed issue or merged PR with rich rationale (linked KEP, design
   discussion, multiple reviewers), bounded blast radius (≤ ~15 files
   touched), pinned to the parent commit so the fixture represents the world
@@ -343,6 +398,43 @@ required.
 **Out of scope.** Adding new commands. Removing existing commands.
 Renaming. The shape work is mechanical; the catalogue is the deliverable.
 
+---
+
+### W6 — MCP distribution server (gated follow-on, not in the critical path)
+
+**Goal.** Plant engram in the MCP registry as the temporal, evidence-backed
+alternative to the flat official memory server — *without* surrendering
+engine-decides-model-executes. Per
+[ADR-009](DECISIONS.md#adr-009----mcp-as-a-distribution-surface-refines-adr-004).
+
+**Gate.** Do not start until the wow moment (W1 gating fixture + W2 + W3) has
+landed a win. If the cycle exits in "Loss," W6 is deferred until the diagnosis
+is resolved. The hook path proves the thesis; MCP is distribution, never a
+prerequisite.
+
+**Scope (when ungated).**
+- A thin server exposing the existing `engram context --format=json` primitive
+  as a *single* context endpoint, plus at most a small fixed set of stable read
+  surfaces (`context`, `why`, `diff`). The engine assembles and bounds the
+  pack; the model elects only *when* to pull it.
+- Reuses `packages/harnesses/core/` context assembly so the hook path and MCP
+  path share one assembler. Lives under `packages/harnesses/`, not a
+  resurrected `packages/engram-mcp/`.
+- **Hard scope guard:** no graph-traversal tools (`neighbors`, `shortest_path`,
+  `get_edge`, …). Those were the deleted `engram-mcp` and stay dead (ADR-005).
+  Adding them is a new ADR, not a W6 extension.
+
+**Definition of done (when ungated).**
+- An MCP-native harness without a force-injection hook (e.g. Cursor, whose
+  `beforeSubmitPrompt` is block/inform-only) can pull an engram pack via the
+  server against the fixture.
+- The README positions the server explicitly against the official
+  `@modelcontextprotocol/server-memory` (flat KG, no time/evidence) — the
+  comparison is the distribution artifact.
+
+**Out of scope.** Replacing the hook path for hook-capable harnesses. Any
+model-driven retrieval over graph primitives.
+
 ## Explicit kills for this cycle
 
 These remain valuable in the abstract; they actively dilute the cycle:
@@ -354,8 +446,12 @@ These remain valuable in the abstract; they actively dilute the cycle:
   layer is dilution. Buganizer / Jira / Linear / Confluence stay queued.
 - **No web UI / `engram visualize` work.** Zero contribution to the wow
   moment.
-- **No MCP server work.** ADR-005 settled this; restating to forestall
-  drift.
+- **No MCP server work *in this cycle*.** [ADR-009](DECISIONS.md#adr-009----mcp-as-a-distribution-surface-refines-adr-004)
+  reverses the blanket ban for a distribution-only single-endpoint server, but
+  it is explicitly **gated behind the wow moment** and sequenced as a W3
+  follow-on (see W6). Building it before the hook path proves the thesis is
+  out of scope and would re-introduce the dilution this cycle exists to avoid.
+  The retrieval-tool MCP of the deleted `engram-mcp` stays dead (ADR-005).
 - **No projection kinds beyond `module_overview`.** Pivot plan D5 lists four;
   three of them wait.
 

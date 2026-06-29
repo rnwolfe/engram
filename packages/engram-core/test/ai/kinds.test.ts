@@ -23,6 +23,7 @@ const BUILTIN_NAMES = [
   "decision_page",
   "topic_cluster",
   "contradiction_report",
+  "module_overview",
 ];
 
 const REQUIRED_FIELDS = [
@@ -65,12 +66,12 @@ example_title_pattern: "Test: {name}"
 // ─── Built-in kinds ───────────────────────────────────────────────────────────
 
 describe("loadKindCatalog — built-in kinds", () => {
-  test("loads exactly four built-in kinds", () => {
+  test("loads exactly five built-in kinds", () => {
     const catalog = loadKindCatalog(undefined, false);
-    expect(catalog).toHaveLength(4);
+    expect(catalog).toHaveLength(5);
   });
 
-  test("all four built-in kinds are present by name", () => {
+  test("all five built-in kinds are present by name", () => {
     const catalog = loadKindCatalog(undefined, false);
     const names = catalog.map((k) => k.name);
     for (const expected of BUILTIN_NAMES) {
@@ -120,8 +121,8 @@ describe("loadKindCatalog — XDG override", () => {
   test("appends a new custom kind from the override directory", () => {
     writeKindYaml(xdgDir, "test_kind.yaml", MINIMAL_VALID_YAML);
     const catalog = loadKindCatalog(xdgDir, false);
-    // four built-ins + one custom
-    expect(catalog).toHaveLength(5);
+    // five built-ins + one custom
+    expect(catalog).toHaveLength(6);
     const names = catalog.map((k) => k.name);
     expect(names).toContain("test_kind");
   });
@@ -142,8 +143,8 @@ example_title_pattern: "Override: {entity_name}"
     writeKindYaml(xdgDir, "entity_summary.yaml", overrideYaml);
     const catalog = loadKindCatalog(xdgDir, false);
 
-    // Still four total — the override replaced, not appended
-    expect(catalog).toHaveLength(4);
+    // Still five total — the override replaced, not appended
+    expect(catalog).toHaveLength(5);
 
     const entry = catalog.find((k) => k.name === "entity_summary");
     expect(entry).toBeDefined();
@@ -286,11 +287,11 @@ describe("loadKindCatalog — cache behavior", () => {
     try {
       writeKindYaml(xdgDir, "custom_kind.yaml", MINIMAL_VALID_YAML);
       const withOverride = loadKindCatalog(xdgDir, false);
-      expect(withOverride).toHaveLength(5);
+      expect(withOverride).toHaveLength(6);
 
       // Module cache (no overrideXdgDir) should not have the custom kind
       const fromCache = loadKindCatalog();
-      expect(fromCache).toHaveLength(4);
+      expect(fromCache).toHaveLength(5);
     } finally {
       rmSync(xdgDir, { recursive: true, force: true });
     }
@@ -303,7 +304,7 @@ describe("loadKindCatalog — non-existent override dir", () => {
   test("returns only built-ins when override dir does not exist", () => {
     const nonExistent = join(tmpdir(), "engram-kinds-does-not-exist-xyz123");
     const catalog = loadKindCatalog(nonExistent, false);
-    expect(catalog).toHaveLength(4);
+    expect(catalog).toHaveLength(5);
     const names = catalog.map((k) => k.name);
     for (const expected of BUILTIN_NAMES) {
       expect(names).toContain(expected);

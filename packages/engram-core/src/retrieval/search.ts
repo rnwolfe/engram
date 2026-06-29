@@ -21,6 +21,7 @@ import {
 } from "../graph/embedding-model.js";
 import { findSimilar } from "../graph/embeddings.js";
 import type { Entity } from "../graph/entities.js";
+import { escapeFtsQuery } from "../graph/fts.js";
 import type { TraversedEntity } from "./graph-search.js";
 import { graphSearch } from "./graph-search.js";
 import type { ScoreComponents } from "./scoring.js";
@@ -92,19 +93,6 @@ interface EvidenceRow {
 
 interface CountRow {
   count: number;
-}
-
-/**
- * Escape a query string for FTS5 MATCH.
- * Wraps each token in double quotes to avoid syntax errors with special chars.
- */
-function escapeFtsQuery(query: string): string {
-  return query
-    .trim()
-    .split(/\s+/)
-    .filter((t) => t.length > 0)
-    .map((t) => `"${t.replace(/"/g, '""')}"`)
-    .join(" ");
 }
 
 /**

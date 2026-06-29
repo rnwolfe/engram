@@ -8,6 +8,7 @@
 
 import { createHash } from "node:crypto";
 import type { EngramGraph } from "../format/index.js";
+import { escapeFtsQuery } from "./fts.js";
 import type {
   AnchorType,
   GetProjectionResult,
@@ -325,8 +326,11 @@ export function searchProjections(
   query: string,
   opts?: ListProjectionsOpts,
 ): GetProjectionResult[] {
+  // Sanitize for FTS5 MATCH — a raw query with FTS5 syntax (hyphens, colons,
+  // operators) throws "no such column" / parse errors. Shared with the main
+  // search path via escapeFtsQuery.
   const conditions: string[] = ["projections_fts MATCH ?"];
-  const params: string[] = [query];
+  const params: string[] = [escapeFtsQuery(query)];
 
   if (!opts?.include_superseded) {
     conditions.push("p.invalidated_at IS NULL");

@@ -6,7 +6,12 @@
  * append the prompt, and any harness-specific caveats.
  */
 
-export type HarnessName = "generic" | "claude-code" | "cursor" | "gemini";
+export type HarnessName =
+  | "generic"
+  | "claude-code"
+  | "cursor"
+  | "gemini"
+  | "gemini-cli";
 
 export const HARNESS_OVERRIDES: Record<HarnessName, string> = {
   generic: `\
@@ -80,5 +85,28 @@ To make this guide available in every Gemini CLI session, append it to \`GEMINI.
 \`\`\`sh
 engram companion --harness gemini >> GEMINI.md
 \`\`\`
+`,
+
+  "gemini-cli": `\
+### How to invoke engram context with Gemini CLI (shell-wrapper)
+
+Add the shell-wrapper snippet to your shell profile so every \`gemini\` invocation
+automatically prepends the engram context pack when a \`.engram\` database is present:
+
+\`\`\`sh
+engram companion --harness gemini-cli >> ~/.bashrc
+# or for zsh:
+engram companion --harness gemini-cli >> ~/.zshrc
+\`\`\`
+
+Reload your shell (\`source ~/.bashrc\`) or start a new session after appending.
+
+The wrapper calls \`engram context\` before each prompt and prepends the pack if a
+\`.engram\` database exists in the current directory. If no \`.engram\` is found, the
+wrapper passes through to \`gemini\` unchanged.
+
+> **Note:** The native \`@engram/harness-gemini-cli\` extension package is currently
+> workspace-only (not published). External users should use the shell-wrapper above.
+> Native extension support will be documented once the Gemini CLI plugin API stabilises.
 `,
 };

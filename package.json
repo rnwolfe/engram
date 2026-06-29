@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": [
     "packages/*",
-    "packages/plugins/*"
+    "packages/plugins/*",
+    "packages/harnesses/*"
   ],
   "scripts": {
     "build": "bun run --filter '*' build",
@@ -11,8 +12,10 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "check:versions": "bun scripts/check-versions.ts",
-    "verify": "bun run check:versions && bun run build && bun test && bun run lint",
-    "prepare": "husky"
+    "check:cli-conformance": "bun scripts/check-cli-conformance.ts",
+    "verify": "bun run check:versions && bun run build && bun test && bun run lint && bun run check:cli-conformance",
+    "prepare": "husky",
+    "eval": "bun packages/engram-core/test/fixtures/eval/run.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.12",

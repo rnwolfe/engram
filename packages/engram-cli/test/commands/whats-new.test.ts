@@ -156,7 +156,7 @@ describe("engram whats-new", () => {
     expect(parsed.currentVersion).toBe(ENGINE_VERSION);
     expect(parsed.lastSeen).toBe("0.1.0");
     expect(Array.isArray(parsed.versions)).toBe(true);
-    expect(parsed.versions[0].version).toBe("0.3.0");
+    expect(parsed.versions[0].version).toBe("0.3.2");
 
     // JSON consumers should not have metadata side effects.
     expect(readLastSeen(dbDir)).toBe("0.1.0");

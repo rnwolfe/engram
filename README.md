@@ -49,6 +49,24 @@ The result is a self-maintaining body of knowledge grounded in evidence — not
 a snapshot, not a RAG index. A versioned synthesis that knows what changed,
 when, and why.
 
+### Why it's different
+
+Coding agents already grep, glob, and read your *current* code well — and the
+best of them dropped vector indexing because it goes stale. Engram isn't another
+index over the current snapshot. It answers the question agentic search
+structurally can't: **how the code got this way — who decided what, when, why,
+and whether it's still true.**
+
+> Everyone graphs your current code. Nobody graphs how it got that way — with
+> evidence and time.
+
+That's the whole point: bi-temporal validity (`--as-of` time travel), atomic
+**supersession** when a decision is reversed, and an enforced **evidence chain**
+on every fact — recovered from the git/PR/issue history agents can't see. Engram
+delivers it **invisibly** through coding-agent harness hooks (the engine
+assembles and bounds the pack; the model just runs), with a single-endpoint MCP
+surface planned for harnesses without a hook.
+
 ### Design principles
 
 - **Library first, CLI second** — logic lives in `engram-core`.
