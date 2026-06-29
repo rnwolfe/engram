@@ -211,11 +211,26 @@ write-up.
 
 ## 5. The eval, in depth — the MCP reversal as a testable surface
 
-This is the load-bearing insight: **the very decision to reverse the MCP ban is
-the cleanest possible fixture for engram's differentiator.** It is unseen
-(engram's private history), supersession-dependent by construction, falsifiable
-(bare *will* find the superseded ADR), and dogfooding (engram proving its thesis
-on its own decisions is the build-in-public story).
+> **RESULT (2026-06-29, P1 executed).** This fixture was built and run.
+> **Verdict: no differentiation — bare agentic search got the answer fully
+> right**, so the prediction in §5.2 is **falsified** for capable harnesses. The
+> answer is co-located in one grep-discoverable file (`DECISIONS.md`), and a
+> real agent reads it rather than "stopping at ADR-005." The fixture is retained
+> as a **retrieval/pack-quality regression** (the pack must lead with the ADR-009
+> episode — now verified) but is **not** the wow-moment gate. The corrected
+> hypothesis: engram beats capable agentic search only when the rationale is
+> **not readable from files** — PR/issue threads (ingested, not in the tree) or
+> co-change/ownership/supersession across many commits. Full writeup:
+> [`experiments/wow-moment-mcp/decision.md`](experiments/wow-moment-mcp/decision.md).
+> The three retrieval bugs this verification surfaced (§5.3) are fixed and are
+> the real, durable win of P1.
+
+This was the original load-bearing insight: **the very decision to reverse the
+MCP ban is the cleanest possible fixture for engram's differentiator.** It is
+unseen (engram's private history), supersession-dependent by construction, and
+dogfooding. The flaw the run exposed: "unseen" and "dispersed enough to defeat a
+capable bare agent" are *different* properties, and a small well-documented repo
+satisfies the first but not the second.
 
 ### 5.1 The frozen prompt (candidate — finalize at P1 start)
 

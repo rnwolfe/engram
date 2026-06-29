@@ -1,0 +1,95 @@
+fixture:
+  name: engram-mcp-decision
+  description: >
+    Engram's own MCP decision, reversed over time: ADR-004/005 decommissioned
+    `engram-mcp` and banned MCP wholesale; ADR-009 (2026-06-29) reversed the
+    *blanket* ban to allow a distribution-only single-endpoint MCP server while
+    still rejecting model-driven graph-traversal MCP. The wow-moment target:
+    an engram-equipped agent surfaces the CURRENT decision (ADR-009) and the
+    retrieval-vs-distribution distinction, where bare search stops at the
+    superseded ADR-005 "decommission" and answers "MCP was removed, don't."
+    Unseen substrate by construction — the model cannot have memorized
+    engram's private decision history.
+
+  # Self-referential: the substrate is this repository. No external clone.
+  source:
+    type: git
+    repo: .
+    pin: HEAD
+
+# Materialization is deterministic and scripted — see materialize.sh in this
+# directory. The runner expects <name>.engram to already exist.
+#
+# IMPORTANT (eval integrity): only legitimate decision records are ingested.
+# The eval meta-docs (docs/internal/direction-2026-h2.md, near-term-plan.md)
+# are EXCLUDED — they quote this prompt and spell out the answer, which would
+# leak the answer key into both the pack and any bare agent reading the tree.
+ingest:
+  - name: engram-git
+    type: git
+    path: RUNNER_POPULATED        # full history: ADR-009 commit, engram-mcp removal (#136)
+  - name: engram-decisions
+    type: md
+    glob: docs/internal/DECISIONS.md          # the ADR record (sectioned per ADR at ingest)
+  - name: engram-pivot
+    type: md
+    glob: docs/internal/harness-pivot-plan.md # historical "No MCP layer of any kind"
+
+evaluation:
+  model:
+    provider: gemini
+    model_id: gemini-2.5-pro
+    cli_command: gemini
+    cli_flags: ["-p"]
+
+  # The bare condition must run against a SANITIZED checkout (repo minus the eval
+  # meta-docs and minus this fixtures/ directory) so a bare agent cannot read the
+  # answer key. materialize.sh produces that checkout under
+  # <name>.engram-bare-cwd/. Run the bare condition with that as cwd.
+  conditions:
+    - id: bare
+      description: >
+        Agent answers from raw file search alone, in a sanitized checkout that
+        contains the real code + DECISIONS.md (all ADRs) + git history, but NOT
+        the eval meta-docs that state the answer.
+    - id: with_pack
+      description: >
+        Agent receives the `engram context` pack (assembled against the
+        fixture .engram) prepended to the prompt. Pack leads with the ADR-009
+        episode (current decision) as the top discussion.
+
+  prompts:
+    - id: prompt-001
+      text: |
+        I want coding agents to pull engram's context over MCP so it shows up in
+        tools like Cursor. Has this been considered here, and is exposing engram
+        over MCP the right move, or was it deliberately rejected?
+      ground_truth:
+        # The decision record sections that carry the correct, current answer.
+        files:
+          - docs/internal/DECISIONS.md   # ADR-004, ADR-005 (superseded), ADR-009 (current)
+        rationale_sources:
+          - "ADR-009 — MCP as a distribution surface (refines ADR-004)"
+          - "ADR-005 — Decommission engram-mcp and engramark (superseded blanket ban)"
+        expected_answer_summary: |
+          Yes — but as a distribution-only, single-endpoint MCP server, NOT the
+          model-driven graph-traversal tools that were removed. The blanket "no
+          MCP" of ADR-004/005 was reversed by ADR-009 (2026-06-29): MCP-as-
+          retrieval (many model-elected tools over graph primitives) stays
+          rejected because it inverts engine-decides-model-executes; MCP-as-
+          distribution (one `engram context` endpoint — engine decides what,
+          model elects when) is now accepted, precisely for hook-less harnesses
+          like Cursor. The primary delivery path remains harness hooks; MCP is a
+          gated, secondary distribution surface.
+        # Predicted bare failure (recorded before running, per spec §5.2): bare
+        # search hits ADR-005 "Decommission engram-mcp" and harness-pivot-plan
+        # "No MCP layer of any kind" and concludes "MCP was deliberately removed;
+        # don't." If bare instead reads DECISIONS.md top-to-bottom and finds
+        # ADR-009, that is itself a result — the answer is co-located, so this
+        # fixture leans on bare search MISSING the most-recent section in a large
+        # decision record. Escalate to a more dispersed chain (direction-2026-h2
+        # §5.4) if bare reliably succeeds.
+        predicted_bare_failure: |
+          "Exposing engram over MCP was deliberately rejected — ADR-005
+          decommissioned the engram-mcp package and the harness pivot plan
+          explicitly lists 'No MCP layer of any kind'. Don't reintroduce it."
