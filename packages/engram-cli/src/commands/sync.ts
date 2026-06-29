@@ -363,7 +363,7 @@ Exit codes:
         process.stderr.write(
           `Cannot open graph '${dbPath}': ${err instanceof Error ? err.message : String(err)}\n`,
         );
-        process.exit(1);
+        process.exit(2);
       }
 
       // Run sync

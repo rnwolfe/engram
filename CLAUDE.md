@@ -90,11 +90,44 @@ Rules:
 
 ## Architecture Patterns
 
+### Positioning (read this first)
+
+Engram is **not RAG-over-current-code** — agentic search (grep/glob/read) already
+solves "find relevant code," and frontier harnesses deliberately dropped vector
+indexing over staleness/privacy. Engram is the layer agentic search *structurally
+cannot* provide: **how the code got this way — who decided what, when, why, and
+whether it's still true** — recovered from git/PR/issue history as a temporal,
+evidence-backed graph. The one-line frame:
+
+> Everyone graphs your current code. Nobody graphs how it got that way — with
+> evidence and time.
+
+The defensible moat is one axis: **bi-temporal validity + supersession +
+enforced evidence chains over developer substrate.** Everything else is table
+stakes; defend that axis and don't dilute it. See
+[`docs/internal/direction-2026-h2.md`](docs/internal/direction-2026-h2.md) for the
+current direction and execution strategy, and
+[`docs/internal/near-term-plan.md`](docs/internal/near-term-plan.md) for the active
+cycle.
+
 ### Three-Layer Architecture
 
 1. **engram-core** (library) — all logic lives here. Zero CLI or transport dependencies.
 2. **engram-cli** — thin wrapper using `commander` + `@clack/prompts`. Calls core APIs.
-3. **(future) engram-plugins** — pluggable transport/integration layer. Calls core APIs.
+3. **Extension subtrees** — two independent layers, both calling core APIs, neither loading the other:
+   - `packages/plugins/<name>/` — **ingest** plugins (enrichment adapters: Gerrit, Google Workspace, future Jira/Linear/GitLab). Loaded by the plugin loader at `engram sync` time. See [ADR-006](docs/internal/DECISIONS.md), [ADR-008](docs/internal/DECISIONS.md).
+   - `packages/harnesses/<name>/` — **delivery** adapters (Gemini CLI, future Claude Code). Loaded by the host coding-agent harness at session boundaries; translate native hooks to the neutral surface (`on_session_start`, `on_user_prompt`) in `packages/harnesses/core/`.
+
+**Delivery thesis: engine decides, model executes.** Context is injected
+*invisibly* via harness hooks (`on_user_prompt` → `engram context`), not via
+model-elected tools — the engine assembles and bounds the pack; the model only
+runs inference. The **primary** delivery path is the force-injection hook.
+[ADR-009](docs/internal/DECISIONS.md#adr-009----mcp-as-a-distribution-surface-refines-adr-004)
+adds a **secondary, distribution-only** MCP surface: a thin server exposing
+`engram context` as a *single* endpoint ("engine decides *what*, model elects
+*when*") for harnesses without a force-injection hook. The deleted `engram-mcp`
+(many model-driven graph-traversal tools) stays dead — that inverts control
+(ADR-004/005). Do not add graph-traversal MCP tools without a new ADR.
 
 ### Data Model
 
@@ -268,6 +301,8 @@ When creating a PR that implements a GitHub issue:
 | IDs | ULIDs | Sortable, unique, no coordination. Enables future merge without collision |
 | Embedding default | `nomic-embed-text` via Ollama (384 dims) | Local-first, cloud optional |
 | CLI framework | `commander` + `@clack/prompts` | Simple, proven, interactive when needed |
+| Context delivery | Harness hooks first; MCP distribution-only (ADR-009) | Hooks keep "engine decides, model executes"; MCP single-endpoint rides distribution without inverting control |
+| Positioning | Temporal "why," not RAG-on-current-code | Agentic search owns retrieval; engram owns history + evidence + supersession (the unoccupied market cell) |
 
 ## Key Files
 
@@ -276,7 +311,9 @@ When creating a PR that implements a GitHub issue:
 | `CLAUDE.md` | This file — project operating manual |
 | `forge.toml` | Pipeline configuration |
 | `docs/internal/VISION.md` | Product vision and design principles |
-| `docs/internal/DECISIONS.md` | Architectural decision records |
+| `docs/internal/direction-2026-h2.md` | **Current direction + execution strategy** — landscape, moat, focused wow-moment path, MCP distribution sequencing |
+| `docs/internal/near-term-plan.md` | Active cycle (re-aimed 2026-06-29): the wow-moment proof on unseen substrate |
+| `docs/internal/DECISIONS.md` | Architectural decision records (ADR-009 = MCP-as-distribution) |
 | `packages/engram-core/src/index.ts` | Public API surface |
 | `packages/engram-core/src/format/` | `.engram` file schema and migrations |
 | `packages/engram-core/src/graph/` | Entity, edge, alias, evidence CRUD |

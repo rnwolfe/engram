@@ -301,7 +301,7 @@ export async function runInteractive(opts: InitOpts): Promise<void> {
         `Git ingestion failed: ${err instanceof Error ? err.message : String(err)}`,
       );
       closeGraph(graph);
-      process.exit(1);
+      process.exit(2);
     }
   }
 

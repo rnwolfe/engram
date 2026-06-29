@@ -78,7 +78,7 @@ See also:
         console.error(
           `${c.red("Error:")} opening graph: ${err instanceof Error ? err.message : String(err)}`,
         );
-        process.exit(1);
+        process.exit(2);
       }
 
       const provider = createProvider();
@@ -112,7 +112,7 @@ See also:
           );
         }
         closeGraph(graph);
-        process.exit(1);
+        process.exit(2);
         return;
       }
 

@@ -14,6 +14,7 @@ import { registerExport } from "./commands/export.js";
 import { registerHistory } from "./commands/history.js";
 import { registerIngest } from "./commands/ingest.js";
 import { registerInit } from "./commands/init.js";
+import { registerListTools } from "./commands/list-tools.js";
 import { registerMaintenance } from "./commands/maintenance.js";
 import { registerOnboard } from "./commands/onboard.js";
 import { registerOwnership } from "./commands/ownership.js";
@@ -51,6 +52,7 @@ Typical lifecycle:
 Run 'engram <command> --help' for details on a command.`,
   );
 
+registerListTools(program);
 registerInit(program);
 registerAdd(program);
 registerCompanion(program);
