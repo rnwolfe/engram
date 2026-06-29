@@ -42,20 +42,16 @@ engram/
 │   │   │   │   ├── adapter.ts       # EnrichmentAdapter interface
 │   │   │   │   ├── adapters/
 │   │   │   │   │   └── github.ts    # GitHub PRs + Issues (v0.1)
-│   │   │   │   ├── markdown.ts
+│   │   │   │   ├── markdown.ts        # section-aware markdown/ADR ingestion
 │   │   │   │   ├── text.ts
-│   │   │   │   └── source/            # Source code ingestion (tree-sitter)
+│   │   │   │   └── k8s/               # K8s-operator semantics (RBAC + watches), tree-sitter-free
+│   │   │   │       ├── index.ts       # ingestK8s() — walks .go, writes rbac/watch entities+edges
+│   │   │   │       └── scan.ts        # regex-based Go scanner (ports the old kubebuilder/watch logic)
 │   │   │   ├── sync/         # Config-driven sync orchestrator
 │   │   │   │   ├── types.ts         # SyncConfig, SyncSource, SyncResult, SyncAuthConfig
 │   │   │   │   ├── errors.ts        # SyncConfigValidationError, SyncSourceError
 │   │   │   │   ├── run.ts           # runSync() orchestrator + validateSyncConfig()
 │   │   │   │   └── index.ts         # barrel export
-│   │   │   │       ├── index.ts       # Orchestrator — ingestSource() entry point
-│   │   │   │       ├── walker.ts      # File walker (respects .gitignore, .engramignore, denylist)
-│   │   │   │       ├── parser.ts      # tree-sitter WASM wrapper
-│   │   │   │       ├── extractors/    # Language-specific symbol extractors
-│   │   │   │       ├── queries/       # tree-sitter query files
-│   │   │   │       └── grammars/      # Bundled WASM grammar files
 │   │   │   ├── ai/           # LLM integration (entity extraction, embeddings)
 │   │   │   │   ├── provider.ts      # Abstract interface
 │   │   │   │   ├── ollama.ts
@@ -335,7 +331,7 @@ When creating a PR that implements a GitHub issue:
 | `docs/internal/specs/vocabulary.md` | Controlled vocabulary registries — entity_type, source_type, relation_type |
 | `packages/engram-core/src/vocab/` | Vocabulary registry module (ENTITY_TYPES, EPISODE_SOURCE_TYPES, RELATION_TYPES, etc.) |
 | `packages/engram-core/src/format/verify.ts` | Graph integrity checker; supports `{ strict: true }` for vocab validation |
-| `packages/engram-core/src/ingest/source/` | Source code ingestion — walks working tree, parses TS/JS with tree-sitter, creates file/module/symbol entities |
+| `packages/engram-core/src/ingest/k8s/` | Kubernetes-operator semantics (kubebuilder RBAC + controller-runtime watches) via regex Go scan. Tree-sitter source ingestion (general symbol/AST entities) was **removed** in [ADR-010](docs/internal/DECISIONS.md#adr-010----remove-tree-sitter-source-ingestion-the-moat-is-off-tree-history-not-code-structure) — it was redundant with agentic file search and taxed retrieval precision. |
 
 <!-- engram-companion:claude-code -->
 ## Engram context pack — usage guide

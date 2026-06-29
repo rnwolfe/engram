@@ -17,18 +17,14 @@ import { GoogleWorkspaceAdapter } from "@engram/plugin-google-workspace";
 // For those commands we log a "starting" line and print results when done.
 // spinner() is only used for async operations (GitHub fetch, LLM calls).
 import type { Command } from "commander";
-import type {
-  EngramGraph,
-  EnrichmentAdapter,
-  SourceProgressEvent,
-} from "engram-core";
+import type { EngramGraph, EnrichmentAdapter } from "engram-core";
 import {
   closeGraph,
   EnrichmentAdapterError,
   GitHubAdapter,
   ingestGitRepo,
+  ingestK8s,
   ingestMarkdown,
-  ingestSource,
   openGraph,
   resolveDbPath,
 } from "engram-core";
@@ -48,15 +44,6 @@ interface IngestGitOpts {
 }
 
 interface IngestMdOpts {
-  db: string;
-}
-
-interface IngestSourceOpts {
-  exclude?: string[];
-  gitignore: boolean;
-  engramignore: boolean;
-  dryRun?: boolean;
-  verbose?: boolean;
   db: string;
 }
 
@@ -220,82 +207,42 @@ See also:
       closeGraph(graph);
     });
 
-  // ingest source
+  // ingest k8s — Kubernetes-operator semantics (RBAC + watch graphs) from Go.
+  // Replaces the removed tree-sitter source ingestion (ADR-010): general
+  // symbol/AST entities were redundant with agentic file search; only the
+  // cross-file operator semantics a single-file read cannot reveal are kept.
   ingest
-    .command("source [sourcePath]")
-    .description("Ingest source files into the knowledge graph")
+    .command("k8s [sourcePath]")
+    .description(
+      "Ingest Kubernetes-operator semantics (kubebuilder RBAC + controller-runtime watches) from Go files",
+    )
     .addHelpText(
       "after",
       `
 Examples:
-  # Ingest source from current directory
-  engram ingest source
+  # Scan Go files under the current directory
+  engram ingest k8s
 
-  # Dry-run to preview what would be indexed
-  engram ingest source --dry-run
+  # Scan a specific operator tree
+  engram ingest k8s ./controllers
 
-  # Exclude test and generated files
-  engram ingest source --exclude "**/*.test.ts" --exclude "dist/**"
-
-  # Verbose per-file output
-  engram ingest source --verbose
-
-Exclusion precedence (highest to lowest):
-  1. Built-in denylist dirs (node_modules, vendor, generated, testdata, …)
-  2. --exclude flags
-  3. .engramignore  — per-directory ignore file (gitignore glob syntax).
-     Place a .engramignore at the repo root or any subdirectory.
-     Supports negation patterns to re-include paths excluded by .engramignore:
-       proto/gen/        # exclude everything under proto/gen/
-       !proto/gen/custom.ts  # …except this one file
-     Note: negation only works within .engramignore itself — it cannot
-     re-include a path that .gitignore has excluded (they are independent gates).
-     Use --no-engramignore to bypass .engramignore (denylist still applies).
-  4. .gitignore      — use --no-gitignore to bypass
-
-When to use:
-  Run after engram ingest git to add symbol-level entities (functions,
-  classes, modules) for code navigation queries.
+Extracts the RBAC permission graph (from // +kubebuilder:rbac markers) and the
+watch/owns graph (from SetupWithManager .For/.Owns/.Watches calls) — cross-file
+operator semantics not visible in a single-file read.
 
 See also:
   engram ingest git   Ingest commit history`,
     )
-    .option(
-      "--exclude <glob>",
-      "additional exclude glob (repeatable)",
-      (val: string, prev: string[]) => [...prev, val],
-      [] as string[],
-    )
-    .option(
-      "--no-gitignore",
-      "skip .gitignore application (denylist still applies)",
-    )
-    .option(
-      "--no-engramignore",
-      "skip .engramignore application (denylist still applies)",
-    )
-    .option("--dry-run", "walk and report counts without writing")
-    .option("-v, --verbose", "emit per-file progress output")
     .option("--db <path>", "path to .engram file", ".engram")
-    .action(async (sourcePath: string | undefined, opts: IngestSourceOpts) => {
-      if (process.stdout.isTTY) intro("engram ingest source");
-
+    .action(async (sourcePath: string | undefined, opts: { db: string }) => {
+      if (process.stdout.isTTY) intro("engram ingest k8s");
       const dbPath = resolveDbPath(path.resolve(opts.db));
       const resolvedSource = path.resolve(sourcePath ?? ".");
-      const startMs = Date.now();
-
-      if (opts.dryRun) {
-        log.info("Dry-run mode — no writes will be made");
-      }
 
       try {
-        const stat = fs.statSync(resolvedSource);
-        if (!stat.isDirectory()) {
-          log.error(`Source path is not a directory: ${resolvedSource}`);
-          process.exit(1);
-        }
+        fs.statSync(resolvedSource);
       } catch {
-        log.error(`Source path does not exist: ${resolvedSource}`);
+        log.error(`Path does not exist: ${resolvedSource}`);
         process.exit(1);
       }
 
@@ -309,73 +256,18 @@ See also:
         process.exit(2);
       }
 
-      let fileIdx = 0;
-
-      const onProgress = opts.verbose
-        ? (event: SourceProgressEvent) => {
-            const label = {
-              file_parsed: "parsed  ",
-              file_skipped: "cached  ",
-              file_error: "error   ",
-              file_scanned: null, // suppress raw scan events
-            }[event.type];
-            if (!label) return;
-            fileIdx++;
-            const suffix = event.message ? `  ${event.message}` : "";
-            log.info(`[${fileIdx}] ${label} ${event.relPath}${suffix}`);
-          }
-        : undefined;
-
-      const s = opts.verbose ? undefined : spinner();
-      if (s) s.start(`Scanning ${resolvedSource}`);
-
-      let dryRunHadErrors = false;
-
       try {
-        const result = await ingestSource(graph, {
-          root: resolvedSource,
-          exclude: opts.exclude?.length ? opts.exclude : undefined,
-          respectGitignore: opts.gitignore,
-          respectEngramignore: opts.engramignore,
-          dryRun: opts.dryRun,
-          onProgress,
-        });
-
-        if (s) s.stop("Scan complete");
-
-        const elapsedSec = ((Date.now() - startMs) / 1000).toFixed(1);
-        const uncached = result.filesScanned - result.filesSkipped;
-        const summaryLines = [
-          opts.dryRun
-            ? "Source ingestion dry-run complete."
-            : "Source ingestion complete.",
-          `  Scanned:  ${result.filesScanned} files`,
-          `  Parsed:   ${result.filesParsed} files (${result.filesSkipped} unchanged, ${uncached - result.filesParsed} unsupported/errored)`,
-          `  Skipped:  ${result.filesSkipped} files`,
-          `  Archived: ${result.deletedArchived} files`,
-          `  Entities: ${result.entitiesCreated} created`,
+        const result = ingestK8s(graph, resolvedSource);
+        const summary = [
+          "Kubernetes-operator ingestion complete.",
+          `  Episodes: ${result.episodesCreated} created`,
+          `  Entities: ${result.entitiesCreated} created, ${result.entitiesResolved} resolved`,
           `  Edges:    ${result.edgesCreated} created`,
-          `  Errors:   ${result.errors.length}`,
-          `  Elapsed:  ${elapsedSec}s`,
-        ];
-        log.success(summaryLines.join("\n"));
-
-        if (result.errors.length > 0) {
-          const errLines = result.errors
-            .slice(0, 10)
-            .map((e) => `  ${e.relPath}: ${e.message}`);
-          if (result.errors.length > 10) {
-            errLines.push(`  … and ${result.errors.length - 10} more`);
-          }
-          log.warn(`Per-file errors (not fatal):\n${errLines.join("\n")}`);
-          if (opts.dryRun) {
-            dryRunHadErrors = true;
-          }
-        }
+        ].join("\n");
+        log.success(summary);
       } catch (err) {
-        if (s) s.stop("Source ingestion failed");
         log.error(
-          `Source ingestion failed: ${err instanceof Error ? err.message : String(err)}`,
+          `Kubernetes ingestion failed: ${err instanceof Error ? err.message : String(err)}`,
         );
         closeGraph(graph);
         process.exit(2);
@@ -383,10 +275,6 @@ See also:
 
       closeGraph(graph);
       if (process.stdout.isTTY) outro("Done");
-
-      if (dryRunHadErrors) {
-        process.exit(1);
-      }
     });
 
   // ---------------------------------------------------------------------------

@@ -73,8 +73,8 @@ describe("help-coverage: Phase 1 commands have Examples blocks", () => {
     expect(hasExamples(helpOutput(["ingest", "enrich", "github"]))).toBe(true);
   });
 
-  it("engram ingest source --help has Examples", () => {
-    expect(hasExamples(helpOutput(["ingest", "source"]))).toBe(true);
+  it("engram ingest k8s --help has Examples", () => {
+    expect(hasExamples(helpOutput(["ingest", "k8s"]))).toBe(true);
   });
 
   it("engram ingest md --help has Examples", () => {
@@ -91,7 +91,7 @@ describe("help-coverage: Phase 1 commands have Examples blocks", () => {
       ["init"],
       ["ingest", "git"],
       ["ingest", "enrich", "github"],
-      ["ingest", "source"],
+      ["ingest", "k8s"],
       ["ingest", "md"],
       ["companion"],
     ];

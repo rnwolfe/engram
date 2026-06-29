@@ -19,7 +19,6 @@ import {
   getEntity,
   getEpisode,
   InvalidAsOfError,
-  listActiveProjections,
   openGraph,
   resolveAsOf,
   resolveDbPath,
@@ -1370,35 +1369,10 @@ async function assembleContextPack(
     );
   }
 
-  // Look up module_overview projections for matched file/module entities (up to 3).
+  // Projection surfacing in packs is dormant: module_overview (the only kind
+  // that anchored to code entities) was removed with source ingestion (ADR-010).
+  // The generic ProjectionInPack plumbing is retained for future rationale kinds.
   const projections: ProjectionInPack[] = [];
-  try {
-    const moduleEntities = entities
-      .filter((e) => e.entity_type === "file" || e.entity_type === "module")
-      .slice(0, 3);
-
-    for (const ent of moduleEntities) {
-      const results = listActiveProjections(graph, {
-        kind: "module_overview",
-        anchor_type: "entity",
-        anchor_id: ent.result_id,
-      });
-      if (results.length > 0) {
-        const r = results[0];
-        projections.push({
-          kind: r.projection.kind,
-          anchor_id: ent.result_id,
-          anchor_name: ent.canonical_name,
-          body: r.projection.body,
-          stale: r.stale,
-          stale_reason: r.stale_reason,
-          generated_at: r.projection.created_at,
-        });
-      }
-    }
-  } catch {
-    // Projection lookup failed (e.g. schema mismatch) — skip silently.
-  }
 
   return {
     query,

@@ -210,35 +210,6 @@ describe("engram init --yes enhanced pipeline", () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  it("runs source ingest unconditionally in --yes mode", {
-    timeout: 120000,
-  }, async () => {
-    // Run from a temp dir with a minimal .ts file so source ingest has
-    // something to parse — never touches the real repo root.
-    fs.writeFileSync(path.join(dir, "hello.ts"), "export const x = 1;\n");
-
-    const out = await captureStdout(async () => {
-      const origCwd = process.cwd();
-      process.chdir(dir);
-      try {
-        await makeProgram().parseAsync([
-          "node",
-          "engram",
-          "init",
-          "--yes",
-          "--embedding-model",
-          "none",
-          "--db",
-          dbPath,
-        ]);
-      } finally {
-        process.chdir(origCwd);
-      }
-    });
-
-    expect(out).toContain("Source ingestion");
-  });
-
   it("--format json emits structured JSON output", {
     timeout: 120000,
   }, async () => {
@@ -277,7 +248,6 @@ describe("engram init --yes enhanced pipeline", () => {
     const parsed = JSON.parse(candidate.slice(openBrace + 1)); // skip the "\n"
     expect(parsed).toHaveProperty("git");
     expect(parsed).toHaveProperty("enrichment");
-    expect(parsed).toHaveProperty("source");
     expect(parsed).toHaveProperty("companion");
     expect(parsed).toHaveProperty("embed");
   });

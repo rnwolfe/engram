@@ -496,3 +496,74 @@ use.
   is a distribution follow-on, not a prerequisite. Do not build it before the
   private-substrate wow moment lands.
 
+## ADR-010 -- Remove tree-sitter source ingestion; the moat is off-tree history, not code structure
+
+**Date**: 2026-06-29
+**Status**: Accepted
+**Supersedes (partial)**: harness-pivot-plan D4 ("source code as a first-class
+substrate"), VISION.md phase 2 source-ingestion line, and the source-ingestion
+specs. Reverses the D4 elevation.
+
+**Context**: Two wow-moment validations (`experiments/wow-moment-mcp`,
+`experiments/pr-issue-substrate`, both 2026-06-29) established where engram does
+and does not beat capable agentic search:
+
+- It does **not** beat agentic grep/glob/read on *current code structure* — the
+  agent already reads the files. The MCP fixture (answer co-located in a tree
+  file) showed **no differentiation**.
+- It **does** beat it on *off-tree rationale* the agent cannot grep — PR/issue
+  threads and history-derived signals. The PR/issue fixture confirmed this.
+
+The most expensive subsystem — tree-sitter source ingestion (`src/ingest/source/`:
+walker, parser, per-language extractors, vendored WASM grammars, queries, the
+Kubernetes-operator extras) — produces exactly the layer that lost: `symbol`,
+`file`, and source-`module` entities plus structural `imports`/`calls`/`defines`
+edges that mirror current code. Measured on engram-on-engram + GitHub:
+**symbol (1515) + module (595) = 82% of all entities are AST-derived**, and
+`source` episodes (376, full file contents) are the single largest episode type.
+This bloat (a) inflates ingestion time/cost, (b) crowds the pack's Entities
+"navigation aid" section, and (c) competes in FTS retrieval — directly worsening
+the **discussion-retrieval precision** that both validations named as the real
+bottleneck.
+
+Critically, the history signals are **independent of AST**: `git.ts` creates its
+own `module` entities per touched file path and attaches **co-change**,
+**ownership**, and blame edges to those (the `fileEntityCache`, lines ~318/527/655).
+Dropping source ingestion therefore loses *none* of the git-derived moat.
+
+**Decision**: Remove tree-sitter source ingestion and the source/code-embedding
+layer. Keep the git VCS layer (commits, blame, co-change, ownership,
+supersession), enrichment adapters (GitHub PR/issue, Gerrit), and markdown/doc
+ingestion. Engram's substrate becomes **history + rationale**, not current code
+structure.
+
+Remove: `packages/engram-core/src/ingest/source/` (walker, parser, extractors,
+grammars WASM, queries, K8s operator extras), the `engram ingest source`
+subcommand, source-walk in `init`/`sync`, source-episode embedding, and the
+now-unused `symbol`/`file` entity types and `defines`/`imports`/`calls` relation
+types in the vocab. Keep git-created `file`-path `module` entities (so
+`engram why <file>` and co-change/ownership keep working at file granularity).
+
+**Alternatives considered**:
+- *Keep AST behind an opt-in flag.* Rejected: the bloat still ships in the
+  binary (vendored grammars), the code still needs maintenance, and an opt-in a
+  validation showed to be net-negative for retrieval is not worth the surface.
+- *Keep AST for symbol-level `engram why`.* Rejected as default: file-level
+  `why` (git blame + commits + PRs) carries the rationale; symbol granularity is
+  a marginal nicety not worth a parser per language.
+- *Status quo.* Rejected: it directly taxes the one metric the wow-moment
+  hinges on (discussion-retrieval precision), for a capability agentic search
+  already covers.
+
+**Consequences**:
+- Smaller, faster, cheaper ingest; ~73% fewer entities on the dogfood repo;
+  substantially smaller release binary (no vendored WASM grammars).
+- Cleaner packs and higher retrieval precision (the named bottleneck), because
+  symbol/source noise no longer competes with PR/issue/commit/doc rationale.
+- `module_overview` projection loses its source-entity inputs — see the scope
+  decision recorded alongside this ADR (drop vs re-base on git+commits+PRs).
+- Docs to update: VISION phase 2, CLAUDE.md (ingestion architecture, file tree,
+  key files), README, source-ingestion specs (mark removed), vocabulary spec.
+- The removal is recorded here and recoverable from git history; the
+  source-ingestion specs are preserved as rejected-design records.
+

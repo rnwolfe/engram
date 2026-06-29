@@ -41,7 +41,6 @@ import {
   prepareDbDirectory,
   runEmbed,
   runMarkdownIngest,
-  runSourceIngest,
 } from "./init-runners.js";
 
 function cancelAndExit(): never {
@@ -227,11 +226,6 @@ export async function runInteractive(opts: InitOpts): Promise<void> {
   ) as string;
   const mdPath = mdRaw.trim();
 
-  // Step 3 — Source ingest (always offered)
-  const doSource = assertNotCancel(
-    await confirm({ message: "Ingest source code?", initialValue: true }),
-  ) as boolean;
-
   // Step 4 — Companion setup
   const cwd = process.cwd();
   const detectedHarnesses = detectHarnessFiles(cwd);
@@ -313,7 +307,6 @@ export async function runInteractive(opts: InitOpts): Promise<void> {
   if (mdPath) await runMarkdownIngest(graph, mdPath);
 
   // Step 3 execute — source
-  if (doSource) await runSourceIngest(graph, cwd);
 
   // Step 4 execute — companion
   if (companionFiles.length > 0) {
