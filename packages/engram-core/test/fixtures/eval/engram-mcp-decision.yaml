@@ -37,10 +37,10 @@ ingest:
 
 evaluation:
   model:
-    provider: gemini
-    model_id: gemini-2.5-pro
-    cli_command: gemini
-    cli_flags: ["-p"]
+    provider: antigravity
+    model_id: gemini-3.1-pro-high
+    cli_command: agy
+    cli_flags: ["--dangerously-skip-permissions", "-p"]
 
   # The bare condition must run against a SANITIZED checkout (repo minus the eval
   # meta-docs and minus this fixtures/ directory) so a bare agent cannot read the

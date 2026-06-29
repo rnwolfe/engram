@@ -258,9 +258,24 @@ falsifiability of the cycle. Ship one kind well first.
 
 ---
 
-### W3 — Gemini CLI plugin & hooks (primary harness)
+### W3 — Antigravity (agy) plugin & delivery (primary harness)
 
-**Goal.** Invisible delivery: the developer types a prompt into Gemini CLI
+> **Harness pivot (2026-06-29).** The primary dogfood harness is now
+> **Antigravity** (Google's agentic CLI, `agy`), not Gemini CLI. Reasons: (1)
+> Gemini CLI's individual free tier was decommissioned (`IneligibleTierError`),
+> making it unusable for evals; (2) `agy` is agentic, multi-model (Gemini 3.x,
+> Claude 4.6, GPT-OSS), and can import Gemini/Claude plugins (`agy plugin
+> import`); (3) Antigravity exposes **no documented force-injection per-prompt
+> hook**, so its delivery leans on the shell-wrapper, plugin-import, and the
+> gated MCP distribution surface ([ADR-009](DECISIONS.md#adr-009----mcp-as-a-distribution-surface-refines-adr-004))
+> — which *reinforces* the ADR-009 decision. The harness package is
+> `packages/harnesses/antigravity/` (renamed from `gemini-cli`); the eval runner
+> and fixtures use `agy -p`. References to "Gemini CLI" below should be read as
+> "Antigravity (agy)" except where the no-hook caveat changes the mechanism
+> (the `on_user_prompt` force-injection hook is not available on Antigravity; use
+> the shell-wrapper / MCP path).
+
+**Goal.** Invisible delivery: the developer types a prompt into Antigravity
 and the engram pack lands in context automatically. No commands, no
 remembering, no prompt-engineering instructions.
 

@@ -11,7 +11,7 @@ const VALID_HARNESSES: HarnessName[] = [
   "claude-code",
   "cursor",
   "gemini",
-  "gemini-cli",
+  "antigravity",
 ];
 
 export function companionSentinel(harness: HarnessName): string {

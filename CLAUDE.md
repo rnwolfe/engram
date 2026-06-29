@@ -116,7 +116,7 @@ cycle.
 2. **engram-cli** — thin wrapper using `commander` + `@clack/prompts`. Calls core APIs.
 3. **Extension subtrees** — two independent layers, both calling core APIs, neither loading the other:
    - `packages/plugins/<name>/` — **ingest** plugins (enrichment adapters: Gerrit, Google Workspace, future Jira/Linear/GitLab). Loaded by the plugin loader at `engram sync` time. See [ADR-006](docs/internal/DECISIONS.md), [ADR-008](docs/internal/DECISIONS.md).
-   - `packages/harnesses/<name>/` — **delivery** adapters (Gemini CLI, future Claude Code). Loaded by the host coding-agent harness at session boundaries; translate native hooks to the neutral surface (`on_session_start`, `on_user_prompt`) in `packages/harnesses/core/`.
+   - `packages/harnesses/<name>/` — **delivery** adapters (Antigravity/`agy` is the primary dogfood harness; future Claude Code). Loaded by the host coding-agent harness at session boundaries; translate native hooks (or, for hook-less harnesses like Antigravity, a shell-wrapper / the ADR-009 MCP surface) to the neutral surface (`on_session_start`, `on_user_prompt`) in `packages/harnesses/core/`.
 
 **Delivery thesis: engine decides, model executes.** Context is injected
 *invisibly* via harness hooks (`on_user_prompt` → `engram context`), not via
