@@ -74,7 +74,7 @@ describe("ingestK8s", () => {
     // FooReconciler module entity is created once and reused for grants+watches
     const fooCount = graph.db
       .query<{ n: number }, [string]>(
-        "SELECT COUNT(*) n FROM entities WHERE canonical_name = ? AND entity_type = 'module'",
+        "SELECT COUNT(*) n FROM entities WHERE canonical_name = ? AND entity_type = 'k8s_controller'",
       )
       .get("FooReconciler");
     expect(fooCount?.n).toBe(1);

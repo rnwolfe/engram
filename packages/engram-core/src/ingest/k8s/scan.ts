@@ -34,7 +34,10 @@ export interface K8sScanResult {
 }
 
 const KUBEBUILDER_RBAC_RE = /^\s*\/\/\s*\+kubebuilder:rbac:(.+)$/;
-const TYPE_DECL_RE = /^\s*type\s+([A-Za-z_]\w*)\b/;
+// Only struct declarations carry kubebuilder RBAC markers (reconcilers). The old
+// tree-sitter query matched struct types only; requiring `struct` here avoids
+// associating markers with aliases/interfaces (false-positive permissions).
+const TYPE_DECL_RE = /^\s*type\s+([A-Za-z_]\w*)\s+struct\b/;
 const SETUP_RE =
   /func\s*\(\s*\w+\s+\*?([A-Za-z_]\w*)\s*\)\s*SetupWithManager\b/g;
 // `\.\s*` tolerates fluent method chains that put `.` at the end of one line

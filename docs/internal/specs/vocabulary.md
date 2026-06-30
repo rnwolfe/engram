@@ -43,6 +43,7 @@ union type (for function signatures and parameter narrowing).
 | `ISSUE` | `"issue"` | Bug tracker issue |
 | `K8S_RESOURCE_KIND` | `"k8s_resource_kind"` | Kubernetes resource type (e.g. Deployment, ReplicaSet) |
 | `RBAC_PERMISSION` | `"rbac_permission"` | Kubernetes RBAC permission (group/resource#verb tuple) |
+| `K8S_CONTROLLER` | `"k8s_controller"` | A controller-runtime reconciler struct; anchors RBAC/watch edges (kept distinct from `module` so non-file names don't pollute file-centric features) |
 | `BAZEL_TARGET` | `"bazel_target"` | Bazel/Buck build target (from BUILD file ingestion) |
 | `DOCUMENT` | `"document"` | External document (Google Doc, Confluence page, etc.) |
 

@@ -18,6 +18,10 @@ export const ENTITY_TYPES = {
   ISSUE: "issue",
   K8S_RESOURCE_KIND: "k8s_resource_kind",
   RBAC_PERMISSION: "rbac_permission",
+  /** A controller-runtime reconciler struct (anchors RBAC/watch edges). Kept
+   * distinct from MODULE so non-file controller names don't pollute file-centric
+   * features (co-change, ownership, onboard "hot files"). */
+  K8S_CONTROLLER: "k8s_controller",
   BAZEL_TARGET: "bazel_target",
   /** A document entity (e.g. a Google Doc, a Confluence page). */
   DOCUMENT: "document",

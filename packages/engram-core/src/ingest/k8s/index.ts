@@ -6,7 +6,8 @@
  * single-file read does not reveal. Preserved from the removed tree-sitter
  * source ingestion per ADR-010, reimplemented over raw text (see scan.ts).
  *
- * Entities: reconciler structs (`module`), `k8s_resource_kind`, `rbac_permission`.
+ * Entities: reconciler structs (`k8s_controller`), `k8s_resource_kind`,
+ * `rbac_permission`.
  * Edges: `rbac_grants`, `controller_watches`, `controller_owns` (all `observed`).
  */
 import * as fs from "node:fs";
@@ -16,7 +17,11 @@ import { addEdge } from "../../graph/edges.js";
 import { addEntity, type EvidenceInput } from "../../graph/entities.js";
 import { addEpisode } from "../../graph/episodes.js";
 import type { EngramGraph } from "../../graph/index.js";
-import { ENTITY_TYPES, RELATION_TYPES } from "../../vocab/index.js";
+import {
+  ENTITY_TYPES,
+  EPISODE_SOURCE_TYPES,
+  RELATION_TYPES,
+} from "../../vocab/index.js";
 import type { IngestResult } from "../git.js";
 import { scanGoForK8s } from "./scan.js";
 
@@ -90,16 +95,26 @@ export function ingestK8s(
       continue;
     }
 
+    // Idempotent per file: addEpisode dedups on (source_type, source_ref) and
+    // returns the existing row, so reruns reuse it. Count created vs. skipped
+    // accurately by checking existence first (mirrors the markdown ingester).
+    const sourceRef = `k8s:${file}`;
+    const already = graph.db
+      .query<{ id: string }, [string, string]>(
+        "SELECT id FROM episodes WHERE source_type = ? AND source_ref = ?",
+      )
+      .get(EPISODE_SOURCE_TYPES.SOURCE_FILE, sourceRef);
     const episode = addEpisode(graph, {
-      source_type: "source",
-      source_ref: `k8s:${file}`,
+      source_type: EPISODE_SOURCE_TYPES.SOURCE_FILE,
+      source_ref: sourceRef,
       content,
       actor: opts.actor,
       timestamp: new Date(fs.statSync(file).mtime).toISOString(),
       owner_id: opts.owner_id,
       metadata: { file_path: file, extractor: EXTRACTOR },
     });
-    counts.episodesCreated++;
+    if (already) counts.episodesSkipped++;
+    else counts.episodesCreated++;
     const ev: EvidenceInput[] = [
       { episode_id: episode.id, extractor: EXTRACTOR, confidence: 1 },
     ];
@@ -108,7 +123,7 @@ export function ingestK8s(
       ensureEntity(perm.canonicalName, ENTITY_TYPES.RBAC_PERMISSION, ev);
     }
     for (const grant of result.grants) {
-      const src = ensureEntity(grant.struct, ENTITY_TYPES.MODULE, ev);
+      const src = ensureEntity(grant.struct, ENTITY_TYPES.K8S_CONTROLLER, ev);
       const tgt = ensureEntity(
         grant.permission,
         ENTITY_TYPES.RBAC_PERMISSION,
@@ -128,7 +143,11 @@ export function ingestK8s(
       counts.edgesCreated++;
     }
     for (const watch of result.watches) {
-      const src = ensureEntity(watch.controller, ENTITY_TYPES.MODULE, ev);
+      const src = ensureEntity(
+        watch.controller,
+        ENTITY_TYPES.K8S_CONTROLLER,
+        ev,
+      );
       const tgt = ensureEntity(
         watch.resourceKind,
         ENTITY_TYPES.K8S_RESOURCE_KIND,

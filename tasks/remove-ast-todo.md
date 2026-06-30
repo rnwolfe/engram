@@ -26,4 +26,4 @@ Branch: `refactor/remove-tree-sitter-ast`. Verify `bun run build` + `bun test` +
 All stages complete except vocab cleanup (S5 deferred — FILE/SYMBOL types kept as
 harmless registry entries; CLI commands reference them defensively and fall back
 to git `module` entities). K8s RBAC/watch preserved standalone (regex, no
-tree-sitter). 1272 tests pass.
+tree-sitter). 1264 tests pass.
