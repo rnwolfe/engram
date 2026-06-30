@@ -34,8 +34,8 @@ relationships that never makes it into a commit message.
 Engram runs a three-layer pipeline:
 
 1. **Ingest** — pull knowledge from where it already lives: git history
-   (free, no tokens), source code (tree-sitter AST parsing), GitHub PRs,
-   Gerrit changes, Google Docs, markdown documents, or a custom plugin.
+   (free, no tokens), GitHub PRs, Gerrit changes, Google Docs, markdown/ADR
+   documents, Kubernetes-operator semantics, or a custom plugin.
    Every piece of source becomes an immutable **episode** with full
    provenance.
 2. **Graph** — encode that evidence as a temporal knowledge graph:
@@ -205,7 +205,7 @@ structured, LLM-free rendering.
 | `engram add [content]` | Add a manual note or file as evidence. |
 | `engram sync` | Run every source declared in `.engram.config.json` in one pass. |
 | `engram ingest git [path]` | Ingest a git repository's commit history. |
-| `engram ingest source [path]` | Ingest source files (tree-sitter). |
+| `engram ingest k8s [path]` | Ingest Kubernetes-operator semantics (RBAC + watches) from Go. |
 | `engram ingest md <glob>` | Ingest markdown documents. |
 | `engram ingest enrich github --scope owner/repo` | Enrich with GitHub PRs and issues. |
 | `engram ingest enrich gerrit --scope <project>` | Enrich with Gerrit changes (plugin). |
@@ -286,34 +286,25 @@ a multi-source example.
 - **Temporal validity** — every relationship carries a `[valid_from,
   valid_until)` window.
 
-### Source code — tree-sitter
+### Kubernetes-operator semantics
 
-`engram ingest source` walks the working tree, parses source files with
-tree-sitter, and creates file, module, and symbol entities. Respects
-`.gitignore` and an optional `.engramignore` by default; monorepo-aware
-vendor heuristics skip `node_modules`, build artifacts, lockfiles, and
-vendored third-party trees automatically.
+> **Tree-sitter source ingestion was removed.** Parsing the working tree into
+> file/module/symbol entities mirrored *current code structure* — exactly what a
+> coding agent already reads with grep/glob. It added no signal over agentic
+> search and taxed retrieval precision, so it was dropped. Engram's substrate is
+> **history + rationale** (git, PRs/issues, design docs), not a code index.
 
-Supported languages: **TypeScript/JavaScript (including TSX/JSX), Go, Python,
-Rust, Java, Ruby, C, C++, C#**, and **Starlark** (`BUILD`/`BUILD.bazel`/`BUCK`
-files).
+What's kept is the cross-file *operator semantics* a single-file read can't
+reveal. `engram ingest k8s` scans Go files (no tree-sitter — plain regex) for:
 
-Beyond generic symbol extraction, engram parses a few ecosystem-specific
-structures into first-class graph signal:
-
-- **Kubebuilder RBAC markers** in Go (`+kubebuilder:rbac:…`) become
-  `rbac_permission` entities linked to their controller.
-- **controller-runtime** `SetupWithManager` relationships become edges from a
-  reconciler to resources it watches (`.For()`/`.Watches()`) and owns
-  (`.Owns()`).
-- **Bazel** `BUILD` rules become `bazel_target` entities with
-  `build_depends_on` edges, yielding a navigable build-dependency graph.
+- **Kubebuilder RBAC markers** (`+kubebuilder:rbac:…`) → `rbac_permission`
+  entities linked to their controller (`rbac_grants` edges).
+- **controller-runtime** `SetupWithManager` → edges from a reconciler to
+  resources it watches (`.For()`/`.Watches()`) and owns (`.Owns()`).
 
 ```bash
-engram ingest source                            # current directory
-engram ingest source packages/engram-core       # specific path
-engram ingest source --exclude "*.test.ts"      # extra exclusions
-engram ingest source --dry-run --verbose
+engram ingest k8s                       # scan Go files under the current dir
+engram ingest k8s ./controllers         # a specific operator tree
 ```
 
 ### Enrichment — why, not just what

@@ -57,7 +57,7 @@ describe("engram init --yes summary", () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  it("no ingestion flags: shows Created and Next steps, source always runs", {
+  it("no ingestion flags: shows Created and Next steps", {
     timeout: 120000,
   }, async () => {
     const out = await captureStdout(async () => {
@@ -84,15 +84,15 @@ describe("engram init --yes summary", () => {
     expect(out).toContain("Next steps:");
     expect(out).toContain("engram context");
 
-    // Source ingest always runs now (even without explicit flag)
-    expect(out).toContain("Source ingestion");
+    // Source ingestion removed (ADR-010) — init no longer walks source.
+    expect(out).not.toContain("Source ingestion");
 
     expect(out).not.toContain("Git ingestion:");
     expect(out).not.toContain("Markdown:");
     expect(out).not.toContain("Embeddings:");
   });
 
-  it("--from-git: shows git ingestion stats in summary (source always runs)", {
+  it("--from-git: shows git ingestion stats in summary", {
     timeout: 120000,
   }, async () => {
     const repoPath = path.resolve(__dirname, "../../../..");
@@ -127,46 +127,10 @@ describe("engram init --yes summary", () => {
     expect(out).toContain("edges");
     expect(out).toContain("Next steps:");
 
-    // Source ingest always runs
-    expect(out).toContain("Source ingestion");
+    // Source ingestion removed (ADR-010).
+    expect(out).not.toContain("Source ingestion");
 
     expect(out).not.toContain("Markdown:");
-    expect(out).not.toContain("Embeddings:");
-  });
-
-  it("--from-git: shows both git and source stats (source unconditional)", {
-    timeout: 120000,
-  }, async () => {
-    const repoPath = path.resolve(__dirname, "../../../..");
-
-    const out = await captureStdout(async () => {
-      // chdir to isolated temp dir so companion/source ingest never touch
-      // the real repo root or any real harness files.
-      const origCwd = process.cwd();
-      process.chdir(dir);
-      try {
-        await makeProgram().parseAsync([
-          "node",
-          "engram",
-          "init",
-          "--yes",
-          "--embedding-model",
-          "none",
-          "--from-git",
-          repoPath,
-          "--db",
-          dbPath,
-        ]);
-      } finally {
-        process.chdir(origCwd);
-      }
-    });
-
-    expect(out).toContain("Git ingestion:");
-    expect(out).toContain("Source ingestion");
-    expect(out).toContain("files parsed");
-    expect(out).toContain("Next steps:");
-
     expect(out).not.toContain("Embeddings:");
   });
 });

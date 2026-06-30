@@ -10,7 +10,6 @@ import type { EngramGraph } from "../format/index.js";
 import type { AuthCredential, EnrichmentAdapter } from "../ingest/adapter.js";
 import { resolveReferences } from "../ingest/cross-ref/index.js";
 import { ingestGitRepo } from "../ingest/git.js";
-import { ingestSource } from "../ingest/source/index.js";
 import {
   bundledPluginsRoot,
   discoverPlugins,
@@ -140,20 +139,6 @@ async function runSource(
     if (type === "git") {
       const repoPath = path.resolve(cwd, src.path ?? src.root ?? ".");
       const result = await ingestGitRepo(graph, repoPath);
-      return {
-        name: src.name,
-        type,
-        status: "success",
-        episodesCreated: result.episodesCreated,
-        entitiesCreated: result.entitiesCreated,
-        edgesCreated: result.edgesCreated,
-        elapsedMs: Date.now() - startMs,
-      };
-    }
-
-    if (type === "source") {
-      const root = path.resolve(cwd, src.root ?? src.path ?? ".");
-      const result = await ingestSource(graph, { root });
       return {
         name: src.name,
         type,

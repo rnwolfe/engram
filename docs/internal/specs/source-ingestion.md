@@ -1,3 +1,5 @@
+> **SUPERSEDED (ADR-010, 2026-06-29):** tree-sitter source ingestion was removed (general AST/symbol entities were redundant with agentic file search). Preserved as a rejected-design record. The Kubernetes-operator RBAC/watch extraction lives on, tree-sitter-free, as `engram ingest k8s` (src/ingest/k8s/).
+
 # Source Code Ingestion — Spec
 
 **Phase**: 2 (growth)

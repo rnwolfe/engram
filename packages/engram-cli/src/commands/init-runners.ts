@@ -6,7 +6,7 @@
  * Exports:
  *  - InitOpts, EMBEDDING_DIMENSIONS, KNOWN_EMBEDDING_MODELS (shared types/consts)
  *  - prepareDbDirectory, buildProvider (shared utility helpers)
- *  - runMarkdownIngest, runSourceIngest, runEmbed (step runners used by both modes)
+ *  - runMarkdownIngest, runEmbed (step runners used by both modes)
  *  - runNonInteractive (the --yes pipeline)
  *
  * Interactive mode lives in init-interactive.ts.
@@ -22,7 +22,6 @@ import {
   GeminiProvider,
   ingestGitRepo,
   ingestMarkdown,
-  ingestSource,
   OllamaProvider,
   reindexEmbeddings,
   resolveDbPath,
@@ -49,7 +48,6 @@ export interface InitOpts {
   yes: boolean;
   verify: boolean;
   ingestMd?: string;
-  ingestSource?: boolean;
   embed?: boolean;
   format?: string;
   githubRepo?: string;
@@ -154,41 +152,6 @@ export async function runMarkdownIngest(
   }
 }
 
-export async function runSourceIngest(
-  graph: ReturnType<typeof createGraph>,
-  root: string,
-): Promise<{
-  filesParsed: number;
-  filesSkipped: number;
-  entitiesCreated: number;
-  edgesCreated: number;
-} | null> {
-  const s = spinner();
-  s.start("Ingesting source code…");
-  try {
-    const result = await ingestSource(graph, { root });
-    s.stop(
-      [
-        "Source ingestion complete",
-        `  Files: ${result.filesParsed} parsed, ${result.filesSkipped} skipped`,
-        `  Entities: ${result.entitiesCreated} created`,
-        `  Edges:    ${result.edgesCreated} created`,
-      ].join("\n"),
-    );
-    return {
-      filesParsed: result.filesParsed,
-      filesSkipped: result.filesSkipped,
-      entitiesCreated: result.entitiesCreated,
-      edgesCreated: result.edgesCreated,
-    };
-  } catch (err) {
-    s.stop(
-      `Source ingestion failed: ${err instanceof Error ? err.message : String(err)}`,
-    );
-    return null;
-  }
-}
-
 export async function runEmbed(
   graph: ReturnType<typeof createGraph>,
   provider: AIProvider,
@@ -269,17 +232,10 @@ export async function runNonInteractive(opts: InitOpts): Promise<void> {
     edgesCreated: number;
   };
   type MdSummary = { episodesCreated: number; episodesSkipped: number };
-  type SourceSummary = {
-    filesParsed: number;
-    filesSkipped: number;
-    entitiesCreated: number;
-    edgesCreated: number;
-  };
   type EmbedSummary = { done: number; errors: number; elapsedS: string };
 
   let gitSummary: GitSummary | null = null;
   let mdSummary: MdSummary | null = null;
-  let sourceSummary: SourceSummary | null = null;
   let githubSummary: GitHubEnrichSummary | null = null;
   let companionSummary: CompanionSummary | null = null;
   let embedSummary: EmbedSummary | null = null;
@@ -344,8 +300,8 @@ export async function runNonInteractive(opts: InitOpts): Promise<void> {
     mdSummary = await runMarkdownIngest(graph, opts.ingestMd);
   }
 
-  // Step 3 — Source ingest (always runs)
-  sourceSummary = await runSourceIngest(graph, cwd);
+  // Source ingestion removed (ADR-010): AST/symbol entities were redundant with
+  // agentic file search. Operator semantics: `engram ingest k8s`.
 
   // Step 4 — Companion setup (append to detected harness files)
   const detectedHarnesses = detectHarnessFiles(cwd);
@@ -395,12 +351,6 @@ export async function runNonInteractive(opts: InitOpts): Promise<void> {
             skipped: [],
           }
         : { skipped: ["github"] },
-      source: sourceSummary
-        ? {
-            files: sourceSummary.filesParsed,
-            symbols: sourceSummary.entitiesCreated,
-          }
-        : { skipped: true },
       companion: companionSummary ?? { appended: [], created: [], skipped: [] },
       embed: embedSummary ? { embedded: embedSummary.done } : { skipped: true },
     };
@@ -431,12 +381,6 @@ export async function runNonInteractive(opts: InitOpts): Promise<void> {
           : ""),
     );
   }
-  if (sourceSummary) {
-    summaryLines.push(
-      `  Source ingestion: ${sourceSummary.entitiesCreated} entities, ` +
-        `${sourceSummary.edgesCreated} edges (${sourceSummary.filesParsed} files parsed)`,
-    );
-  }
   if (companionSummary) {
     const appended = companionSummary.appended.concat(companionSummary.created);
     if (appended.length > 0) {
@@ -452,10 +396,7 @@ export async function runNonInteractive(opts: InitOpts): Promise<void> {
   }
 
   const hasStats =
-    gitSummary !== null ||
-    mdSummary !== null ||
-    sourceSummary !== null ||
-    embedSummary !== null;
+    gitSummary !== null || mdSummary !== null || embedSummary !== null;
   if (hasStats) summaryLines.push("");
 
   summaryLines.push("Next steps:");

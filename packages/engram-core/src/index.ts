@@ -186,14 +186,10 @@ export {
 } from "./ingest/cursor.js";
 export type { GitIngestOpts, IngestResult } from "./ingest/git.js";
 export { ingestGitRepo } from "./ingest/git.js";
+export type { K8sIngestOpts } from "./ingest/k8s/index.js";
+export { ingestK8s, scanGoForK8s } from "./ingest/k8s/index.js";
 export type { MarkdownIngestOpts } from "./ingest/markdown.js";
 export { ingestMarkdown } from "./ingest/markdown.js";
-export type {
-  ProgressEvent as SourceProgressEvent,
-  SourceIngestOptions,
-  SourceIngestResult,
-} from "./ingest/source/index.js";
-export { ingestSource } from "./ingest/source/index.js";
 export type { TextIngestOpts } from "./ingest/text.js";
 export { ingestText } from "./ingest/text.js";
 export type {
